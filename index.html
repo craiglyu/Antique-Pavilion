@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>吉寶軒 Jibao Xuan - 撥雲見日</title>
-    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=LXGW+WenKai+TC&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&family=LXGW+WenKai+TC&display=swap"
         rel="stylesheet">
     <style>
         :root {
@@ -88,8 +88,9 @@
         }
 
         .brand-logo-svg text {
-            font-family: 'Ma Shan Zheng', cursive;
+            font-family: 'Zhi Mang Xing', cursive;
             font-size: 5rem;
+            letter-spacing: 1.5rem;
             fill: transparent;
             stroke: var(--ink);
             stroke-width: 1.5;
@@ -178,13 +179,13 @@
         .cloud-left {
             left: 0;
             transform: translateX(-50px);
-            animation: cloudDriftLeft 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: cloudDriftLeft 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
         .cloud-right {
             right: 0;
             transform: translateX(50px) scaleX(-1);
-            animation: cloudDriftRight 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: cloudDriftRight 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
         .cloud-left path,
@@ -194,8 +195,9 @@
             stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
-            filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.2));
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
             opacity: 0.8;
+            transition: all 4s ease;
         }
 
         .center-text-line {
@@ -760,7 +762,7 @@
             .card,
             .card.odd,
             .card.even {
-                flex-direction: column;
+                flex-direction: column !important;
                 width: 100%;
             }
 
@@ -811,6 +813,9 @@
     <canvas id="glCanvas"></canvas>
 
     <div class="page-wrapper">
+        <div id="header-sentinel"
+            style="position: absolute; top: 200px; left: 0; width: 10px; height: 10px; visibility: hidden; pointer-events: none;">
+        </div>
         <header id="main-header">
             <!-- 3. 書法筆觸標題 -->
             <svg class="brand-logo-svg" viewBox="0 0 400 120">
@@ -825,15 +830,17 @@
                 <div class="center-text-line"></div>
                 <!-- 雲紋 SVG (左) -->
                 <svg class="cloud-left" viewBox="0 0 400 60" preserveAspectRatio="xMaxYMid meet">
-                    <!-- 卷雲頭 -->
-                    <path d="M50,45 C150,45 250,45 320,35 C350,30 360,15 340,15 C320,15 310,25 320,35 S360,45 390,45" />
-                    <!-- 雲尾層次 -->
-                    <path d="M100,35 C200,35 280,25 300,20" stroke-width="1" opacity="0.6" />
+                    <!-- 卷雲頭與優雅收尾 -->
+                    <path
+                        d="M40,30 C40,10 70,10 70,30 C70,50 40,50 30,35 C20,20 50,5 90,15 C130,25 170,45 220,40 C270,35 310,15 360,25 C380,29 390,30 400,30" />
+                    <path d="M80,25 C120,40 160,20 200,30 C240,40 280,30 320,15" stroke-width="1" opacity="0.6" />
                 </svg>
                 <!-- 雲紋 SVG (右) -->
                 <svg class="cloud-right" viewBox="0 0 400 60" preserveAspectRatio="xMaxYMid meet">
-                    <path d="M50,45 C150,45 250,45 320,35 C350,30 360,15 340,15 C320,15 310,25 320,35 S360,45 390,45" />
-                    <path d="M100,35 C200,35 280,25 300,20" stroke-width="1" opacity="0.6" />
+                    <!-- 卷雲頭與優雅收尾 -->
+                    <path
+                        d="M40,30 C40,10 70,10 70,30 C70,50 40,50 30,35 C20,20 50,5 90,15 C130,25 170,45 220,40 C270,35 310,15 360,25 C380,29 390,30 400,30" />
+                    <path d="M80,25 C120,40 160,20 200,30 C240,40 280,30 320,15" stroke-width="1" opacity="0.6" />
                 </svg>
             </div>
         </header>
@@ -899,20 +906,30 @@
 
             // 滾動監聽：進度條與 Sticky Header
             const header = document.getElementById('main-header');
+            const sentinel = document.getElementById('header-sentinel');
             const progressBar = document.getElementById('scroll-progress-bar');
 
-            window.addEventListener('scroll', () => {
-                // Header 收縮
-                if (window.scrollY > 200) {
-                    header.classList.add('header-compact');
-                } else {
-                    header.classList.remove('header-compact');
-                }
+            // 使用 IntersectionObserver 監控 Header 切換
+            const headerObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) {
+                        header.classList.add('header-compact');
+                    } else {
+                        header.classList.remove('header-compact');
+                    }
+                });
+            }, { threshold: 0 });
 
+            if (sentinel) {
+                headerObserver.observe(sentinel);
+            }
+
+            window.addEventListener('scroll', () => {
                 // 滾動進度
                 const maxScroll = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) - window.innerHeight;
                 if (maxScroll > 0) {
-                    const progress = Math.min(Math.max((window.scrollY / maxScroll) * 100, 0), 100);
+                    let progress = Math.floor((window.scrollY / maxScroll) * 100);
+                    progress = Math.min(Math.max(progress, 0), 100);
                     progressBar.style.height = `${progress}%`;
                 }
             }, { passive: true });
