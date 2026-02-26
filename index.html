@@ -21,6 +21,7 @@
             padding: 0;
             background-color: #cfc0a8;
             /* 米色/宣紙底色，避免底部抖動閃爍白底 */
+            overscroll-behavior-y: none;
             font-family: 'LXGW WenKai TC', cursive, serif;
             color: var(--ink);
             overflow-x: hidden;
@@ -32,12 +33,11 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 100%;
+            height: 100dvh;
             background-image: url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp');
             /* Placeholder URL */
             background-size: cover;
             background-position: center top;
-            background-attachment: fixed;
             filter: sepia(0.2) brightness(0.9);
             z-index: -2;
             pointer-events: none;
@@ -265,7 +265,7 @@
         .page-wrapper {
             position: relative;
             overflow: hidden;
-            min-height: 100vh;
+            min-height: 100dvh;
         }
 
         /* --- 展覽容器 --- */
@@ -910,9 +910,9 @@
                 }
 
                 // 滾動進度
-                const maxScroll = document.body.scrollHeight - window.innerHeight;
+                const maxScroll = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) - window.innerHeight;
                 if (maxScroll > 0) {
-                    const progress = (window.scrollY / maxScroll) * 100;
+                    const progress = Math.min(Math.max((window.scrollY / maxScroll) * 100, 0), 100);
                     progressBar.style.height = `${progress}%`;
                 }
             }, { passive: true });
