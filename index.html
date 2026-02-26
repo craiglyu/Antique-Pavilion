@@ -9,6 +9,12 @@
         href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=LXGW+WenKai+TC&display=swap"
         rel="stylesheet">
     <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
         :root {
             --gold: #c49a45;
             --ink: #2c2c2c;
@@ -816,7 +822,7 @@
 
             .info-box {
                 width: 100%;
-                padding: 30px 20px;
+                padding: 25px 20px;
             }
 
             .modal-content {
@@ -831,14 +837,19 @@
 
             .modal-right {
                 width: 100%;
-                padding: 20px;
-                /* [修改] 調降 padding 避免手機版過於壓迫 */
+                padding: 25px 20px;
                 box-sizing: border-box;
-                /* [新增] 確保 100% width 包含 padding */
             }
 
             .modal-title {
                 font-size: 1.8rem;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+
+            .modal-era {
+                word-wrap: break-word;
+                overflow-wrap: break-word;
             }
         }
     </style>
