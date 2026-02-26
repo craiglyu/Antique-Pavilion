@@ -38,7 +38,8 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 100dvh;
+            height: 130dvh;
+            /* 增加高度以容納視差滾動空間 */
             background-image: url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp');
             /* Placeholder URL */
             background-size: cover;
@@ -46,6 +47,8 @@
             filter: sepia(0.2) brightness(0.9);
             z-index: -2;
             pointer-events: none;
+            will-change: transform;
+            /* 提升硬體加速與滾動效能 */
         }
 
         #glCanvas {
@@ -82,20 +85,20 @@
             box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
         }
 
-    
+
         .brand-title {
             /* 1. 統一字體：與藏品標題一致，避免 fallback 到系統字體 */
-            font-family: 'LXGW WenKai TC', serif; 
-            
+            font-family: 'LXGW WenKai TC', serif;
+
             /* 2. 恢復原本尺寸：維持 5rem 的震撼感 */
-            font-size: 5rem; 
-            
+            font-size: 5rem;
+
             /* 3. 調整字重：文楷體在 5rem 時，建議設為 normal 或 600，避免過粗導致筆畫糊在一起 */
-            font-weight: normal; 
-            
+            font-weight: normal;
+
             color: var(--ink);
             margin: 0;
-            
+
             /* 4. 起始間距與特效：保持原本的設計 */
             letter-spacing: 0.2rem;
             filter: blur(10px);
@@ -109,7 +112,7 @@
             100% {
                 opacity: 1;
                 /* 保持原本 1.5rem 的寬廣字距，這與文楷體的文人氣息非常契合 */
-                letter-spacing: 1.5rem; 
+                letter-spacing: 1.5rem;
                 filter: blur(0px) drop-shadow(4px 4px 0px rgba(196, 154, 69, 0.2));
                 transform: scale(1);
             }
@@ -123,7 +126,7 @@
             filter: blur(0px) drop-shadow(2px 2px 0px rgba(196, 154, 69, 0.2));
             transform: scale(1);
             opacity: 1;
-        }        
+        }
 
         .brand-slogan {
             font-size: 1.5rem;
@@ -283,7 +286,8 @@
 
         /* --- 藏品卡片與進場動畫 --- */
         .card {
-            width: 100%;
+            width: 85%;
+            /* 縮小寬度以營造錯落有致的留白 */
             background: #fff;
             border-radius: 4px;
             box-shadow: 0 10px 30px var(--shadow);
@@ -298,18 +302,22 @@
             opacity: 0;
             transform: translateY(20px) translateX(60px);
             /* 預設右側滑入 */
-            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease;
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease, align-self 0.4s ease;
             will-change: transform, opacity;
         }
 
         /* 奇數展品 (Odd): 文字在左，圖片在右 */
         .card.odd {
             flex-direction: row-reverse;
+            align-self: flex-start;
+            /* 奇數卡片靠左錯開 */
         }
 
         /* 偶數展品 (Even): 圖片在左，文字在右 */
         .card.even {
             flex-direction: row;
+            align-self: flex-end;
+            /* 偶數卡片靠右錯開 */
         }
 
         .card.from-left {
@@ -434,6 +442,8 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
+            box-sizing: border-box;
+            /* [新增] 確保 padding 不會撐破卡片寬度 */
         }
 
         /* 4. 印章互動 */
@@ -506,6 +516,10 @@
             margin: 0 0 10px;
             color: var(--ink);
             line-height: 1.3;
+            padding-right: 90px;
+            /* [新增] 避免標題被右上方印章圖案遮擋 */
+            word-break: break-word;
+            /* [新增] 避免長字串撐破 */
         }
 
         .item-era {
@@ -619,6 +633,8 @@
             opacity: 0;
             transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
             border: 1px solid rgba(196, 154, 69, 0.3);
+            box-sizing: border-box;
+            /* [新增] 防止內容撐破寬度 */
         }
 
         .modal-overlay.active .modal-content {
@@ -672,6 +688,8 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            box-sizing: border-box;
+            /* [新增] 確保 padding 包含在 width 內 */
         }
 
         .modal-right::-webkit-scrollbar {
@@ -692,6 +710,8 @@
             color: var(--ink);
             margin: 0 0 10px;
             line-height: 1.3;
+            word-break: break-word;
+            /* [新增] 處理長字串避免破版 */
         }
 
         .modal-era {
@@ -710,6 +730,8 @@
             margin-bottom: 30px;
             white-space: pre-wrap;
             /* remove flex-grow to ensure full text reveals correctly with scroll */
+            word-break: break-word;
+            /* [新增] 處理長內容斷行 */
         }
 
         .modal-tags {
@@ -783,6 +805,8 @@
             .card.even {
                 flex-direction: column !important;
                 width: 100%;
+                align-self: center;
+                /* 取消左右錯開，保持垂直置中 */
             }
 
             .img-box {
@@ -807,7 +831,10 @@
 
             .modal-right {
                 width: 100%;
-                padding: 25px;
+                padding: 20px;
+                /* [修改] 調降 padding 避免手機版過於壓迫 */
+                box-sizing: border-box;
+                /* [新增] 確保 100% width 包含 padding */
             }
 
             .modal-title {
@@ -966,6 +993,13 @@
                         // [新增] 強制鎖定底部 Header 狀態防 iOS 回彈抖動
                         if (window.scrollY > 0 && window.scrollY >= maxScroll - 50) {
                             header.classList.add('header-compact');
+                        }
+
+                        // [新增] 背景視差滾動監聽 (Parallax Scrolling)
+                        const bgLayer = document.querySelector('.bg-layer');
+                        if (bgLayer) {
+                            // 使用捲動量的 30% 產生景深與遲緩感
+                            bgLayer.style.transform = `translateY(${window.scrollY * -0.3}px)`;
                         }
 
                         ticking = false;
