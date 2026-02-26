@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吉寶軒 Jibao Xuan - 撥雲見日</title>
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=LXGW+WenKai+TC&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --gold: #c49a45;
+            --ink: #2c2c2c;
+            --paper: #f7f4ed;
+            --seal-red: #8a2a2a;
+            --shadow: rgba(0, 0, 0, 0.15);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #cfc0a8;
+            /* 米色/宣紙底色，避免底部抖動閃爍白底 */
+            overscroll-behavior-y: none;
+            font-family: 'LXGW WenKai TC', cursive, serif;
+            color: var(--ink);
+            overflow-x: hidden;
+        }
+
+        /* --- 背景與潑墨裝飾 --- */
+        .bg-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100dvh;
+            background-image: url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp');
+            /* Placeholder URL */
+            background-size: cover;
+            background-position: center top;
+            filter: sepia(0.2) brightness(0.9);
+            z-index: -2;
+            pointer-events: none;
+        }
+
+        #glCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* --- 3. 頭部品牌區 (Header) --- */
+        header {
+            text-align: center;
+            padding: 80px 20px 20px;
+            position: relative;
+            transition: all 0.5s ease;
+        }
+
+        /* Sticky Header 收縮狀態 */
+        header.header-compact {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(247, 244, 237, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(196, 154, 69, 0.3);
+            padding: 16px 20px 12px;
+            box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
+        }
+
+        .brand-logo-svg {
+            width: 100%;
+            max-width: 600px;
+            height: 120px;
+            margin: 0 auto;
+            overflow: visible;
+            transition: height 0.5s ease;
+        }
+
+        header.header-compact .brand-logo-svg {
+            height: 56px;
+        }
+
+        .brand-logo-svg text {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 5rem;
+            fill: transparent;
+            stroke: var(--ink);
+            stroke-width: 1.5;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            filter: drop-shadow(4px 4px 0px rgba(196, 154, 69, 0.2));
+            animation: drawStroke 2.5s ease forwards, fillText 1s 2s ease forwards;
+        }
+
+        .brand-logo-svg text:nth-child(1) {
+            animation-delay: 0s, 2s;
+        }
+
+        .brand-logo-svg text:nth-child(2) {
+            animation-delay: 0.3s, 2.3s;
+        }
+
+        .brand-logo-svg text:nth-child(3) {
+            animation-delay: 0.6s, 2.6s;
+        }
+
+        @keyframes drawStroke {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @keyframes fillText {
+            to {
+                fill: var(--ink);
+                stroke: transparent;
+            }
+        }
+
+        .brand-slogan {
+            font-size: 1.5rem;
+            color: var(--gold);
+            margin-top: 15px;
+            letter-spacing: 0.5rem;
+            font-weight: bold;
+            opacity: 0;
+            max-height: 50px;
+            overflow: hidden;
+            animation: fadeIn 2s 2.5s forwards;
+            transition: all 0.5s ease;
+        }
+
+        header.header-compact .brand-slogan {
+            opacity: 0;
+            max-height: 0;
+            margin-top: 0;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* 1. 如意雲分隔線 */
+        .ruyi-divider {
+            width: 100%;
+            max-width: 800px;
+            height: 60px;
+            margin: 20px auto 30px;
+            position: relative;
+            overflow: visible;
+            transition: all 0.4s ease;
+        }
+
+        header.header-compact .ruyi-divider {
+            opacity: 0;
+            height: 0;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .cloud-left,
+        .cloud-right {
+            position: absolute;
+            top: 0;
+            width: 50%;
+            height: 100%;
+        }
+
+        .cloud-left {
+            left: 0;
+            transform: translateX(-50px);
+            animation: cloudDriftLeft 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        .cloud-right {
+            right: 0;
+            transform: translateX(50px) scaleX(-1);
+            animation: cloudDriftRight 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        .cloud-left path,
+        .cloud-right path {
+            fill: none;
+            stroke: var(--ink);
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.2));
+            opacity: 0.8;
+        }
+
+        .center-text-line {
+            position: absolute;
+            top: 30px;
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--ink), transparent);
+            opacity: 0;
+            transform: scaleX(0);
+            animation: lineReveal 2s 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        @keyframes cloudDriftLeft {
+            0% {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+
+            20% {
+                opacity: 1;
+                transform: translateX(-50px);
+            }
+
+            80% {
+                transform: translateX(20px);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateX(30px);
+                opacity: 0;
+            }
+        }
+
+        @keyframes cloudDriftRight {
+            0% {
+                opacity: 0;
+                transform: translateX(50px) scaleX(-1);
+            }
+
+            20% {
+                opacity: 1;
+                transform: translateX(50px) scaleX(-1);
+            }
+
+            80% {
+                transform: translateX(-20px) scaleX(-1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateX(-30px) scaleX(-1);
+                opacity: 0;
+            }
+        }
+
+        @keyframes lineReveal {
+            to {
+                opacity: 0.5;
+                transform: scaleX(1);
+            }
+        }
+
+        /* --- Wrapper Container for Parallax --- */
+        .page-wrapper {
+            position: relative;
+            overflow: hidden;
+            min-height: 100dvh;
+        }
+
+        /* --- 展覽容器 --- */
+        .gallery-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 20px 40px 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 80px;
+        }
+
+        /* --- 藏品卡片與進場動畫 --- */
+        .card {
+            width: 100%;
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 10px 30px var(--shadow);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: row;
+            /* Default layout */
+            border: 1px solid rgba(0, 0, 0, 0.05);
+
+            /* Reveal Animation */
+            opacity: 0;
+            transform: translateY(20px) translateX(60px);
+            /* 預設右側滑入 */
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease;
+            will-change: transform, opacity;
+        }
+
+        /* 奇數展品 (Odd): 文字在左，圖片在右 */
+        .card.odd {
+            flex-direction: row-reverse;
+        }
+
+        /* 偶數展品 (Even): 圖片在左，文字在右 */
+        .card.even {
+            flex-direction: row;
+        }
+
+        .card.from-left {
+            transform: translateY(20px) translateX(-60px);
+        }
+
+        .card.from-right {
+            transform: translateY(20px) translateX(60px);
+        }
+
+        .card.is-visible {
+            opacity: 1;
+            transform: translateY(0) translateX(0);
+        }
+
+        .card:hover {
+            transform: translateY(-5px) scale(1.01);
+            box-shadow: 0 20px 50px rgba(196, 154, 69, 0.3);
+            z-index: 10;
+        }
+
+        .img-box {
+            width: 45%;
+            height: 450px;
+            position: relative;
+            overflow: hidden;
+            background: #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        .antique-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.85) sepia(0.2);
+            transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1), filter 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .card:hover .antique-img {
+            transform: scale(1.1);
+            filter: brightness(1.05) sepia(0);
+        }
+
+        /* 5. 撥雲見寶：邊緣漸暈霧化遮罩 (Vignette Cloud Mask) */
+        .vignette-cloud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* 模擬 feGaussianBlur, 中心透明, 邊緣不透明 */
+            -webkit-mask-image: radial-gradient(ellipse at center, transparent 30%, black 80%);
+            mask-image: radial-gradient(ellipse at center, transparent 30%, black 80%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background: rgba(247, 244, 237, 0.4);
+            opacity: 1;
+            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .card:hover .vignette-cloud {
+            opacity: 0;
+        }
+
+        .moving-cloud {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background-image: url('https://www.transparenttextures.com/patterns/foggy-birds.png');
+            opacity: 0.4;
+            animation: drift 60s linear infinite;
+            pointer-events: none;
+            z-index: 3;
+            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .card:hover .moving-cloud {
+            opacity: 0;
+        }
+
+        @keyframes drift {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 金色聚焦內框，配合 hover 顯現，增加立體感 */
+        .focus-border {
+            position: absolute;
+            top: 5%;
+            left: 5%;
+            width: 90%;
+            height: 90%;
+            border: 1px solid var(--gold);
+            opacity: 0;
+            transform: scale(1.05);
+            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1), transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            pointer-events: none;
+            z-index: 4;
+            mix-blend-mode: overlay;
+        }
+
+        .card:hover .focus-border {
+            opacity: 0.8;
+            transform: scale(1);
+        }
+
+        .info-box {
+            width: 55%;
+            padding: 40px 50px;
+            position: relative;
+            background-image: url('https://www.transparenttextures.com/patterns/rice-paper-2.png');
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* 4. 印章互動 */
+        .seal-wrapper {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        .seal-svg {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.4s ease;
+            overflow: visible;
+        }
+
+        .seal-wrapper:hover .seal-svg {
+            transform: scale(1.1) rotate(-5deg);
+        }
+
+        .seal-bg {
+            fill: var(--paper);
+            stroke: var(--seal-red);
+            stroke-width: 3;
+            transition: fill 0.4s ease;
+        }
+
+        .seal-text {
+            fill: var(--seal-red);
+            font-size: 14px;
+            font-family: 'LXGW WenKai TC';
+            font-weight: bold;
+            transition: fill 0.4s ease;
+        }
+
+        .seal-wrapper:hover .seal-bg {
+            fill: var(--seal-red);
+        }
+
+        .seal-wrapper:hover .seal-text {
+            fill: var(--paper);
+        }
+
+        .seal-halo {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, var(--seal-red) 20%, transparent 70%);
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0.6;
+            transition: transform 0.6s ease, opacity 0.6s ease;
+            z-index: -1;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .seal-wrapper:hover .seal-halo {
+            transform: translate(-50%, -50%) scale(2.5);
+            opacity: 0;
+        }
+
+        .item-name {
+            font-size: 1.8rem;
+            margin: 0 0 10px;
+            color: var(--ink);
+            line-height: 1.3;
+        }
+
+        .item-era {
+            color: var(--gold);
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed #ddd;
+            padding-bottom: 15px;
+        }
+
+        .item-story {
+            font-size: 1rem;
+            line-height: 1.8;
+            color: #555;
+            text-align: justify;
+            margin-bottom: 20px;
+            display: -webkit-box;
+            -webkit-line-clamp: 5;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .tags {
+            font-size: 0.9rem;
+        }
+
+        .tag {
+            color: #999;
+            margin-right: 10px;
+            font-style: italic;
+        }
+
+        .loading {
+            text-align: center;
+            font-size: 1.5rem;
+            color: var(--gold);
+            margin-top: 50px;
+            width: 100%;
+        }
+
+        /* --- 滾動進度指示器（印章風格） --- */
+        #scroll-progress-wrap {
+            position: fixed;
+            right: 10px;
+            top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 200;
+            pointer-events: none;
+        }
+
+        #scroll-seal {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 6px;
+        }
+
+        #scroll-progress-track {
+            width: 2px;
+            height: 50vh;
+            background: rgba(196, 154, 69, 0.15);
+            border-radius: 1px;
+            overflow: hidden;
+        }
+
+        #scroll-progress-bar {
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to bottom, #c49a45, #8a2a2a);
+            border-radius: 1px;
+            transition: height 0.1s linear;
+        }
+
+        /* --- Lightbox / Modal 樣式 --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(28, 28, 28, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: var(--paper);
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            position: relative;
+            transform: scale(0.95) translateY(20px);
+            opacity: 0;
+            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
+            border: 1px solid rgba(196, 154, 69, 0.3);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: background 0.3s ease;
+            color: var(--ink);
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            background: rgba(0, 0, 0, 0.1);
+            color: var(--seal-red);
+        }
+
+        .modal-left {
+            width: 45%;
+            background: #e8e6e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
+        }
+
+        .modal-right {
+            width: 55%;
+            padding: 40px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-right::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .modal-right::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .modal-right::-webkit-scrollbar-thumb {
+            background: var(--gold);
+            border-radius: 3px;
+        }
+
+        .modal-title {
+            font-size: 2.2rem;
+            color: var(--ink);
+            margin: 0 0 10px;
+            line-height: 1.3;
+        }
+
+        .modal-era {
+            font-size: 1.2rem;
+            color: var(--gold);
+            margin-bottom: 25px;
+            border-bottom: 1px dashed #ccc;
+            padding-bottom: 15px;
+        }
+
+        .modal-story {
+            font-size: 1.1rem;
+            line-height: 1.9;
+            color: #444;
+            text-align: justify;
+            margin-bottom: 30px;
+            white-space: pre-wrap;
+            flex-grow: 1;
+        }
+
+        .modal-tags {
+            margin-bottom: 30px;
+        }
+
+        .modal-tags .tag {
+            display: inline-block;
+            background: rgba(196, 154, 69, 0.1);
+            padding: 5px 12px;
+            border-radius: 4px;
+            margin: 0 8px 8px 0;
+            color: var(--ink);
+            font-size: 0.95rem;
+        }
+
+        .modal-action {
+            display: inline-block;
+            padding: 12px 30px;
+            background: var(--seal-red);
+            color: var(--paper);
+            text-decoration: none;
+            font-size: 1.1rem;
+            border-radius: 4px;
+            text-align: center;
+            transition: background 0.3s ease, transform 0.3s ease;
+            cursor: pointer;
+            align-self: flex-start;
+        }
+
+        .modal-action:hover {
+            background: #6b1f1f;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(138, 42, 42, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .brand-logo-svg {
+                height: 80px;
+            }
+
+            .brand-logo-svg text {
+                font-size: 3.5rem;
+            }
+
+            .gallery-container {
+                padding: 20px;
+                gap: 40px;
+            }
+
+            .card,
+            .card.odd,
+            .card.even {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .img-box {
+                width: 100%;
+                height: 300px;
+            }
+
+            .info-box {
+                width: 100%;
+                padding: 30px 20px;
+            }
+
+            .modal-content {
+                flex-direction: column;
+                max-height: 85vh;
+            }
+
+            .modal-left {
+                width: 100%;
+                height: 35vh;
+            }
+
+            .modal-right {
+                width: 100%;
+                padding: 25px;
+            }
+
+            .modal-title {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 5. SVG clip-path 潑墨邊緣定義 -->
+    <svg width="0" height="0" style="position:absolute;">
+        <defs>
+            <clipPath id="ink-clip" clipPathUnits="objectBoundingBox">
+                <path
+                    d="M0.05,0.05 Q0.1,0 0.5,0.02 T0.95,0.05 Q1,0.1 0.98,0.5 T0.95,0.95 Q0.9,1 0.5,0.98 T0.05,0.95 Q0,0.9 0.02,0.5 T0.05,0.05 Z" />
+            </clipPath>
+        </defs>
+    </svg>
+
+    <div class="bg-layer"></div>
+    <canvas id="glCanvas"></canvas>
+
+    <div class="page-wrapper">
+        <header id="main-header">
+            <!-- 3. 書法筆觸標題 -->
+            <svg class="brand-logo-svg" viewBox="0 0 400 120">
+                <text x="20%" y="50%" dominant-baseline="middle" text-anchor="middle">吉</text>
+                <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">寶</text>
+                <text x="80%" y="50%" dominant-baseline="middle" text-anchor="middle">軒</text>
+            </svg>
+            <div class="brand-slogan">靜觀歲月 · 撥雲見寶</div>
+
+            <!-- 1. 如意雲分隔線 -->
+            <div class="ruyi-divider">
+                <div class="center-text-line"></div>
+                <!-- 雲紋 SVG (左) -->
+                <svg class="cloud-left" viewBox="0 0 400 60" preserveAspectRatio="xMaxYMid meet">
+                    <!-- 卷雲頭 -->
+                    <path d="M50,45 C150,45 250,45 320,35 C350,30 360,15 340,15 C320,15 310,25 320,35 S360,45 390,45" />
+                    <!-- 雲尾層次 -->
+                    <path d="M100,35 C200,35 280,25 300,20" stroke-width="1" opacity="0.6" />
+                </svg>
+                <!-- 雲紋 SVG (右) -->
+                <svg class="cloud-right" viewBox="0 0 400 60" preserveAspectRatio="xMaxYMid meet">
+                    <path d="M50,45 C150,45 250,45 320,35 C350,30 360,15 340,15 C320,15 310,25 320,35 S360,45 390,45" />
+                    <path d="M100,35 C200,35 280,25 300,20" stroke-width="1" opacity="0.6" />
+                </svg>
+            </div>
+        </header>
+
+        <div id="gallery" class="gallery-container">
+            <div class="loading">載入中...</div>
+        </div>
+
+    </div> <!-- end page-wrapper -->
+
+    <!-- [新增] 滾動進度指示器 -->
+    <div id="scroll-progress-wrap">
+        <svg id="scroll-seal" viewBox="0 0 20 20">
+            <rect x="2" y="2" width="16" height="16" rx="2" fill="none" stroke="#8a2a2a" stroke-width="1.5" />
+            <text x="10" y="14" text-anchor="middle" font-family="LXGW WenKai TC" font-size="9" fill="#8a2a2a">軒</text>
+        </svg>
+        <div id="scroll-progress-track">
+            <div id="scroll-progress-bar"></div>
+        </div>
+    </div>
+
+    <!-- [新增] Lightbox Modal 結構 -->
+    <div class="modal-overlay" id="artifactModal">
+        <div class="modal-content">
+            <div class="modal-close" onclick="closeModal()">✕</div>
+            <div class="modal-left">
+                <img src="" alt="" class="modal-img" id="modalImg">
+            </div>
+            <div class="modal-right">
+                <h2 class="modal-title" id="modalTitle"></h2>
+                <div class="modal-era" id="modalEra"></div>
+                <div class="modal-story" id="modalStory"></div>
+                <div class="modal-tags" id="modalTags"></div>
+                <a href="#contact" class="modal-action" onclick="closeModal()">預約鑑賞</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbyE2LwKU_5ldY-HH9XB5fOfby_y4Skheb2D8ZMpHhfZGGZrmQpZDxIXD7h0x5ZxvAcsMA/exec";
+
+        // 全域變數儲存展品資料
+        let artifactsData = [];
+
+        // 觀察者：卡片進場特效
+        const revealObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchArtifacts();
+            initWebGLFog(); // 啟動 WebGL 雲霧特效
+
+            // 點擊 Modal 外部背景關閉
+            document.getElementById('artifactModal').addEventListener('click', function (e) {
+                if (e.target === this) closeModal();
+            });
+
+            // 滾動監聽：進度條與 Sticky Header
+            const header = document.getElementById('main-header');
+            const progressBar = document.getElementById('scroll-progress-bar');
+
+            window.addEventListener('scroll', () => {
+                // Header 收縮
+                if (window.scrollY > 200) {
+                    header.classList.add('header-compact');
+                } else {
+                    header.classList.remove('header-compact');
+                }
+
+                // 滾動進度
+                const maxScroll = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) - window.innerHeight;
+                if (maxScroll > 0) {
+                    const progress = Math.min(Math.max((window.scrollY / maxScroll) * 100, 0), 100);
+                    progressBar.style.height = `${progress}%`;
+                }
+            }, { passive: true });
+        });
+
+        // 打開 Modal 並填入資料
+        function openModal(index) {
+            const item = artifactsData[index];
+            if (!item) return;
+
+            // 處理圖片 HD 解析度 (若能取得 ID，則請求大張尺寸 w2000)
+            let highResUrl = item.imageUrl || 'https://via.placeholder.com/800x800?text=No+Image';
+            if (item.imageUrl) {
+                const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                if (idMatch) highResUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w2000`;
+            }
+
+            document.getElementById('modalImg').src = highResUrl;
+            document.getElementById('modalImg').alt = item.itemName;
+            document.getElementById('modalTitle').textContent = item.itemName;
+            document.getElementById('modalEra').textContent = item.era || '年代待考';
+            document.getElementById('modalStory').textContent = item.story || '暫無故事描述。';
+
+            const tagsHtml = item.tags ? item.tags.split(' ').map(t => `<span class="tag">#${t.replace('#', '')}</span>`).join('') : '';
+            document.getElementById('modalTags').innerHTML = tagsHtml;
+
+            // 防止背景捲動
+            document.body.style.overflow = 'hidden';
+            document.getElementById('artifactModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('artifactModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // -----------------------------------------------------------------
+        // [修改] WebGL 雲霧 FBM Shader
+        // -----------------------------------------------------------------
+        function initWebGLFog() {
+            const canvas = document.getElementById('glCanvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (!gl) {
+                console.warn("WebGL not supported");
+                return;
+            }
+
+            // Vertex Shader: 全屏鋪滿
+            const vsSource = `
+                attribute vec2 position;
+                void main() {
+                    gl_Position = vec4(position, 0.0, 1.0);
+                }
+            `;
+
+            // Fragment Shader: FBM 運算
+            // 中文註解：
+            // - 調整 fbm() 中 time 的乘數可以改變雲霧流動速度
+            // - 改變 fogColor 可以調整雲的顏色
+            // - 調整 smoothstep 來改變雲霧的透度與邊緣柔和度
+            const fsSource = `
+                precision highp float;
+                uniform vec2 u_resolution;
+                uniform float u_time;
+                uniform vec2 u_mouse;
+
+                float random(vec2 st) {
+                    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+                }
+
+                float noise(vec2 st) {
+                    vec2 i = floor(st);
+                    vec2 f = fract(st);
+
+                    float a = random(i);
+                    float b = random(i + vec2(1.0, 0.0));
+                    float c = random(i + vec2(0.0, 1.0));
+                    float d = random(i + vec2(1.0, 1.0));
+
+                    vec2 u = f * f * (3.0 - 2.0 * f);
+
+                    return mix(a, b, u.x) +
+                           (c - a) * u.y * (1.0 - u.x) +
+                           (d - b) * u.x * u.y;
+                }
+
+                float fbm(vec2 st) {
+                    float value = 0.0;
+                    float amplitude = 0.5;
+                    for (int i = 0; i < 5; i++) {
+                        value += amplitude * noise(st);
+                        st *= 2.0;
+                        amplitude *= 0.5;
+                    }
+                    return value;
+                }
+
+                void main() {
+                    vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+                    uv.x *= u_resolution.x / u_resolution.y;
+
+                    // 滑鼠微幅擾動
+                    vec2 mouseOffset = (u_mouse - 0.5) * 0.1;
+                    
+                    vec2 q = vec2(0.);
+                    q.x = fbm(uv + 0.1 * u_time);
+                    q.y = fbm(uv + vec2(1.0) + vec2(0.0, 0.05 * u_time));
+
+                    vec2 r = vec2(0.);
+                    r.x = fbm(uv + 1.0 * q + vec2(1.7, 9.2) + 0.02 * u_time + mouseOffset);
+                    r.y = fbm(uv + 1.0 * q + vec2(8.3, 2.8) + 0.03 * u_time - mouseOffset);
+
+                    float f = fbm(uv + r);
+
+                    // 淡金色與透明底漸層混合
+                    vec3 fogColor = vec3(0.96, 0.94, 0.90);
+                    
+                    // 用於決定不透明度
+                    float alpha = smoothstep(0.3, 0.7, f + 0.1 * sin(u_time * 0.5)); 
+                    alpha *= 0.6; // 降低不透明度，不喧賓奪主
+                    
+                    gl_FragColor = vec4(fogColor, alpha);
+                }
+            `;
+
+            function compileShader(gl, type, source) {
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return null;
+                return shader;
+            }
+
+            const vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+            const program = gl.createProgram();
+            gl.attachShader(program, vs);
+            gl.attachShader(program, fs);
+            gl.linkProgram(program);
+            gl.useProgram(program);
+
+            const vertices = new Float32Array([
+                -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
+                -1.0, 1.0, 1.0, -1.0, 1.0, 1.0,
+            ]);
+
+            const buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+            const positionLoc = gl.getAttribLocation(program, 'position');
+            gl.enableVertexAttribArray(positionLoc);
+            gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+            const resLoc = gl.getUniformLocation(program, 'u_resolution');
+            const timeLoc = gl.getUniformLocation(program, 'u_time');
+            const mouseLoc = gl.getUniformLocation(program, 'u_mouse');
+
+            let mouseX = 0.5, mouseY = 0.5;
+            window.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX / window.innerWidth;
+                mouseY = 1.0 - (e.clientY / window.innerHeight);
+            });
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+                gl.uniform2f(resLoc, canvas.width, canvas.height);
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            let startTime = performance.now();
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+            function render(time) {
+                const dt = (time - startTime) * 0.001;
+                gl.uniform1f(timeLoc, dt);
+                gl.uniform2f(mouseLoc, mouseX, mouseY);
+
+                gl.clearColor(0.0, 0.0, 0.0, 0.0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+                requestAnimationFrame(render);
+            }
+            requestAnimationFrame(render);
+        }
+
+        async function fetchArtifacts() {
+            const gallery = document.getElementById('gallery');
+            try {
+                const res = await fetch(API_URL);
+                const json = await res.json();
+                if (json.success && json.data.length > 0) {
+                    gallery.innerHTML = '';
+                    artifactsData = json.data; // 儲存至全域供 Modal 使用
+
+                    json.data.forEach((item, index) => {
+                        let imageUrl = 'https://via.placeholder.com/400x400?text=No+Image';
+                        if (item.imageUrl) {
+                            const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+                            if (idMatch) {
+                                imageUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
+                            }
+                        }
+                        const tagsHtml = item.tags ? item.tags.split(' ').map(t => `<span class="tag">#${t.replace('#', '')}</span>`).join('') : '';
+
+                        const categoryText = item.category || '藏品';
+                        const char1 = categoryText.substring(0, 1) || '藏';
+                        const char2 = categoryText.substring(1, 2) || '品';
+
+                        // [修改] 判斷奇偶數，交錯佈局與進場方向
+                        const isOdd = index % 2 !== 0; // index 1 is odd
+                        const layoutClass = isOdd ? 'odd' : 'even';
+                        const inClass = isOdd ? 'from-left' : 'from-right';
+
+                        const card = document.createElement('div');
+                        card.className = `card ${layoutClass} ${inClass}`;
+                        card.style.cursor = 'pointer';
+                        card.setAttribute('onclick', `openModal(${index})`);
+
+                        // 首 6 張直接顯示避免白屏
+                        if (index < 6) {
+                            card.classList.add('is-visible');
+                        }
+
+                        card.innerHTML = `
+                            <div class="img-box">
+                                <img class="antique-img" src="${imageUrl}" loading="lazy" alt="${item.itemName}">
+                                <div class="vignette-cloud"></div>
+                                <div class="moving-cloud"></div>
+                                <div class="focus-border"></div>
+                            </div>
+                            <div class="info-box">
+                                <div class="seal-wrapper">
+                                    <div class="seal-halo"></div>
+                                    <svg class="seal-svg" viewBox="0 0 50 50">
+                                        <rect class="seal-bg" x="5" y="5" width="40" height="40" rx="4" />
+                                        <text class="seal-text" x="50%" y="35%" dominant-baseline="middle" text-anchor="middle">${char1}</text>
+                                        <text class="seal-text" x="50%" y="70%" dominant-baseline="middle" text-anchor="middle">${char2}</text>
+                                    </svg>
+                                </div>
+                                <h2 class="item-name">${item.itemName}</h2>
+                                <div class="item-era">${item.era || '年代待考'}</div>
+                                <p class="item-story">${item.story || '暫無故事描述。'}</p>
+                                <div class="tags">${tagsHtml}</div>
+                            </div>
+                        `;
+                        gallery.appendChild(card);
+
+                        // 加入 Observer 監聽
+                        if (index >= 6) {
+                            revealObserver.observe(card);
+                        }
+                    });
+                } else {
+                    gallery.innerHTML = '<div class="loading">庫房目前空置，或無法取得資料。</div>';
+                }
+            } catch (e) {
+                console.error(e);
+                gallery.innerHTML = `<div class="loading" style="color:red;">連線失敗：請檢查 GAS 部署網址。<br><small>${e.message}</small></div>`;
+            }
+        }
+
+    </script>
+</body>
+
+</html>
