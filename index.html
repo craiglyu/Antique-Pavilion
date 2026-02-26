@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>吉寶軒 Jibao Xuan - 撥雲見日</title>
-    <link href="https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&family=LXGW+WenKai+TC&display=swap"
+    <link
+        href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=LXGW+WenKai+TC&display=swap"
         rel="stylesheet">
     <style>
         :root {
@@ -16,10 +17,14 @@
             --shadow: rgba(0, 0, 0, 0.15);
         }
 
+        html {
+            overscroll-behavior-y: none;
+        }
+
         body {
             margin: 0;
             padding: 0;
-            background-color: #cfc0a8;
+            background-color: transparent;
             /* 米色/宣紙底色，避免底部抖動閃爍白底 */
             overscroll-behavior-y: none;
             font-family: 'LXGW WenKai TC', cursive, serif;
@@ -53,19 +58,22 @@
             pointer-events: none;
         }
 
-        /* --- 3. 頭部品牌區 (Header) --- */
+        /* --- 3. 頭部品牌區 (Header Fixed) --- */
         header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 100;
             text-align: center;
             padding: 80px 20px 20px;
-            position: relative;
-            transition: all 0.5s ease;
+            box-sizing: border-box;
+            background: transparent;
+            transition: padding 0.6s ease, background 0.6s ease, backdrop-filter 0.6s ease, border-bottom 0.6s ease, box-shadow 0.6s ease;
         }
 
-        /* Sticky Header 收縮狀態 */
+        /* Compact 收縮狀態 (Fixed) - 避免 Layout Reflow */
         header.header-compact {
-            position: sticky;
-            top: 0;
-            z-index: 100;
             background: rgba(247, 244, 237, 0.92);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -74,56 +82,48 @@
             box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
         }
 
-        .brand-logo-svg {
-            width: 100%;
-            max-width: 600px;
-            height: 120px;
-            margin: 0 auto;
-            overflow: visible;
-            transition: height 0.5s ease;
+    
+        .brand-title {
+            /* 1. 統一字體：與藏品標題一致，避免 fallback 到系統字體 */
+            font-family: 'LXGW WenKai TC', serif; 
+            
+            /* 2. 恢復原本尺寸：維持 5rem 的震撼感 */
+            font-size: 5rem; 
+            
+            /* 3. 調整字重：文楷體在 5rem 時，建議設為 normal 或 600，避免過粗導致筆畫糊在一起 */
+            font-weight: normal; 
+            
+            color: var(--ink);
+            margin: 0;
+            
+            /* 4. 起始間距與特效：保持原本的設計 */
+            letter-spacing: 0.2rem;
+            filter: blur(10px);
+            opacity: 0;
+            transform: scale(0.95);
+            animation: titleReveal 2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            transition: all 0.5s ease;
         }
 
-        header.header-compact .brand-logo-svg {
-            height: 56px;
-        }
-
-        .brand-logo-svg text {
-            font-family: 'Zhi Mang Xing', cursive;
-            font-size: 5rem;
-            letter-spacing: 1.5rem;
-            fill: transparent;
-            stroke: var(--ink);
-            stroke-width: 1.5;
-            stroke-dasharray: 1000;
-            stroke-dashoffset: 1000;
-            filter: drop-shadow(4px 4px 0px rgba(196, 154, 69, 0.2));
-            animation: drawStroke 2.5s ease forwards, fillText 1s 2s ease forwards;
-        }
-
-        .brand-logo-svg text:nth-child(1) {
-            animation-delay: 0s, 2s;
-        }
-
-        .brand-logo-svg text:nth-child(2) {
-            animation-delay: 0.3s, 2.3s;
-        }
-
-        .brand-logo-svg text:nth-child(3) {
-            animation-delay: 0.6s, 2.6s;
-        }
-
-        @keyframes drawStroke {
-            to {
-                stroke-dashoffset: 0;
+        @keyframes titleReveal {
+            100% {
+                opacity: 1;
+                /* 保持原本 1.5rem 的寬廣字距，這與文楷體的文人氣息非常契合 */
+                letter-spacing: 1.5rem; 
+                filter: blur(0px) drop-shadow(4px 4px 0px rgba(196, 154, 69, 0.2));
+                transform: scale(1);
             }
         }
 
-        @keyframes fillText {
-            to {
-                fill: var(--ink);
-                stroke: transparent;
-            }
-        }
+        /* 修正收縮狀態 (Compact Header)：維持原本 2.2rem 的設計比例 */
+        header.header-compact .brand-title {
+            font-size: 2.2rem;
+            letter-spacing: 0.8rem;
+            animation: none;
+            filter: blur(0px) drop-shadow(2px 2px 0px rgba(196, 154, 69, 0.2));
+            transform: scale(1);
+            opacity: 1;
+        }        
 
         .brand-slogan {
             font-size: 1.5rem;
@@ -178,26 +178,21 @@
 
         .cloud-left {
             left: 0;
-            transform: translateX(-50px);
-            animation: cloudDriftLeft 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: cloudEnterLeft 3s cubic-bezier(0.25, 1, 0.5, 1) forwards, cloudFloat 5s ease-in-out 3s infinite;
         }
 
         .cloud-right {
             right: 0;
-            transform: translateX(50px) scaleX(-1);
-            animation: cloudDriftRight 4s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            transform: scaleX(-1);
+            animation: cloudEnterRight 3s cubic-bezier(0.25, 1, 0.5, 1) forwards, cloudFloatRight 5s ease-in-out 3s infinite;
         }
 
-        .cloud-left path,
-        .cloud-right path {
-            fill: none;
-            stroke: var(--ink);
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
-            opacity: 0.8;
-            transition: all 4s ease;
+        .ruyi-path {
+            fill: rgba(44, 44, 44, 0.08);
+            /* 半透明填充質感 */
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
+            /* 營造浮雕造型 */
+            transform-origin: center;
         }
 
         .center-text-line {
@@ -212,47 +207,51 @@
             animation: lineReveal 2s 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
-        @keyframes cloudDriftLeft {
+        @keyframes cloudEnterLeft {
             0% {
+                transform: translateX(-100px) scale(0.9);
                 opacity: 0;
-                transform: translateX(-50px);
-            }
-
-            20% {
-                opacity: 1;
-                transform: translateX(-50px);
-            }
-
-            80% {
-                transform: translateX(20px);
-                opacity: 1;
             }
 
             100% {
-                transform: translateX(30px);
-                opacity: 0;
+                transform: translateX(0) scale(1);
+                opacity: 1;
             }
         }
 
-        @keyframes cloudDriftRight {
+        @keyframes cloudEnterRight {
             0% {
+                transform: translateX(100px) scale(-0.9, 0.9);
                 opacity: 0;
-                transform: translateX(50px) scaleX(-1);
-            }
-
-            20% {
-                opacity: 1;
-                transform: translateX(50px) scaleX(-1);
-            }
-
-            80% {
-                transform: translateX(-20px) scaleX(-1);
-                opacity: 1;
             }
 
             100% {
-                transform: translateX(-30px) scaleX(-1);
-                opacity: 0;
+                transform: translateX(0) scale(-1, 1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes cloudFloat {
+
+            0%,
+            100% {
+                transform: translateX(0) translateY(0);
+            }
+
+            50% {
+                transform: translateX(0) translateY(-5px);
+            }
+        }
+
+        @keyframes cloudFloatRight {
+
+            0%,
+            100% {
+                transform: translateX(0) scaleX(-1) translateY(0);
+            }
+
+            50% {
+                transform: translateX(0) scaleX(-1) translateY(-5px);
             }
         }
 
@@ -274,7 +273,8 @@
         .gallery-container {
             max-width: 1100px;
             margin: 0 auto;
-            padding: 20px 40px 100px;
+            padding: 380px 40px 100px;
+            /* 預留上方 Fixed Header 空間 */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -332,7 +332,7 @@
         }
 
         .img-box {
-            width: 45%;
+            width: 50%;
             height: 450px;
             position: relative;
             overflow: hidden;
@@ -425,8 +425,9 @@
             transform: scale(1);
         }
 
+
         .info-box {
-            width: 55%;
+            width: 50%;
             padding: 40px 50px;
             position: relative;
             background-image: url('https://www.transparenttextures.com/patterns/rice-paper-2.png');
@@ -565,7 +566,7 @@
 
         #scroll-progress-track {
             width: 2px;
-            height: 50vh;
+            height: 50dvh;
             background: rgba(196, 154, 69, 0.15);
             border-radius: 1px;
             overflow: hidden;
@@ -607,7 +608,7 @@
             background: var(--paper);
             width: 90%;
             max-width: 900px;
-            max-height: 90vh;
+            max-height: 90dvh;
             border-radius: 8px;
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
             display: flex;
@@ -708,7 +709,7 @@
             text-align: justify;
             margin-bottom: 30px;
             white-space: pre-wrap;
-            flex-grow: 1;
+            /* remove flex-grow to ensure full text reveals correctly with scroll */
         }
 
         .modal-tags {
@@ -746,6 +747,23 @@
         }
 
         @media (max-width: 768px) {
+
+            /* 依靠 JS 的 in-center 狀態來觸發手機端的褪去遮罩，實現自動探索感 */
+            .card.in-center .antique-img {
+                transform: scale(1.1);
+                filter: brightness(1.05) sepia(0);
+            }
+
+            .card.in-center .vignette-cloud,
+            .card.in-center .moving-cloud {
+                opacity: 0;
+            }
+
+            .card.in-center .focus-border {
+                opacity: 0.8;
+                transform: scale(1);
+            }
+
             .brand-logo-svg {
                 height: 80px;
             }
@@ -755,7 +773,8 @@
             }
 
             .gallery-container {
-                padding: 20px;
+                padding: 240px 20px 40px;
+                /* Mobile header space */
                 gap: 40px;
             }
 
@@ -778,12 +797,12 @@
 
             .modal-content {
                 flex-direction: column;
-                max-height: 85vh;
+                max-height: 85dvh;
             }
 
             .modal-left {
                 width: 100%;
-                height: 35vh;
+                height: 35dvh;
             }
 
             .modal-right {
@@ -814,33 +833,29 @@
 
     <div class="page-wrapper">
         <div id="header-sentinel"
-            style="position: absolute; top: 200px; left: 0; width: 10px; height: 10px; visibility: hidden; pointer-events: none;">
+            style="position: absolute; top: 0; left: 0; width: 100%; height: 150px; visibility: hidden; pointer-events: none;">
         </div>
         <header id="main-header">
-            <!-- 3. 書法筆觸標題 -->
-            <svg class="brand-logo-svg" viewBox="0 0 400 120">
-                <text x="20%" y="50%" dominant-baseline="middle" text-anchor="middle">吉</text>
-                <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">寶</text>
-                <text x="80%" y="50%" dominant-baseline="middle" text-anchor="middle">軒</text>
-            </svg>
+            <!-- 3. 書法正文標題 -->
+            <h1 class="brand-title">吉寶軒</h1>
             <div class="brand-slogan">靜觀歲月 · 撥雲見寶</div>
 
             <!-- 1. 如意雲分隔線 -->
             <div class="ruyi-divider">
                 <div class="center-text-line"></div>
                 <!-- 雲紋 SVG (左) -->
-                <svg class="cloud-left" viewBox="0 0 400 60" preserveAspectRatio="xMaxYMid meet">
-                    <!-- 卷雲頭與優雅收尾 -->
-                    <path
-                        d="M40,30 C40,10 70,10 70,30 C70,50 40,50 30,35 C20,20 50,5 90,15 C130,25 170,45 220,40 C270,35 310,15 360,25 C380,29 390,30 400,30" />
-                    <path d="M80,25 C120,40 160,20 200,30 C240,40 280,30 320,15" stroke-width="1" opacity="0.6" />
+                <svg class="cloud-left" viewBox="0 0 200 60" preserveAspectRatio="xMaxYMid meet">
+                    <!-- 雲頭帶有捲曲細節，內部掏空的如意雲圖案 -->
+                    <path class="ruyi-path"
+                        d="M100,45 C115,58 140,62 160,50 C180,38 185,15 170,5 C155,-5 130,2 125,20 C120,35 135,48 150,45 C162,42 168,28 158,18 C148,8 135,15 138,28 C140,35 148,38 152,32 C125,25 110,50 85,35 C70,25 60,10 45,15 C30,20 22,35 30,48 C38,60 55,60 65,48 C75,35 68,20 55,22 C45,25 42,35 48,42 C52,48 60,48 62,42 C40,40 25,60 10,45 Z"
+                        fill-rule="evenodd" />
                 </svg>
                 <!-- 雲紋 SVG (右) -->
-                <svg class="cloud-right" viewBox="0 0 400 60" preserveAspectRatio="xMaxYMid meet">
-                    <!-- 卷雲頭與優雅收尾 -->
-                    <path
-                        d="M40,30 C40,10 70,10 70,30 C70,50 40,50 30,35 C20,20 50,5 90,15 C130,25 170,45 220,40 C270,35 310,15 360,25 C380,29 390,30 400,30" />
-                    <path d="M80,25 C120,40 160,20 200,30 C240,40 280,30 320,15" stroke-width="1" opacity="0.6" />
+                <svg class="cloud-right" viewBox="0 0 200 60" preserveAspectRatio="xMaxYMid meet">
+                    <!-- 使用 transform scale(-1, 1) 翻轉即可共用路徑 -->
+                    <path class="ruyi-path"
+                        d="M100,45 C115,58 140,62 160,50 C180,38 185,15 170,5 C155,-5 130,2 125,20 C120,35 135,48 150,45 C162,42 168,28 158,18 C148,8 135,15 138,28 C140,35 148,38 152,32 C125,25 110,50 85,35 C70,25 60,10 45,15 C30,20 22,35 30,48 C38,60 55,60 65,48 C75,35 68,20 55,22 C45,25 42,35 48,42 C52,48 60,48 62,42 C40,40 25,60 10,45 Z"
+                        fill-rule="evenodd" />
                 </svg>
             </div>
         </header>
@@ -895,6 +910,17 @@
             });
         }, { threshold: 0.15 });
 
+        // [新增] 觀察者：卡片滑到視野中心時觸發特效
+        const centerObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('in-center');
+                } else {
+                    entry.target.classList.remove('in-center');
+                }
+            });
+        }, { rootMargin: '-30% 0px -30% 0px' });
+
         document.addEventListener('DOMContentLoaded', () => {
             fetchArtifacts();
             initWebGLFog(); // 啟動 WebGL 雲霧特效
@@ -924,13 +950,27 @@
                 headerObserver.observe(sentinel);
             }
 
+            let ticking = false;
             window.addEventListener('scroll', () => {
-                // 滾動進度
-                const maxScroll = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) - window.innerHeight;
-                if (maxScroll > 0) {
-                    let progress = Math.floor((window.scrollY / maxScroll) * 100);
-                    progress = Math.min(Math.max(progress, 0), 100);
-                    progressBar.style.height = `${progress}%`;
+                if (!ticking) {
+                    window.requestAnimationFrame(() => {
+                        // 滾動進度
+                        const scrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+                        const maxScroll = Math.round(scrollHeight - window.innerHeight);
+                        if (maxScroll > 0) {
+                            let progress = Math.floor((window.scrollY / maxScroll) * 100);
+                            progress = Math.min(Math.max(progress, 0), 100);
+                            progressBar.style.height = `${progress}%`;
+                        }
+
+                        // [新增] 強制鎖定底部 Header 狀態防 iOS 回彈抖動
+                        if (window.scrollY > 0 && window.scrollY >= maxScroll - 50) {
+                            header.classList.add('header-compact');
+                        }
+
+                        ticking = false;
+                    });
+                    ticking = true;
                 }
             }, { passive: true });
         });
@@ -1187,6 +1227,8 @@
                         if (index >= 6) {
                             revealObserver.observe(card);
                         }
+                        // 手機與中心觸發監聽
+                        centerObserver.observe(card);
                     });
                 } else {
                     gallery.innerHTML = '<div class="loading">庫房目前空置，或無法取得資料。</div>';
