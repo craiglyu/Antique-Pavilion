@@ -9,12 +9,6 @@
         href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=LXGW+WenKai+TC&display=swap"
         rel="stylesheet">
     <style>
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-        }
-
         :root {
             --gold: #c49a45;
             --ink: #2c2c2c;
@@ -44,8 +38,7 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 130dvh;
-            /* 增加高度以容納視差滾動空間 */
+            height: 100dvh;
             background-image: url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp');
             /* Placeholder URL */
             background-size: cover;
@@ -53,8 +46,6 @@
             filter: sepia(0.2) brightness(0.9);
             z-index: -2;
             pointer-events: none;
-            will-change: transform;
-            /* 提升硬體加速與滾動效能 */
         }
 
         #glCanvas {
@@ -292,8 +283,7 @@
 
         /* --- 藏品卡片與進場動畫 --- */
         .card {
-            width: 85%;
-            /* 縮小寬度以營造錯落有致的留白 */
+            width: 100%;
             background: #fff;
             border-radius: 4px;
             box-shadow: 0 10px 30px var(--shadow);
@@ -308,22 +298,18 @@
             opacity: 0;
             transform: translateY(20px) translateX(60px);
             /* 預設右側滑入 */
-            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease, align-self 0.4s ease;
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease;
             will-change: transform, opacity;
         }
 
         /* 奇數展品 (Odd): 文字在左，圖片在右 */
         .card.odd {
             flex-direction: row-reverse;
-            align-self: flex-start;
-            /* 奇數卡片靠左錯開 */
         }
 
         /* 偶數展品 (Even): 圖片在左，文字在右 */
         .card.even {
             flex-direction: row;
-            align-self: flex-end;
-            /* 偶數卡片靠右錯開 */
         }
 
         .card.from-left {
@@ -448,8 +434,6 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            box-sizing: border-box;
-            /* [新增] 確保 padding 不會撐破卡片寬度 */
         }
 
         /* 4. 印章互動 */
@@ -522,10 +506,6 @@
             margin: 0 0 10px;
             color: var(--ink);
             line-height: 1.3;
-            padding-right: 90px;
-            /* [新增] 避免標題被右上方印章圖案遮擋 */
-            word-break: break-word;
-            /* [新增] 避免長字串撐破 */
         }
 
         .item-era {
@@ -639,8 +619,6 @@
             opacity: 0;
             transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
             border: 1px solid rgba(196, 154, 69, 0.3);
-            box-sizing: border-box;
-            /* [新增] 防止內容撐破寬度 */
         }
 
         .modal-overlay.active .modal-content {
@@ -694,8 +672,6 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            box-sizing: border-box;
-            /* [新增] 確保 padding 包含在 width 內 */
         }
 
         .modal-right::-webkit-scrollbar {
@@ -716,8 +692,6 @@
             color: var(--ink);
             margin: 0 0 10px;
             line-height: 1.3;
-            word-break: break-word;
-            /* [新增] 處理長字串避免破版 */
         }
 
         .modal-era {
@@ -736,8 +710,6 @@
             margin-bottom: 30px;
             white-space: pre-wrap;
             /* remove flex-grow to ensure full text reveals correctly with scroll */
-            word-break: break-word;
-            /* [新增] 處理長內容斷行 */
         }
 
         .modal-tags {
@@ -811,8 +783,6 @@
             .card.even {
                 flex-direction: column !important;
                 width: 100%;
-                align-self: center;
-                /* 取消左右錯開，保持垂直置中 */
             }
 
             .img-box {
@@ -822,7 +792,7 @@
 
             .info-box {
                 width: 100%;
-                padding: 25px 20px;
+                padding: 30px 20px;
             }
 
             .modal-content {
@@ -837,19 +807,11 @@
 
             .modal-right {
                 width: 100%;
-                padding: 25px 20px;
-                box-sizing: border-box;
+                padding: 25px;
             }
 
             .modal-title {
                 font-size: 1.8rem;
-                word-wrap: break-word;
-                overflow-wrap: break-word;
-            }
-
-            .modal-era {
-                word-wrap: break-word;
-                overflow-wrap: break-word;
             }
         }
     </style>
@@ -933,7 +895,7 @@
     </div>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbz0lSssvqseJ-d3NnSY-P0vPaHDvoNvdj55IGgzeazaOIutM4Zo7n3JPOv0np-vNuo_/exec";
+        const API_URL = "https://script.google.com/macros/s/AKfycbz6wId1wRbY48o7xH2X4T0e7UFlppakZvBYmJn4KybA6uGgzk4CZs8YXQSTZoj2Suhiew/exec";
 
         // 全域變數儲存展品資料
         let artifactsData = [];
@@ -1004,13 +966,6 @@
                         // [新增] 強制鎖定底部 Header 狀態防 iOS 回彈抖動
                         if (window.scrollY > 0 && window.scrollY >= maxScroll - 50) {
                             header.classList.add('header-compact');
-                        }
-
-                        // [新增] 背景視差滾動監聽 (Parallax Scrolling)
-                        const bgLayer = document.querySelector('.bg-layer');
-                        if (bgLayer) {
-                            // 使用捲動量的 30% 產生景深與遲緩感
-                            bgLayer.style.transform = `translateY(${window.scrollY * -0.3}px)`;
                         }
 
                         ticking = false;
@@ -1286,6 +1241,5 @@
 
     </script>
 </body>
-
 
 </html>
