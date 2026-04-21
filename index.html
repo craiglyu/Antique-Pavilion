@@ -5,16 +5,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>吉寶軒 Jibao Xuan - 撥雲見日</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=LXGW+WenKai+TC&display=swap"
-        rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=LXGW+WenKai+TC:wght@300;400;500&family=Noto+Serif+TC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
     <style>
         :root {
-            --gold: #c49a45;
-            --ink: #2c2c2c;
-            --paper: #f7f4ed;
+            /* ── Brand core ── */
+            --gold:     #c49a45;
+            --ink:      #2c2c2c;
+            --paper:    #f7f4ed;
             --seal-red: #8a2a2a;
-            --shadow: rgba(0, 0, 0, 0.15);
+
+            /* ── Gold scale ── */
+            --gold-900: #6b5220;
+            --gold-700: #8a6f2f;
+            --gold-500: #c49a45;
+            --gold-300: #d9b977;
+            --gold-100: #ead6a8;
+            --gold-050: #f3e8cc;
+
+            /* ── Ink scale ── */
+            --ink-900: #1a1a1a;
+            --ink-800: #2c2c2c;
+            --ink-600: #4a4a4a;
+            --ink-500: #6b6b6b;
+            --ink-400: #999999;
+            --ink-300: #bdbdbd;
+            --ink-200: #d9d6cf;
+
+            /* ── Paper scale ── */
+            --paper-100: #ffffff;
+            --paper-200: #fbf9f3;
+            --paper-300: #f7f4ed;
+            --paper-400: #ede8dc;
+            --paper-500: #e0dac8;
+
+            /* ── Seal scale ── */
+            --seal-900: #5c1c1c;
+            --seal-700: #6b1f1f;
+            --seal-500: #8a2a2a;
+            --seal-300: #b45353;
+
+            /* ── Semantic tokens ── */
+            --fg-1:      var(--ink-800);
+            --fg-2:      var(--ink-600);
+            --fg-3:      var(--ink-500);
+            --fg-muted:  var(--ink-400);
+            --fg-accent: var(--gold-500);
+            --fg-seal:   var(--seal-500);
+            --fg-invert: var(--paper-300);
+            --bg-ground: var(--paper-300);
+            --bg-raised: var(--paper-200);
+            --bg-sunken: var(--paper-400);
+
+            /* ── Rules ── */
+            --rule-hair: 1px solid rgba(44,44,44,0.12);
+            --rule-dash: 1px dashed var(--paper-500);
+            --rule-gold: 1px solid rgba(196,154,69,0.4);
+
+            /* ── Shadows ── */
+            --shadow:       rgba(0,0,0,0.15);
+            --shadow-card:  0 10px 30px rgba(0,0,0,0.15);
+            --shadow-hover: 0 20px 50px rgba(196,154,69,0.30);
+            --shadow-modal: 0 25px 50px rgba(0,0,0,0.5);
+
+            /* ── Motion ── */
+            --ease-ink: cubic-bezier(0.25, 1, 0.5, 1);
+
+            /* ── Typography ── */
+            --font-display: 'Noto Serif TC', serif;
+            --font-body:    'LXGW WenKai TC', 'Noto Serif TC', serif;
+            --font-plaque:  'Ma Shan Zheng', serif;
+            --font-callig:  'Zhi Mang Xing', cursive;
+            --font-latin:   'Cormorant Garamond', serif;
         }
 
         html {
@@ -84,13 +147,10 @@
 
 
         .brand-title {
-            /* 1. 統一字體：與藏品標題一致，避免 fallback 到系統字體 */
-            font-family: 'LXGW WenKai TC', serif;
+            /* DP-001：啟用品牌字體 token，書法印章感 */
+            font-family: var(--font-plaque); /* Ma Shan Zheng */
 
-            /* 2. 恢復原本尺寸：維持 5rem 的震撼感 */
             font-size: 5rem;
-
-            /* 3. 調整字重：文楷體在 5rem 時，建議設為 normal 或 600，避免過粗導致筆畫糊在一起 */
             font-weight: normal;
 
             color: var(--ink);
@@ -130,7 +190,7 @@
             color: var(--gold);
             margin-top: 15px;
             letter-spacing: 0.5rem;
-            font-weight: bold;
+            font-weight: 400;
             opacity: 0;
             max-height: 50px;
             overflow: hidden;
@@ -284,9 +344,9 @@
         /* --- 藏品卡片與進場動畫 --- */
         .card {
             width: 100%;
-            background: #fff;
+            background: var(--bg-raised);
             border-radius: 4px;
-            box-shadow: 0 10px 30px var(--shadow);
+            box-shadow: var(--shadow-card);
             overflow: hidden;
             position: relative;
             display: flex;
@@ -327,7 +387,7 @@
 
         .card:hover {
             transform: translateY(-5px) scale(1.01);
-            box-shadow: 0 20px 50px rgba(196, 154, 69, 0.3);
+            box-shadow: var(--shadow-hover);
             z-index: 10;
         }
 
@@ -336,21 +396,34 @@
             height: 450px;
             position: relative;
             overflow: hidden;
-            background: #e0e0e0;
+            background: var(--paper-500);
             flex-shrink: 0;
         }
+
+        /* DP-002: 三種卡片比例變體 */
+        /* 縱軸器物：書畫、長頸瓶、玉器 */
+        .card--portrait .img-box  { width: 42%; height: 540px; }
+        .card--portrait .info-box { width: 58%; }
+
+        /* 橫軸器物：銅器、傢俱、文房 */
+        .card--landscape .img-box  { width: 58%; height: 380px; }
+        .card--landscape .info-box { width: 42%; }
+
+        /* 主打展品（首件或特選） */
+        .card--feature .img-box  { width: 62%; height: 520px; }
+        .card--feature .info-box { width: 38%; padding: 50px 40px; }
 
         .antique-img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            filter: brightness(0.85) sepia(0.2);
+            filter: brightness(0.95); /* DP-005: 移除 sepia，尊重釉色原色 */
             transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1), filter 1.2s cubic-bezier(0.25, 1, 0.5, 1);
         }
 
         .card:hover .antique-img {
-            transform: scale(1.1);
-            filter: brightness(1.05) sepia(0);
+            transform: scale(1.08); /* DP-005: 縮小增量，避免商業感 */
+            filter: brightness(1.02);
         }
 
         /* 5. 撥雲見寶：邊緣漸暈霧化遮罩 (Vignette Cloud Mask) */
@@ -382,7 +455,7 @@
             height: 200%;
             top: -50%;
             left: -50%;
-            background-image: url('https://www.transparenttextures.com/patterns/foggy-birds.png');
+            background-image: none;
             opacity: 0.4;
             animation: drift 60s linear infinite;
             pointer-events: none;
@@ -430,7 +503,7 @@
             width: 50%;
             padding: 40px 50px;
             position: relative;
-            background-image: url('https://www.transparenttextures.com/patterns/rice-paper-2.png');
+            background: var(--paper-300);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -502,7 +575,10 @@
         }
 
         .item-name {
+            font-family: var(--font-plaque); /* DP-001 rev: Ma Shan Zheng，氣韻統一 */
             font-size: 1.8rem;
+            font-weight: normal;
+            letter-spacing: 0.15rem;
             margin: 0 0 10px;
             color: var(--ink);
             line-height: 1.3;
@@ -512,14 +588,14 @@
             color: var(--gold);
             font-size: 1.1rem;
             margin-bottom: 20px;
-            border-bottom: 1px dashed #ddd;
+            border-bottom: var(--rule-dash);
             padding-bottom: 15px;
         }
 
         .item-story {
             font-size: 1rem;
             line-height: 1.8;
-            color: #555;
+            color: var(--fg-2);
             text-align: justify;
             margin-bottom: 20px;
             display: -webkit-box;
@@ -533,9 +609,16 @@
         }
 
         .tag {
-            color: #999;
-            margin-right: 10px;
-            font-style: italic;
+            color: var(--fg-muted);   /* DP-004: 改用 token */
+            font-style: normal;        /* DP-004: 移除義大利體 */
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            margin-right: 8px;
+        }
+        .tag::before {
+            content: '#';
+            color: var(--gold-300);
+            margin-right: 2px;
         }
 
         .loading {
@@ -652,7 +735,7 @@
 
         .modal-left {
             width: 45%;
-            background: #e8e6e1;
+            background: var(--paper-400);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -688,7 +771,10 @@
         }
 
         .modal-title {
+            font-family: var(--font-plaque); /* DP-001 rev: Ma Shan Zheng */
             font-size: 2.2rem;
+            font-weight: normal;
+            letter-spacing: 0.2rem;
             color: var(--ink);
             margin: 0 0 10px;
             line-height: 1.3;
@@ -698,14 +784,14 @@
             font-size: 1.2rem;
             color: var(--gold);
             margin-bottom: 25px;
-            border-bottom: 1px dashed #ccc;
+            border-bottom: var(--rule-dash);
             padding-bottom: 15px;
         }
 
         .modal-story {
             font-size: 1.1rem;
             line-height: 1.9;
-            color: #444;
+            color: var(--fg-2);
             text-align: justify;
             margin-bottom: 30px;
             white-space: pre-wrap;
@@ -718,12 +804,58 @@
 
         .modal-tags .tag {
             display: inline-block;
-            background: rgba(196, 154, 69, 0.1);
-            padding: 5px 12px;
-            border-radius: 4px;
+            background: transparent;               /* DP-004: 移除淡金底 */
+            border: 1px solid var(--rule-gold);    /* DP-004: 精緻金邊 pill */
+            padding: 4px 10px;
+            border-radius: 2px;                    /* DP-004: 方角更典雅 */
             margin: 0 8px 8px 0;
-            color: var(--ink);
-            font-size: 0.95rem;
+            color: var(--fg-2);
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            font-style: normal;
+        }
+        .modal-tags .tag::before { content: none; } /* Modal 標籤不加 # */
+
+        /* DP-003: 策展人鑑定摘要區塊 */
+        .modal-appraisal { display: none; }
+        .appraisal-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0 16px;
+            color: var(--fg-3);
+            font-size: 0.75rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-family: var(--font-latin);
+        }
+        .appraisal-divider::before,
+        .appraisal-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--rule-gold);
+        }
+        .appraisal-label { white-space: nowrap; }
+        .appraisal-row {
+            font-size: 0.9rem;
+            color: var(--fg-2);
+            margin-bottom: 6px;
+            line-height: 1.6;
+        }
+        .appraisal-price {
+            font-family: var(--font-latin); /* Cormorant Garamond */
+            font-size: 1.3rem;
+            color: var(--fg-accent);
+            letter-spacing: 0.03em;
+            margin: 6px 0;
+        }
+        .appraisal-note {
+            font-size: 0.9rem;
+            color: var(--fg-2);
+            line-height: 1.7;
+            font-style: italic;
+            margin-top: 4px;
         }
 
         .modal-action {
@@ -741,7 +873,7 @@
         }
 
         .modal-action:hover {
-            background: #6b1f1f;
+            background: var(--seal-700);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(138, 42, 42, 0.3);
         }
@@ -750,8 +882,8 @@
 
             /* 依靠 JS 的 in-center 狀態來觸發手機端的褪去遮罩，實現自動探索感 */
             .card.in-center .antique-img {
-                transform: scale(1.1);
-                filter: brightness(1.05) sepia(0);
+                transform: scale(1.08);
+                filter: brightness(1.02); /* DP-005: 同步 hover 標準 */
             }
 
             .card.in-center .vignette-cloud,
@@ -889,6 +1021,15 @@
                 <div class="modal-era" id="modalEra"></div>
                 <div class="modal-story" id="modalStory"></div>
                 <div class="modal-tags" id="modalTags"></div>
+                <!-- DP-003: 策展人鑑定摘要（Christie's Lot Details 格式） -->
+                <div class="modal-appraisal" id="modalAppraisal">
+                    <div class="appraisal-divider">
+                        <span class="appraisal-label">鑑定參考</span>
+                    </div>
+                    <div class="appraisal-row" id="modalRefItem"></div>
+                    <div class="appraisal-row appraisal-price" id="modalRefPrice"></div>
+                    <div class="appraisal-note" id="modalDisplayRec"></div>
+                </div>
                 <a href="#contact" class="modal-action" onclick="closeModal()">預約鑑賞</a>
             </div>
         </div>
@@ -993,8 +1134,16 @@
             document.getElementById('modalEra').textContent = item.era || '年代待考';
             document.getElementById('modalStory').textContent = item.story || '暫無故事描述。';
 
-            const tagsHtml = item.tags ? item.tags.split(' ').map(t => `<span class="tag">#${t.replace('#', '')}</span>`).join('') : '';
+            const tagsHtml = item.tags ? item.tags.split(' ').map(t => `<span class="tag">${t.replace('#', '')}</span>`).join('') : '';
             document.getElementById('modalTags').innerHTML = tagsHtml;
+
+            // DP-003: 填入鑑定摘要三欄位
+            document.getElementById('modalRefItem').textContent   = item.refItem  ? `參考拍品：${item.refItem}` : '';
+            document.getElementById('modalRefPrice').textContent  = item.refPrice ? item.refPrice : '';
+            document.getElementById('modalDisplayRec').textContent = item.displayRecommendation || '';
+            const appraisalEl = document.getElementById('modalAppraisal');
+            appraisalEl.style.display =
+                (item.refItem || item.refPrice || item.displayRecommendation) ? 'block' : 'none';
 
             // 防止背景捲動
             document.body.style.overflow = 'hidden';
@@ -1178,19 +1327,28 @@
                                 imageUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
                             }
                         }
-                        const tagsHtml = item.tags ? item.tags.split(' ').map(t => `<span class="tag">#${t.replace('#', '')}</span>`).join('') : '';
+                        const tagsHtml = item.tags ? item.tags.split(' ').map(t => `<span class="tag">${t.replace('#', '')}</span>`).join('') : '';
 
                         const categoryText = item.category || '藏品';
                         const char1 = categoryText.substring(0, 1) || '藏';
                         const char2 = categoryText.substring(1, 2) || '品';
 
-                        // [修改] 判斷奇偶數，交錯佈局與進場方向
-                        const isOdd = index % 2 !== 0; // index 1 is odd
+                        // 判斷奇偶數，交錯佈局與進場方向
+                        const isOdd = index % 2 !== 0;
                         const layoutClass = isOdd ? 'odd' : 'even';
                         const inClass = isOdd ? 'from-left' : 'from-right';
 
+                        // DP-002: 依 category 自動分配卡片比例變體
+                        const portraitCats  = ['書畫', '瓷器', '玉器', '雜項'];
+                        const landscapeCats = ['銅器', '傢俱', '文房', '金屬'];
+                        const cat = item.category || '';
+                        const variant = index === 0 ? 'feature'
+                            : portraitCats.some(c => cat.includes(c))  ? 'portrait'
+                            : landscapeCats.some(c => cat.includes(c)) ? 'landscape'
+                            : 'portrait'; // 預設縱版
+
                         const card = document.createElement('div');
-                        card.className = `card ${layoutClass} ${inClass}`;
+                        card.className = `card card--${variant} ${layoutClass} ${inClass}`;
                         card.style.cursor = 'pointer';
                         card.setAttribute('onclick', `openModal(${index})`);
 
