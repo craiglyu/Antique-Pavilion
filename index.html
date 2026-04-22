@@ -107,16 +107,19 @@
                 radial-gradient(ellipse 50% 35% at 85% 25%, rgba(44, 44, 44, 0.04) 0%, transparent 60%),
                 url('./seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp') center center / cover no-repeat,
                 linear-gradient(168deg, #f0ece2 0%, #e8e3d4 35%, #e3ddd0 65%, #ddd7c8 100%);
-            filter: sepia(0.04) brightness(0.88) contrast(1.05);
+            /* brightness(0.96): 水墨山水底圖以較高亮度顯示；
+               contrast(1.12): 讓墨線更清晰；sepia(0.06): 微暖調 */
+            filter: sepia(0.06) brightness(0.96) contrast(1.12);
         }
-        /* 1. SVG fibre noise (rice-paper grain), inline URL only */
+        /* SVG fibre noise (rice-paper grain) — multiply blend
+           opacity 降至 0.30（原 0.75）：避免把水墨底圖壓成純紙色 */
         .bg-layer::after {
             content: '';
             position: absolute;
             inset: 0;
             background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' seed='4'/><feColorMatrix values='0 0 0 0 0.17  0 0 0 0 0.17  0 0 0 0 0.17  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
             background-size: 280px 280px;
-            opacity: 0.75;
+            opacity: 0.30;
             mix-blend-mode: multiply;
         }
 
@@ -516,7 +519,7 @@
             /* Layer 1 (top): 菱格錦 diamond brocade — evokes 錦緞 fabric weave
                32×32 tile: outer diamond outline + inner diamond fill + cardinal dots */
             background-image:
-                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><path d='M16,1 L31,16 L16,31 L1,16 Z' fill='none' stroke='rgba(196,154,69,0.11)' stroke-width='0.7'/><path d='M16,9 L23,16 L16,23 L9,16 Z' fill='rgba(196,154,69,0.04)' stroke='rgba(196,154,69,0.08)' stroke-width='0.5'/><circle cx='16' cy='16' r='1.1' fill='rgba(196,154,69,0.09)'/><circle cx='16' cy='1' r='0.7' fill='rgba(196,154,69,0.07)'/><circle cx='31' cy='16' r='0.7' fill='rgba(196,154,69,0.07)'/><circle cx='16' cy='31' r='0.7' fill='rgba(196,154,69,0.07)'/><circle cx='1' cy='16' r='0.7' fill='rgba(196,154,69,0.07)'/></svg>"),
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><path d='M16,1 L31,16 L16,31 L1,16 Z' fill='none' stroke='rgba(196,154,69,0.22)' stroke-width='0.8'/><path d='M16,9 L23,16 L16,23 L9,16 Z' fill='rgba(196,154,69,0.08)' stroke='rgba(196,154,69,0.16)' stroke-width='0.6'/><circle cx='16' cy='16' r='1.2' fill='rgba(196,154,69,0.18)'/><circle cx='16' cy='1' r='0.8' fill='rgba(196,154,69,0.13)'/><circle cx='31' cy='16' r='0.8' fill='rgba(196,154,69,0.13)'/><circle cx='16' cy='31' r='0.8' fill='rgba(196,154,69,0.13)'/><circle cx='1' cy='16' r='0.8' fill='rgba(196,154,69,0.13)'/></svg>"),
             /* Layer 2 (bottom): 宣紙 fibre noise — organic paper grain */
                 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0.17  0 0 0 0 0.15  0 0 0 0 0.10  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
             background-color: var(--paper-300);  /* warm fallback if SVG grain fails */
@@ -1786,7 +1789,7 @@
                     'radial-gradient(ellipse 50% 35% at 85% 25%, rgba(44,44,44,0.04) 0%, transparent 60%),' +
                     mountain + ',' +
                     'linear-gradient(168deg, #f0ece2 0%, #e8e3d4 35%, #e3ddd0 65%, #ddd7c8 100%)';
-                bg.style.filter = 'sepia(0.04) brightness(0.88) contrast(1.05)';
+                bg.style.filter = 'sepia(0.06) brightness(0.96) contrast(1.12)';
             }
             document.documentElement.style.setProperty('--fg-1', '#2c2c2c');
             document.documentElement.style.setProperty('--fg-2', '#4a4a4a');
