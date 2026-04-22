@@ -183,7 +183,9 @@
             filter: blur(10px);
             opacity: 0;
             transform: scale(0.95);
-            animation: titleReveal 2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            /* 1s delay → Google Fonts CJK subsets (吉/寶/軒 in separate woff2 files)
+               have time to load before title becomes visible → no per-char font swap FOUT */
+            animation: titleReveal 2s 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
             transition: all 0.5s ease;
         }
 
@@ -509,6 +511,7 @@
         .info-box {
             width: 50%;
             padding: 40px 50px;
+            box-sizing: border-box;  /* padding included in width — prevents text overflow */
             position: relative;
             /* Layer 1 (top): 菱格錦 diamond brocade — evokes 錦緞 fabric weave
                32×32 tile: outer diamond outline + inner diamond fill + cardinal dots */
@@ -1013,61 +1016,89 @@
         }
 
         @media (max-width: 768px) {
-            .card.in-center .antique-img {
-                transform: scale(1.08);
-                filter: brightness(1.02);  /* DP-005: no sepia */
+            /* ── 如意雲 Mobile Fix ─────────────────────────────────────────
+               Desktop: 300px SVG viewBox fits 300px container → circles look good
+               Mobile:  same viewBox squeezed into ~180px → circles become tiny dots
+               Fix: hide SVG clouds; show elegant gold hairline + glowing centre dot  */
+            .ruyi-divider {
+                height: 20px;
+                margin: 10px auto 18px;
             }
-            .card.in-center .vignette-cloud,
-            .card.in-center .moving-cloud { opacity: 0; }
-            .card.in-center .focus-border { opacity: 0.8; transform: scale(1); }
+            .cloud-left, .cloud-right { display: none; }
+            .ruyi-center {
+                width: 7px; height: 7px;
+                opacity: 1;
+                animation: none;
+                box-shadow: 0 0 0 3px rgba(196,154,69,0.20),
+                            0 0 10px rgba(196,154,69,0.35);
+            }
+            .center-text-line {
+                opacity: 0.40;
+                transform: scaleX(1);
+                animation: none;
+                background: linear-gradient(90deg, transparent, var(--gold-300), var(--gold), var(--gold-300), transparent);
+            }
 
+            /* ── Card layout ──────────────────────────────────────────────
+               Card variant rules (.card--portrait/landscape/feature .img-box) carry
+               higher specificity than .img-box alone → must !important-override here  */
             .gallery-container {
-                padding: 240px 20px 40px;
-                gap: 40px;
+                padding: 220px 16px 40px;
+                gap: 32px;
             }
             .card, .card.odd, .card.even {
                 flex-direction: column !important;
                 width: 100%;
             }
-
-            /* ⚠️ Card variant rules (.card--portrait/landscape/feature .img-box) have higher
-               CSS specificity than plain .img-box — must override explicitly here or mobile
-               will still use desktop 42%/58%/62% widths and break the column layout. */
             .img-box,
             .card--portrait  .img-box,
             .card--landscape .img-box,
             .card--feature   .img-box {
                 width: 100% !important;
-                height: 280px;
+                height: 260px !important;
+                flex-shrink: 0;
             }
             .info-box,
             .card--portrait  .info-box,
             .card--landscape .info-box,
             .card--feature   .info-box {
                 width: 100% !important;
-                padding: 28px 20px;
+                padding: 24px 20px !important;
+                /* Without border-box, 100% + 40px padding overflows card's overflow:hidden
+                   → right-side characters on each line get clipped. */
+                box-sizing: border-box !important;
             }
-            /* Gold side-divider line only makes sense in horizontal (desktop) layout */
+            /* Gold side-divider line is horizontal-layout only */
             .info-box::before,
-            .card.odd .info-box::before { display: none; }
+            .card.odd .info-box::before { display: none !important; }
 
-            .item-name { padding-right: 72px; font-size: 1.45rem; min-height: 52px; }
+            .card.in-center .antique-img {
+                transform: scale(1.08);
+                filter: brightness(1.02);
+            }
+            .card.in-center .vignette-cloud,
+            .card.in-center .moving-cloud { opacity: 0; }
+            .card.in-center .focus-border { opacity: 0.8; transform: scale(1); }
 
+            .item-name { padding-right: 72px; font-size: 1.4rem; min-height: 48px; }
+
+            /* ── Category rail ── */
             .category-rail {
                 justify-content: flex-start;
                 overflow-x: auto;
-                padding: 0 20px 20px;
+                padding: 0 16px 16px;
                 gap: 0;
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none;
             }
             .category-rail::-webkit-scrollbar { display: none; }
-            .cat-btn { padding: 12px 20px; flex-shrink: 0; }
+            .cat-btn { padding: 12px 18px; flex-shrink: 0; }
 
-            .modal-content { flex-direction: column; max-height: 85dvh; }
-            .modal-left { width: 100%; height: 35dvh; }
-            .modal-right { width: 100%; padding: 25px; }
-            .modal-title { font-size: 1.6rem; }
+            /* ── Modal ── */
+            .modal-content { flex-direction: column; max-height: 88dvh; }
+            .modal-left { width: 100%; height: 38dvh; }
+            .modal-right { width: 100%; padding: 22px 20px; }
+            .modal-title { font-size: 1.5rem; }
         }
     </style>
 </head>
