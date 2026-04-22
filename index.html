@@ -4,138 +4,160 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉寶軒 Jibao Xuan - 撥雲見日</title>
+    <title>吉寶軒 Jibao Xuan — 傳承・鑑光・典藏</title>
+    <!-- Three-tier Chinese type system + Latin auction face -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=LXGW+WenKai+TC:wght@300;400;500&family=Noto+Serif+TC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+TC:wght@300;400;500;600;700&family=LXGW+WenKai+TC:wght@300;400;500&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap">
+
     <style>
+        /* =========================================================
+           吉寶軒 Jibao Xuan — Design Tokens
+           ========================================================= */
         :root {
-            /* ── Brand core ── */
-            --gold:     #c49a45;
-            --ink:      #2c2c2c;
-            --paper:    #f7f4ed;
-            --seal-red: #8a2a2a;
+            /* Brand core — do not alter */
+            --gold:       #c49a45;
+            --ink:        #2c2c2c;
+            --paper:      #f7f4ed;
+            --seal-red:   #8a2a2a;
 
-            /* ── Gold scale ── */
-            --gold-900: #6b5220;
-            --gold-700: #8a6f2f;
-            --gold-500: #c49a45;
-            --gold-300: #d9b977;
-            --gold-100: #ead6a8;
-            --gold-050: #f3e8cc;
+            /* Gold scale */
+            --gold-900:   #6b5220;
+            --gold-700:   #8a6f2f;
+            --gold-500:   #c49a45;
+            --gold-300:   #d9b977;
+            --gold-100:   #ead6a8;
+            --gold-050:   #f3e8cc;
 
-            /* ── Ink scale ── */
-            --ink-900: #1a1a1a;
-            --ink-800: #2c2c2c;
-            --ink-600: #4a4a4a;
-            --ink-500: #6b6b6b;
-            --ink-400: #999999;
-            --ink-300: #bdbdbd;
-            --ink-200: #d9d6cf;
+            /* Ink scale */
+            --ink-900:    #1a1a1a;
+            --ink-800:    #2c2c2c;
+            --ink-600:    #4a4a4a;
+            --ink-500:    #6b6b6b;
+            --ink-400:    #999999;
+            --ink-300:    #bdbdbd;
 
-            /* ── Paper scale ── */
-            --paper-100: #ffffff;
-            --paper-200: #fbf9f3;
-            --paper-300: #f7f4ed;
-            --paper-400: #ede8dc;
-            --paper-500: #e0dac8;
+            /* Paper / neutrals */
+            --paper-100:  #ffffff;
+            --paper-200:  #fbf9f3;
+            --paper-300:  #f7f4ed;
+            --paper-400:  #ede8dc;
+            --paper-500:  #e0dac8;
 
-            /* ── Seal scale ── */
-            --seal-900: #5c1c1c;
-            --seal-700: #6b1f1f;
-            --seal-500: #8a2a2a;
-            --seal-300: #b45353;
+            /* Seal */
+            --seal-700:   #6b1f1f;
+            --seal-500:   #8a2a2a;
+            --seal-050:   rgba(138, 42, 42, 0.08);
 
-            /* ── Semantic tokens ── */
-            --fg-1:      var(--ink-800);
-            --fg-2:      var(--ink-600);
-            --fg-3:      var(--ink-500);
-            --fg-muted:  var(--ink-400);
-            --fg-accent: var(--gold-500);
-            --fg-seal:   var(--seal-500);
-            --fg-invert: var(--paper-300);
-            --bg-ground: var(--paper-300);
-            --bg-raised: var(--paper-200);
-            --bg-sunken: var(--paper-400);
+            /* Semantic fg */
+            --fg-1: var(--ink-800);
+            --fg-2: var(--ink-600);
+            --fg-3: var(--ink-500);
+            --fg-muted: var(--ink-400);
 
-            /* ── Rules ── */
-            --rule-hair: 1px solid rgba(44,44,44,0.12);
+            /* Lines */
+            --rule-hair: 1px solid rgba(44, 44, 44, 0.12);
             --rule-dash: 1px dashed var(--paper-500);
-            --rule-gold: 1px solid rgba(196,154,69,0.4);
+            --rule-gold: 1px solid rgba(196, 154, 69, 0.4);
 
-            /* ── Shadows ── */
-            --shadow:       rgba(0,0,0,0.15);
-            --shadow-card:  0 10px 30px rgba(0,0,0,0.15);
-            --shadow-hover: 0 20px 50px rgba(196,154,69,0.30);
-            --shadow-modal: 0 25px 50px rgba(0,0,0,0.5);
+            /* Shadow */
+            --shadow: rgba(0, 0, 0, 0.15);
 
-            /* ── Motion ── */
-            --ease-ink: cubic-bezier(0.25, 1, 0.5, 1);
-
-            /* ── Typography ── */
-            --font-display: 'Noto Serif TC', serif;
-            --font-body:    'LXGW WenKai TC', 'Noto Serif TC', serif;
-            --font-plaque:  'Ma Shan Zheng', serif;
-            --font-callig:  'Zhi Mang Xing', cursive;
-            --font-latin:   'Cormorant Garamond', serif;
+            /* Type tiers — three-layer Chinese system
+               Fallback chain strategy (Windows TC):
+               1. Google web font (may be blocked by SSL proxy)
+               2. 標楷體 / DFKai-SB / BiauKai → bundled kaishu on all Windows TW/HK — CALLIGRAPHIC ✓
+               3. STKaiti / KaiTi → Mac / Simplified-Windows kai alternatives — still calligraphic ✓
+               4. Noto Serif TC → mincho/宋體 style, last resort before system generic
+               ⚠️  CRITICAL: 標楷體 MUST precede Noto Serif TC to avoid mincho fallback on TC systems
+               ⚠️  NEVER put generic 'serif' as last resort without 標楷體 — maps to 新細明體 on Windows TC
+               ⚠️  Ma Shan Zheng covers Simplified chars only; 標楷體 is the per-char TC safety net    */
+            --font-plaque:  'Ma Shan Zheng', '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            --font-display: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            --font-body:    'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            --font-latin:   'Cormorant Garamond', Georgia, serif;  /* Latin/numerals only — never use for Chinese text */
         }
 
-        html {
-            overscroll-behavior-y: none;
-        }
+        html { overscroll-behavior-y: none; }
 
         body {
             margin: 0;
             padding: 0;
-            background-color: transparent;
-            /* 米色/宣紙底色，避免底部抖動閃爍白底 */
+            background-color: #eee9dc;     /* rice-paper underlay, prevents white flash at scroll end */
             overscroll-behavior-y: none;
-            font-family: 'LXGW WenKai TC', cursive, serif;
-            color: var(--ink);
+            font-family: var(--font-body);
+            color: var(--fg-1);
             overflow-x: hidden;
         }
 
-        /* --- 背景與潑墨裝飾 --- */
+        /* =========================================================
+           Background — three-depth ink-wash landscape
+           L1 山水底圖 (bg-layer)  →  L2 潑墨暗角 (ink-vignette)
+           → L3 WebGL 縹霧 (canvas)
+           ========================================================= */
         .bg-layer {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100dvh;
-            background-image: url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp');
-            /* Placeholder URL */
-            background-size: cover;
-            background-position: center top;
-            filter: sepia(0.2) brightness(0.9);
+            inset: 0;
             z-index: -2;
             pointer-events: none;
+            background:
+                linear-gradient(to bottom, rgba(44, 44, 44, 0.06) 0%, transparent 18%),
+                radial-gradient(ellipse 60% 40% at 15% 60%, rgba(196, 154, 69, 0.07) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 35% at 85% 25%, rgba(44, 44, 44, 0.04) 0%, transparent 60%),
+                url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp') center center / cover no-repeat,
+                linear-gradient(168deg, #f0ece2 0%, #e8e3d4 35%, #e3ddd0 65%, #ddd7c8 100%);
+            filter: sepia(0.04) brightness(0.88) contrast(1.05);
+        }
+        /* 1. SVG fibre noise (rice-paper grain), inline URL only */
+        .bg-layer::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' seed='4'/><feColorMatrix values='0 0 0 0 0.17  0 0 0 0 0.17  0 0 0 0 0.17  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+            background-size: 280px 280px;
+            opacity: 0.75;
+            mix-blend-mode: multiply;
         }
 
         #glCanvas {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             z-index: -1;
             pointer-events: none;
         }
 
-        /* --- 3. 頭部品牌區 (Header Fixed) --- */
+        /* Ink vignette — corner ink-bleed onto rice paper, above bg-layer & canvas */
+        .ink-vignette {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(ellipse 120% 80% at 50% -10%,
+                    rgba(44, 44, 44, 0.18) 0%, transparent 60%),
+                radial-gradient(ellipse 80% 60% at 0% 100%,
+                    rgba(44, 44, 44, 0.12) 0%, transparent 55%),
+                radial-gradient(ellipse 80% 60% at 100% 100%,
+                    rgba(44, 44, 44, 0.10) 0%, transparent 55%);
+        }
+
+        /* =========================================================
+           Header
+           ========================================================= */
         header {
             position: fixed;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             width: 100%;
             z-index: 100;
             text-align: center;
             padding: 80px 20px 20px;
             box-sizing: border-box;
             background: transparent;
-            transition: padding 0.6s ease, background 0.6s ease, backdrop-filter 0.6s ease, border-bottom 0.6s ease, box-shadow 0.6s ease;
+            transition: padding 0.6s ease, background 0.6s ease, backdrop-filter 0.6s ease,
+                        border-bottom 0.6s ease, box-shadow 0.6s ease;
         }
 
-        /* Compact 收縮狀態 (Fixed) - 避免 Layout Reflow */
         header.header-compact {
             background: rgba(247, 244, 237, 0.92);
             backdrop-filter: blur(12px);
@@ -145,18 +167,13 @@
             box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
         }
 
-
+        /* Brand mark — calligraphy reserved for the 3-character plaque */
         .brand-title {
-            /* DP-001：啟用品牌字體 token，書法印章感 */
-            font-family: var(--font-plaque); /* Ma Shan Zheng */
-
+            font-family: var(--font-plaque);
             font-size: 5rem;
             font-weight: normal;
-
             color: var(--ink);
             margin: 0;
-
-            /* 4. 起始間距與特效：保持原本的設計 */
             letter-spacing: 0.2rem;
             filter: blur(10px);
             opacity: 0;
@@ -168,14 +185,12 @@
         @keyframes titleReveal {
             100% {
                 opacity: 1;
-                /* 保持原本 1.5rem 的寬廣字距，這與文楷體的文人氣息非常契合 */
                 letter-spacing: 1.5rem;
                 filter: blur(0px) drop-shadow(4px 4px 0px rgba(196, 154, 69, 0.2));
                 transform: scale(1);
             }
         }
 
-        /* 修正收縮狀態 (Compact Header)：維持原本 2.2rem 的設計比例 */
         header.header-compact .brand-title {
             font-size: 2.2rem;
             letter-spacing: 0.8rem;
@@ -185,18 +200,21 @@
             opacity: 1;
         }
 
+        /* Slogan — structured mincho, not calligraphy */
         .brand-slogan {
-            font-size: 1.5rem;
-            color: var(--gold);
-            margin-top: 15px;
-            letter-spacing: 0.5rem;
+            font-family: var(--font-display);
             font-weight: 400;
+            font-size: 1.15rem;
+            color: var(--gold);
+            margin-top: 22px;
+            letter-spacing: 0.5rem;
             opacity: 0;
             max-height: 50px;
             overflow: hidden;
             animation: fadeIn 2s 2.5s forwards;
             transition: all 0.5s ease;
         }
+        .brand-slogan .sep { opacity: 0.5; margin: 0 0.3em; }
 
         header.header-compact .brand-slogan {
             opacity: 0;
@@ -204,18 +222,17 @@
             margin-top: 0;
         }
 
-        @keyframes fadeIn {
-            to {
-                opacity: 1;
-            }
-        }
+        @keyframes fadeIn { to { opacity: 1; } }
 
-        /* 1. 如意雲分隔線 */
+        /* =========================================================
+           Ruyi cloud divider — rebuilt as proper 如意頭 rosette chain
+           Each cloud = 3 ruyi heads linked with S-curves.
+           ========================================================= */
         .ruyi-divider {
             width: 100%;
             max-width: 800px;
-            height: 60px;
-            margin: 20px auto 30px;
+            height: 70px;
+            margin: 28px auto 30px;
             position: relative;
             overflow: visible;
             transition: all 0.4s ease;
@@ -228,36 +245,48 @@
             overflow: hidden;
         }
 
-        .cloud-left,
-        .cloud-right {
+        .cloud-left, .cloud-right {
             position: absolute;
             top: 0;
-            width: 50%;
+            width: calc(50% - 30px);
             height: 100%;
         }
+        .cloud-left { left: 0; display: flex; justify-content: flex-end; }
+        .cloud-right { right: 0; display: flex; justify-content: flex-start; transform: scaleX(-1); }
 
-        .cloud-left {
-            left: 0;
-            animation: cloudEnterLeft 3s cubic-bezier(0.25, 1, 0.5, 1) forwards, cloudFloat 5s ease-in-out 3s infinite;
+        .cloud-left  { animation: cloudEnterLeft 3s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+                                  cloudFloat 5s ease-in-out 3s infinite; }
+        .cloud-right { animation: cloudEnterRight 3s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+                                  cloudFloatRight 5s ease-in-out 3s infinite; }
+
+        .ruyi-svg {
+            width: 300px;
+            height: 70px;
+            overflow: visible;
         }
-
-        .cloud-right {
-            right: 0;
-            transform: scaleX(-1);
-            animation: cloudEnterRight 3s cubic-bezier(0.25, 1, 0.5, 1) forwards, cloudFloatRight 5s ease-in-out 3s infinite;
-        }
-
         .ruyi-path {
-            fill: rgba(44, 44, 44, 0.08);
-            /* 半透明填充質感 */
-            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
-            /* 營造浮雕造型 */
-            transform-origin: center;
+            fill: rgba(44, 44, 44, 0.30);
+            filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.15));
+            stroke: none;
+        }
+
+        /* Tiny centered gold dot between the two cloud halves — anchors the rosette */
+        .ruyi-center {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--gold);
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 3px rgba(196, 154, 69, 0.18),
+                        0 0 10px rgba(196, 154, 69, 0.35);
+            opacity: 0;
+            animation: fadeIn 1.2s 3s forwards;
         }
 
         .center-text-line {
             position: absolute;
-            top: 30px;
+            top: 34px;
             left: 10%;
             right: 10%;
             height: 1px;
@@ -268,127 +297,146 @@
         }
 
         @keyframes cloudEnterLeft {
-            0% {
-                transform: translateX(-100px) scale(0.9);
-                opacity: 0;
-            }
-
-            100% {
-                transform: translateX(0) scale(1);
-                opacity: 1;
-            }
+            0% { transform: translateX(-100px) scale(0.9); opacity: 0; }
+            100% { transform: translateX(0) scale(1); opacity: 1; }
         }
-
         @keyframes cloudEnterRight {
-            0% {
-                transform: translateX(100px) scale(-0.9, 0.9);
-                opacity: 0;
-            }
-
-            100% {
-                transform: translateX(0) scale(-1, 1);
-                opacity: 1;
-            }
+            0% { transform: translateX(100px) scale(-0.9, 0.9); opacity: 0; }
+            100% { transform: translateX(0) scale(-1, 1); opacity: 1; }
         }
-
         @keyframes cloudFloat {
-
-            0%,
-            100% {
-                transform: translateX(0) translateY(0);
-            }
-
-            50% {
-                transform: translateX(0) translateY(-5px);
-            }
+            0%,100% { transform: translateX(0) translateY(0); }
+            50% { transform: translateX(0) translateY(-5px); }
         }
-
         @keyframes cloudFloatRight {
-
-            0%,
-            100% {
-                transform: translateX(0) scaleX(-1) translateY(0);
-            }
-
-            50% {
-                transform: translateX(0) scaleX(-1) translateY(-5px);
-            }
+            0%,100% { transform: translateX(0) scaleX(-1) translateY(0); }
+            50% { transform: translateX(0) scaleX(-1) translateY(-5px); }
         }
+        @keyframes lineReveal { to { opacity: 0.5; transform: scaleX(1); } }
 
-        @keyframes lineReveal {
-            to {
-                opacity: 0.5;
-                transform: scaleX(1);
-            }
+        /* =========================================================
+           Category rail — 懸絲標籤 (auction-house 專場 hanging tags)
+           ========================================================= */
+        .category-rail {
+            display: flex;
+            justify-content: center;
+            gap: 0;
+            padding: 0 40px 32px;
+            max-width: 1100px;
+            margin: 0 auto;
+            border-bottom: var(--rule-hair);
         }
+        .cat-btn {
+            appearance: none;
+            background: transparent;
+            border: none;
+            border-right: var(--rule-hair);
+            padding: 16px 28px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.3s ease;
+            position: relative;
+        }
+        .cat-btn:first-child { border-left: var(--rule-hair); }
+        .cat-glyph {
+            font-family: var(--font-plaque);
+            font-size: 1.4rem;
+            color: var(--fg-3);
+            line-height: 1;
+            transition: color 0.3s ease;
+        }
+        .cat-label {
+            font-family: var(--font-display);
+            font-size: 0.7rem;
+            letter-spacing: 0.14em;
+            color: var(--fg-muted);
+            transition: color 0.3s ease;
+        }
+        .cat-btn::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 20%;
+            right: 20%;
+            height: 2px;
+            background: var(--gold);
+            transform: scaleX(0);
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .cat-btn:hover .cat-glyph { color: var(--fg-1); }
+        .cat-btn:hover .cat-label { color: var(--fg-2); }
+        .cat-btn.active .cat-glyph { color: var(--gold); }
+        .cat-btn.active .cat-label { color: var(--gold-700); }
+        .cat-btn.active::after { transform: scaleX(1); }
 
-        /* --- Wrapper Container for Parallax --- */
+        /* =========================================================
+           Gallery
+           ========================================================= */
         .page-wrapper {
             position: relative;
             overflow: hidden;
             min-height: 100dvh;
         }
 
-        /* --- 展覽容器 --- */
         .gallery-container {
             max-width: 1100px;
             margin: 0 auto;
-            padding: 380px 40px 100px;
-            /* 預留上方 Fixed Header 空間 */
+            padding: 360px 40px 100px;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 80px;
         }
 
-        /* --- 藏品卡片與進場動畫 --- */
+        /* Cards */
         .card {
             width: 100%;
-            background: var(--bg-raised);
+            background: var(--paper-200);
             border-radius: 4px;
-            box-shadow: var(--shadow-card);
+            box-shadow: 0 10px 30px var(--shadow);
             overflow: hidden;
             position: relative;
             display: flex;
             flex-direction: row;
-            /* Default layout */
             border: 1px solid rgba(0, 0, 0, 0.05);
-
-            /* Reveal Animation */
             opacity: 0;
             transform: translateY(20px) translateX(60px);
-            /* 預設右側滑入 */
-            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease;
+            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1),
+                        box-shadow 0.4s ease;
             will-change: transform, opacity;
         }
-
-        /* 奇數展品 (Odd): 文字在左，圖片在右 */
-        .card.odd {
-            flex-direction: row-reverse;
-        }
-
-        /* 偶數展品 (Even): 圖片在左，文字在右 */
-        .card.even {
-            flex-direction: row;
-        }
-
-        .card.from-left {
-            transform: translateY(20px) translateX(-60px);
-        }
-
-        .card.from-right {
-            transform: translateY(20px) translateX(60px);
-        }
-
-        .card.is-visible {
-            opacity: 1;
-            transform: translateY(0) translateX(0);
-        }
-
+        .card.odd  { flex-direction: row-reverse; }
+        .card.even { flex-direction: row; }
+        .card.from-left  { transform: translateY(20px) translateX(-60px); }
+        .card.from-right { transform: translateY(20px) translateX(60px); }
+        .card.is-visible { opacity: 1; transform: translateY(0) translateX(0); }
         .card:hover {
             transform: translateY(-5px) scale(1.01);
-            box-shadow: var(--shadow-hover);
+            box-shadow: 0 20px 50px rgba(196, 154, 69, 0.3);
             z-index: 10;
+        }
+
+        /* FIX-05 — 中式裱裱四角裝飾 L 型角飾 */
+        .card::before, .card::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-color: rgba(196, 154, 69, 0.35);
+            border-style: solid;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .card::before {
+            top: 8px; left: 8px;
+            border-width: 1px 0 0 1px;
+        }
+        .card::after {
+            bottom: 8px; right: 8px;
+            border-width: 0 1px 1px 0;
         }
 
         .img-box {
@@ -396,44 +444,23 @@
             height: 450px;
             position: relative;
             overflow: hidden;
-            background: var(--paper-500);
+            background: var(--paper-500);  /* warm tone during image load */
             flex-shrink: 0;
         }
-
-        /* DP-002: 三種卡片比例變體 */
-        /* 縱軸器物：書畫、長頸瓶、玉器 */
-        .card--portrait .img-box  { width: 42%; height: 540px; }
-        .card--portrait .info-box { width: 58%; }
-
-        /* 橫軸器物：銅器、傢俱、文房 */
-        .card--landscape .img-box  { width: 58%; height: 380px; }
-        .card--landscape .info-box { width: 42%; }
-
-        /* 主打展品（首件或特選） */
-        .card--feature .img-box  { width: 62%; height: 520px; }
-        .card--feature .info-box { width: 38%; padding: 50px 40px; }
-
         .antique-img {
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             object-fit: cover;
-            filter: brightness(0.95); /* DP-005: 移除 sepia，尊重釉色原色 */
-            transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1), filter 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            filter: brightness(0.93);  /* DP-005: no sepia — preserve original glaze colours */
+            transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1),
+                        filter 1.2s cubic-bezier(0.25, 1, 0.5, 1);
         }
-
         .card:hover .antique-img {
-            transform: scale(1.08); /* DP-005: 縮小增量，避免商業感 */
+            transform: scale(1.08);
             filter: brightness(1.02);
         }
 
-        /* 5. 撥雲見寶：邊緣漸暈霧化遮罩 (Vignette Cloud Mask) */
         .vignette-cloud {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            /* 模擬 feGaussianBlur, 中心透明, 邊緣不透明 */
+            position: absolute; inset: 0;
             -webkit-mask-image: radial-gradient(ellipse at center, transparent 30%, black 80%);
             mask-image: radial-gradient(ellipse at center, transparent 30%, black 80%);
             backdrop-filter: blur(12px);
@@ -444,122 +471,112 @@
             pointer-events: none;
             z-index: 2;
         }
-
-        .card:hover .vignette-cloud {
-            opacity: 0;
-        }
+        .card:hover .vignette-cloud { opacity: 0; }
 
         .moving-cloud {
             position: absolute;
-            width: 200%;
-            height: 200%;
-            top: -50%;
-            left: -50%;
-            background-image: none;
+            width: 200%; height: 200%;
+            top: -50%; left: -50%;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='c'><feTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 0.95  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
             opacity: 0.4;
             animation: drift 60s linear infinite;
             pointer-events: none;
             z-index: 3;
             transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1);
         }
+        .card:hover .moving-cloud { opacity: 0; }
+        @keyframes drift { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .card:hover .moving-cloud {
-            opacity: 0;
-        }
-
-        @keyframes drift {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* 金色聚焦內框，配合 hover 顯現，增加立體感 */
         .focus-border {
             position: absolute;
-            top: 5%;
-            left: 5%;
-            width: 90%;
-            height: 90%;
+            top: 5%; left: 5%;
+            width: 90%; height: 90%;
             border: 1px solid var(--gold);
             opacity: 0;
             transform: scale(1.05);
-            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1), transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
+                        transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
             pointer-events: none;
             z-index: 4;
             mix-blend-mode: overlay;
         }
-
-        .card:hover .focus-border {
-            opacity: 0.8;
-            transform: scale(1);
-        }
-
+        .card:hover .focus-border { opacity: 0.8; transform: scale(1); }
 
         .info-box {
             width: 50%;
             padding: 40px 50px;
             position: relative;
-            background: var(--paper-300);
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0.17  0 0 0 0 0.15  0 0 0 0 0.10  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+            background-color: var(--paper-300);  /* warm fallback if SVG grain fails */
+            background-size: 180px 180px;
             display: flex;
             flex-direction: column;
             justify-content: center;
+            /* gold dividing line via ::before only — no static border-left */
+        }
+        .info-box::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8%;
+            height: 84%;
+            width: 2px;
+            background: linear-gradient(
+                to bottom,
+                transparent,
+                rgba(196, 154, 69, 0.5) 20%,
+                rgba(196, 154, 69, 0.5) 80%,
+                transparent
+            );
+            pointer-events: none;
+        }
+        /* Odd card: info-box is on LEFT, image on RIGHT — flip the gold line to the right edge */
+        .card.odd .info-box::before {
+            left: auto;
+            right: 0;
         }
 
-        /* 4. 印章互動 */
+        /* DP-002: card proportion variants */
+        .card--portrait .img-box  { width: 42%; height: 540px; }
+        .card--portrait .info-box { width: 58%; }
+        .card--landscape .img-box  { width: 58%; height: 380px; }
+        .card--landscape .info-box { width: 42%; }
+        .card--feature .img-box  { width: 62%; height: 520px; }
+        .card--feature .info-box { width: 38%; padding: 50px 40px; }
+
+        /* Seal */
         .seal-wrapper {
             position: absolute;
-            top: 20px;
-            right: 30px;
-            width: 60px;
-            height: 60px;
+            top: 20px; right: 30px;
+            width: 60px; height: 60px;
             z-index: 10;
             cursor: pointer;
         }
-
         .seal-svg {
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             transition: transform 0.4s ease;
             overflow: visible;
         }
-
-        .seal-wrapper:hover .seal-svg {
-            transform: scale(1.1) rotate(-5deg);
-        }
-
+        .seal-wrapper:hover .seal-svg { transform: scale(1.1) rotate(-5deg); }
         .seal-bg {
             fill: var(--paper);
             stroke: var(--seal-red);
             stroke-width: 3;
             transition: fill 0.4s ease;
         }
-
         .seal-text {
             fill: var(--seal-red);
             font-size: 14px;
-            font-family: 'LXGW WenKai TC';
-            font-weight: bold;
+            font-family: var(--font-display);
+            font-weight: 600;
             transition: fill 0.4s ease;
         }
-
-        .seal-wrapper:hover .seal-bg {
-            fill: var(--seal-red);
-        }
-
-        .seal-wrapper:hover .seal-text {
-            fill: var(--paper);
-        }
-
+        .seal-wrapper:hover .seal-bg { fill: var(--seal-red); }
+        .seal-wrapper:hover .seal-text { fill: var(--paper); }
         .seal-halo {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 100%;
-            height: 100%;
+            top: 50%; left: 50%;
+            width: 100%; height: 100%;
             background: radial-gradient(circle, var(--seal-red) 20%, transparent 70%);
             transform: translate(-50%, -50%) scale(0);
             opacity: 0.6;
@@ -568,33 +585,111 @@
             border-radius: 50%;
             pointer-events: none;
         }
-
         .seal-wrapper:hover .seal-halo {
             transform: translate(-50%, -50%) scale(2.5);
             opacity: 0;
         }
 
-        .item-name {
-            font-family: var(--font-plaque); /* DP-001 rev: Ma Shan Zheng，氣韻統一 */
-            font-size: 1.8rem;
-            font-weight: normal;
-            letter-spacing: 0.15rem;
-            margin: 0 0 10px;
-            color: var(--ink);
-            line-height: 1.3;
+        /* Lot number — auction catalogue label (FIX-04) */
+        .lot-number {
+            font-family: var(--font-latin);
+            font-size: 0.65rem;
+            letter-spacing: 0.22em;
+            color: var(--fg-muted);
+            margin: 0 0 16px;
+            text-transform: uppercase;
+        }
+        .lot-num-val {
+            color: var(--gold-700);
+            font-weight: 500;
         }
 
+        /* Item typography */
+        .item-name {
+            font-family: var(--font-display);
+            font-weight: 400;
+            font-size: 1.75rem;
+            margin: 0 0 10px;
+            color: var(--fg-1);
+            line-height: 1.35;
+            letter-spacing: 0.04em;
+            padding-right: 88px; /* clear 60px seal @ right:30 + breathing room */
+            min-height: 60px;
+        }
         .item-era {
-            color: var(--gold);
-            font-size: 1.1rem;
-            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: var(--font-latin);
+            font-size: 0.8rem;
+            letter-spacing: 0.18em;
+            color: var(--gold-700);
+            text-transform: uppercase;
             border-bottom: var(--rule-dash);
-            padding-bottom: 15px;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+        }
+        .item-era::before {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 1px;
+            background: var(--gold-300);
+            flex-shrink: 0;
+        }
+
+        /* Material badges — museum label */
+        .material-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 8px 0 12px;
+            padding-bottom: 14px;
+            border-bottom: var(--rule-dash);
+        }
+        .badge {
+            font-family: var(--font-display);
+            font-size: 0.72rem;
+            letter-spacing: 0.12em;
+            color: var(--gold-700);
+            border: 1px solid rgba(196, 154, 69, 0.5);
+            padding: 2px 8px;
+            border-radius: 2px;
+            background: rgba(196, 154, 69, 0.06);
+            text-transform: none;
+        }
+        .modal-badges .badge {
+            font-size: 0.8rem;
+            padding: 3px 10px;
+        }
+
+        /* Empty state — no results for active filter */
+        .empty-state {
+            width: 100%;
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--fg-3);
+        }
+        .empty-glyph {
+            display: block;
+            font-family: var(--font-plaque);
+            font-size: 4rem;
+            color: var(--gold-100);
+            margin-bottom: 16px;
+            letter-spacing: 0;
+        }
+        .empty-state p {
+            font-family: var(--font-display);
+            letter-spacing: 0.3em;
+            font-size: 0.95rem;
+            color: var(--fg-3);
+            margin: 0;
         }
 
         .item-story {
+            font-family: var(--font-body);
             font-size: 1rem;
-            line-height: 1.8;
+            line-height: 1.9;
             color: var(--fg-2);
             text-align: justify;
             margin-bottom: 20px;
@@ -604,76 +699,59 @@
             overflow: hidden;
         }
 
-        .tags {
-            font-size: 0.9rem;
-        }
-
+        .tags { font-size: 0.9rem; }
         .tag {
-            color: var(--fg-muted);   /* DP-004: 改用 token */
-            font-style: normal;        /* DP-004: 移除義大利體 */
+            color: var(--fg-muted);
+            margin-right: 8px;
+            font-style: normal;           /* DP-004: no italic on tags */
             font-size: 0.75rem;
             letter-spacing: 0.08em;
-            margin-right: 8px;
-        }
-        .tag::before {
-            content: '#';
-            color: var(--gold-300);
-            margin-right: 2px;
+            font-family: var(--font-body);
         }
 
         .loading {
             text-align: center;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
+            font-family: var(--font-display);
+            letter-spacing: 0.3em;
             color: var(--gold);
             margin-top: 50px;
             width: 100%;
         }
 
-        /* --- 滾動進度指示器（印章風格） --- */
+        /* Scroll progress */
         #scroll-progress-wrap {
             position: fixed;
-            right: 10px;
-            top: 20px;
+            right: 10px; top: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             z-index: 200;
             pointer-events: none;
         }
-
-        #scroll-seal {
-            width: 24px;
-            height: 24px;
-            margin-bottom: 6px;
-        }
-
+        #scroll-seal { width: 24px; height: 24px; margin-bottom: 6px; }
         #scroll-progress-track {
-            width: 2px;
-            height: 50dvh;
+            width: 2px; height: 50dvh;
             background: rgba(196, 154, 69, 0.15);
             border-radius: 1px;
             overflow: hidden;
         }
-
         #scroll-progress-bar {
-            width: 100%;
-            height: 0%;
-            background: linear-gradient(to bottom, #c49a45, #8a2a2a);
+            width: 100%; height: 0%;
+            background: linear-gradient(to bottom, var(--gold), var(--seal-red));
             border-radius: 1px;
             transition: height 0.1s linear;
         }
 
-        /* --- Lightbox / Modal 樣式 --- */
+        /* =========================================================
+           Modal
+           ========================================================= */
         .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: fixed; inset: 0;
             background: rgba(28, 28, 28, 0.85);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
-            z-index: 100;
+            z-index: 300;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -681,11 +759,7 @@
             visibility: hidden;
             transition: opacity 0.5s ease, visibility 0.5s ease;
         }
-
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
 
         .modal-content {
             background: var(--paper);
@@ -703,7 +777,6 @@
             transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
             border: 1px solid rgba(196, 154, 69, 0.3);
         }
-
         .modal-overlay.active .modal-content {
             transform: scale(1) translateY(0);
             opacity: 1;
@@ -711,10 +784,8 @@
 
         .modal-close {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 40px;
-            height: 40px;
+            top: 20px; right: 20px;
+            width: 40px; height: 40px;
             border-radius: 50%;
             background: rgba(0, 0, 0, 0.05);
             display: flex;
@@ -722,112 +793,115 @@
             justify-content: center;
             cursor: pointer;
             z-index: 10;
-            transition: background 0.3s ease;
-            color: var(--ink);
+            transition: background 0.3s ease, color 0.3s ease;
+            color: var(--fg-1);
             font-size: 1.5rem;
             line-height: 1;
         }
-
-        .modal-close:hover {
-            background: rgba(0, 0, 0, 0.1);
-            color: var(--seal-red);
-        }
+        .modal-close:hover { background: rgba(0, 0, 0, 0.1); color: var(--seal-red); }
 
         .modal-left {
-            width: 45%;
-            background: var(--paper-400);
+            width: 52%;
+            background: linear-gradient(135deg, var(--paper-500) 0%, var(--paper-400) 100%);
+            box-shadow: inset 0 0 60px rgba(255,255,255,0.3);
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
         }
-
         .modal-img {
-            max-width: 100%;
-            max-height: 100%;
+            max-width: 100%; max-height: 100%;
             object-fit: contain;
             filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
         }
 
         .modal-right {
-            width: 55%;
+            width: 48%;
             padding: 40px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
         }
-
-        .modal-right::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .modal-right::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.05);
-        }
-
-        .modal-right::-webkit-scrollbar-thumb {
-            background: var(--gold);
-            border-radius: 3px;
-        }
+        .modal-right::-webkit-scrollbar { width: 6px; }
+        .modal-right::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.05); }
+        .modal-right::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 3px; }
 
         .modal-title {
-            font-family: var(--font-plaque); /* DP-001 rev: Ma Shan Zheng */
-            font-size: 2.2rem;
-            font-weight: normal;
-            letter-spacing: 0.2rem;
-            color: var(--ink);
+            font-family: var(--font-display);
+            font-weight: 400;
+            font-size: 2rem;
+            color: var(--fg-1);
             margin: 0 0 10px;
             line-height: 1.3;
+            letter-spacing: 0.05em;
+            padding-right: 60px;
         }
-
         .modal-era {
-            font-size: 1.2rem;
-            color: var(--gold);
-            margin-bottom: 25px;
-            border-bottom: var(--rule-dash);
-            padding-bottom: 15px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: var(--font-latin);
+            font-size: 0.78rem;
+            letter-spacing: 0.2em;
+            color: var(--gold-700);
+            text-transform: uppercase;
+            background: rgba(196, 154, 69, 0.07);
+            border: 1px solid rgba(196, 154, 69, 0.25);
+            padding: 5px 14px;
+            border-radius: 2px;
+            margin-bottom: 24px;
+            align-self: flex-start;
         }
-
+        .modal-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 0 0 22px;
+            padding-bottom: 18px;
+            border-bottom: var(--rule-dash);
+        }
+        .mat-badge {
+            font-family: var(--font-display);
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            padding: 3px 10px;
+            border: 1px solid rgba(196, 154, 69, 0.4);
+            color: var(--gold-700);
+            border-radius: 2px;
+            background: rgba(196, 154, 69, 0.05);
+        }
         .modal-story {
-            font-size: 1.1rem;
-            line-height: 1.9;
+            font-family: var(--font-body);
+            font-size: 1.05rem;
+            line-height: 1.95;
             color: var(--fg-2);
             text-align: justify;
-            margin-bottom: 30px;
+            margin-bottom: 24px;
             white-space: pre-wrap;
-            /* remove flex-grow to ensure full text reveals correctly with scroll */
         }
-
-        .modal-tags {
-            margin-bottom: 30px;
-        }
-
+        .modal-tags { margin-bottom: 26px; }
         .modal-tags .tag {
             display: inline-block;
-            background: transparent;               /* DP-004: 移除淡金底 */
-            border: 1px solid var(--rule-gold);    /* DP-004: 精緻金邊 pill */
-            padding: 4px 10px;
-            border-radius: 2px;                    /* DP-004: 方角更典雅 */
+            background: rgba(196, 154, 69, 0.1);
+            padding: 5px 12px;
+            border-radius: 4px;
             margin: 0 8px 8px 0;
-            color: var(--fg-2);
-            font-size: 0.8rem;
-            letter-spacing: 0.06em;
+            color: var(--fg-1);
+            font-size: 0.95rem;
             font-style: normal;
+            font-family: var(--font-body);
         }
-        .modal-tags .tag::before { content: none; } /* Modal 標籤不加 # */
-
-        /* DP-003: 策展人鑑定摘要區塊 */
-        .modal-appraisal { display: none; }
+        /* DP-003: 策展人鑑定摘要（Christie's Lot Details 格式） */
+        .modal-appraisal { display: none; margin-bottom: 20px; }
         .appraisal-divider {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin: 20px 0 16px;
+            margin: 20px 0 14px;
             color: var(--fg-3);
-            font-size: 0.75rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            font-family: var(--font-latin);
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            font-family: var(--font-display);  /* 鑑定參考 is Chinese — never --font-latin */
         }
         .appraisal-divider::before,
         .appraisal-divider::after {
@@ -838,178 +912,279 @@
         }
         .appraisal-label { white-space: nowrap; }
         .appraisal-row {
+            font-family: var(--font-body);
             font-size: 0.9rem;
             color: var(--fg-2);
             margin-bottom: 6px;
             line-height: 1.6;
         }
         .appraisal-price {
-            font-family: var(--font-latin); /* Cormorant Garamond */
-            font-size: 1.3rem;
-            color: var(--fg-accent);
+            /* ⚠️ Explicit chain — no CSS var to avoid resolution timing; 標楷體 leads for 新台幣/萬 */
+            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            font-size: 1.25rem;
+            color: var(--gold-700);
             letter-spacing: 0.03em;
-            margin: 6px 0;
+            margin: 4px 0;
         }
         .appraisal-note {
+            font-family: var(--font-body);
             font-size: 0.9rem;
             color: var(--fg-2);
             line-height: 1.7;
-            font-style: italic;
+            font-style: normal;   /* 中文無真實 italic — 合成斜體會觸發字型降階，改用 normal */
             margin-top: 4px;
         }
 
         .modal-action {
             display: inline-block;
-            padding: 12px 30px;
-            background: var(--seal-red);
-            color: var(--paper);
+            padding: 11px 32px;
+            background: transparent;
+            border: 1px solid var(--seal-red);
+            color: var(--seal-red);
+            /* Explicit chain — bypasses CSS var resolution; 標楷體 leads for calligraphic kai style */
+            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            font-weight: 400;
+            font-size: 0.9rem;
+            letter-spacing: 0.12em;   /* 0.18em 過寬，縮小讓字形更聚合 */
             text-decoration: none;
-            font-size: 1.1rem;
-            border-radius: 4px;
-            text-align: center;
-            transition: background 0.3s ease, transform 0.3s ease;
-            cursor: pointer;
+            transition: background 0.35s ease, color 0.35s ease;
             align-self: flex-start;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        .modal-action:hover {
+            background: var(--seal-red);
+            color: var(--paper-200);
+            transform: none;
+            box-shadow: none;
         }
 
-        .modal-action:hover {
-            background: var(--seal-700);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(138, 42, 42, 0.3);
+        /* Tweaks panel */
+        #tweaks-panel {
+            position: fixed;
+            right: 20px; bottom: 20px;
+            width: 260px;
+            background: rgba(247, 244, 237, 0.97);
+            border: 1px solid rgba(196, 154, 69, 0.4);
+            border-radius: 6px;
+            padding: 16px 18px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            color: var(--fg-1);
+            z-index: 500;
+            display: none;
+        }
+        #tweaks-panel h4 {
+            margin: 0 0 10px;
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+            letter-spacing: 0.3em;
+            color: var(--gold-700);
+            text-transform: none;
+            font-weight: 500;
+        }
+        #tweaks-panel label {
+            display: block;
+            margin: 8px 0 4px;
+            font-size: 0.78rem;
+            letter-spacing: 0.1em;
+            color: var(--fg-2);
+        }
+        #tweaks-panel input[type=color] {
+            width: 100%; height: 28px; border: none; background: transparent; cursor: pointer;
+        }
+        #tweaks-panel select {
+            width: 100%; padding: 4px 6px;
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            border: 1px solid var(--paper-500);
+            background: white;
+            border-radius: 2px;
         }
 
         @media (max-width: 768px) {
-
-            /* 依靠 JS 的 in-center 狀態來觸發手機端的褪去遮罩，實現自動探索感 */
             .card.in-center .antique-img {
                 transform: scale(1.08);
-                filter: brightness(1.02); /* DP-005: 同步 hover 標準 */
+                filter: brightness(1.02);  /* DP-005: no sepia */
             }
-
             .card.in-center .vignette-cloud,
-            .card.in-center .moving-cloud {
-                opacity: 0;
-            }
-
-            .card.in-center .focus-border {
-                opacity: 0.8;
-                transform: scale(1);
-            }
-
-            .brand-logo-svg {
-                height: 80px;
-            }
-
-            .brand-logo-svg text {
-                font-size: 3.5rem;
-            }
+            .card.in-center .moving-cloud { opacity: 0; }
+            .card.in-center .focus-border { opacity: 0.8; transform: scale(1); }
 
             .gallery-container {
                 padding: 240px 20px 40px;
-                /* Mobile header space */
                 gap: 40px;
             }
-
-            .card,
-            .card.odd,
-            .card.even {
+            .card, .card.odd, .card.even {
                 flex-direction: column !important;
                 width: 100%;
             }
+            .img-box { width: 100%; height: 300px; }
+            .info-box { width: 100%; padding: 30px 24px; }
+            .item-name { padding-right: 72px; font-size: 1.45rem; min-height: 52px; }
 
-            .img-box {
-                width: 100%;
-                height: 300px;
+            .category-rail {
+                justify-content: flex-start;
+                overflow-x: auto;
+                padding: 0 20px 20px;
+                gap: 0;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
             }
+            .category-rail::-webkit-scrollbar { display: none; }
+            .cat-btn { padding: 12px 20px; flex-shrink: 0; }
 
-            .info-box {
-                width: 100%;
-                padding: 30px 20px;
-            }
-
-            .modal-content {
-                flex-direction: column;
-                max-height: 85dvh;
-            }
-
-            .modal-left {
-                width: 100%;
-                height: 35dvh;
-            }
-
-            .modal-right {
-                width: 100%;
-                padding: 25px;
-            }
-
-            .modal-title {
-                font-size: 1.8rem;
-            }
+            .modal-content { flex-direction: column; max-height: 85dvh; }
+            .modal-left { width: 100%; height: 35dvh; }
+            .modal-right { width: 100%; padding: 25px; }
+            .modal-title { font-size: 1.6rem; }
         }
     </style>
 </head>
 
 <body>
-    <!-- 5. SVG clip-path 潑墨邊緣定義 -->
+    <!-- Splatter ink clip-path (retained) -->
     <svg width="0" height="0" style="position:absolute;">
         <defs>
             <clipPath id="ink-clip" clipPathUnits="objectBoundingBox">
-                <path
-                    d="M0.05,0.05 Q0.1,0 0.5,0.02 T0.95,0.05 Q1,0.1 0.98,0.5 T0.95,0.95 Q0.9,1 0.5,0.98 T0.05,0.95 Q0,0.9 0.02,0.5 T0.05,0.05 Z" />
+                <path d="M0.05,0.05 Q0.1,0 0.5,0.02 T0.95,0.05 Q1,0.1 0.98,0.5 T0.95,0.95 Q0.9,1 0.5,0.98 T0.05,0.95 Q0,0.9 0.02,0.5 T0.05,0.05 Z" />
             </clipPath>
+
+            <!-- ============ 如意雲 — 如意頭三連 SVG symbol ============
+                 Each 如意頭: elliptical 靈芝 base (rx18 ry12) + twin curled 回勾.
+                 Three heads across 300×70, linked by S-curves, filled as
+                 a single path so drop-shadow reads as one continuous cloud.
+            -->
+            <symbol id="ruyi-chain" viewBox="0 0 300 70">
+                <!-- Head 1 centered at x=40 -->
+                <path d="
+                    M 40 26
+                    C 40 14, 24 10, 22 22
+                    C 20 30, 28 32, 32 28
+                    C 28 34, 22 34, 22 30
+                    M 22 30
+                    C 16 34, 10 32, 10 26
+                    C 10 20, 14 16, 20 18
+                    C 14 14, 8 18, 8 26
+                    C 8 36, 22 42, 40 42
+                    C 58 42, 72 36, 72 26
+                    C 72 18, 66 14, 60 18
+                    C 66 16, 70 20, 70 26
+                    C 70 32, 64 34, 58 30
+                    C 58 34, 52 34, 48 28
+                    C 52 32, 60 30, 60 22
+                    C 58 10, 40 14, 40 26 Z" />
+                <!-- Connecting S-curve to head 2 -->
+                <path d="
+                    M 72 30
+                    C 90 18, 110 18, 128 30
+                    L 128 36
+                    C 110 24, 90 24, 72 36 Z" />
+                <!-- Head 2 centered at x=150 -->
+                <path d="
+                    M 150 26
+                    C 150 14, 134 10, 132 22
+                    C 130 30, 138 32, 142 28
+                    C 138 34, 132 34, 132 30
+                    M 132 30
+                    C 126 34, 120 32, 120 26
+                    C 120 20, 124 16, 130 18
+                    C 124 14, 118 18, 118 26
+                    C 118 36, 132 42, 150 42
+                    C 168 42, 182 36, 182 26
+                    C 182 18, 176 14, 170 18
+                    C 176 16, 180 20, 180 26
+                    C 180 32, 174 34, 168 30
+                    C 168 34, 162 34, 158 28
+                    C 162 32, 170 30, 170 22
+                    C 168 10, 150 14, 150 26 Z" />
+                <!-- Connecting S-curve to head 3 -->
+                <path d="
+                    M 182 30
+                    C 200 18, 220 18, 238 30
+                    L 238 36
+                    C 220 24, 200 24, 182 36 Z" />
+                <!-- Head 3 centered at x=260 -->
+                <path d="
+                    M 260 26
+                    C 260 14, 244 10, 242 22
+                    C 240 30, 248 32, 252 28
+                    C 248 34, 242 34, 242 30
+                    M 242 30
+                    C 236 34, 230 32, 230 26
+                    C 230 20, 234 16, 240 18
+                    C 234 14, 228 18, 228 26
+                    C 228 36, 242 42, 260 42
+                    C 278 42, 292 36, 292 26
+                    C 292 18, 286 14, 280 18
+                    C 286 16, 290 20, 290 26
+                    C 290 32, 284 34, 278 30
+                    C 278 34, 272 34, 268 28
+                    C 272 32, 280 30, 280 22
+                    C 278 10, 260 14, 260 26 Z" />
+            </symbol>
         </defs>
     </svg>
 
     <div class="bg-layer"></div>
     <canvas id="glCanvas"></canvas>
+    <div class="ink-vignette"></div>
 
     <div class="page-wrapper">
-        <div id="header-sentinel"
-            style="position: absolute; top: 0; left: 0; width: 100%; height: 150px; visibility: hidden; pointer-events: none;">
-        </div>
-        <header id="main-header">
-            <!-- 3. 書法正文標題 -->
-            <h1 class="brand-title">吉寶軒</h1>
-            <div class="brand-slogan">靜觀歲月 · 撥雲見寶</div>
+        <div id="header-sentinel" style="position:absolute;top:0;left:0;width:100%;height:150px;visibility:hidden;pointer-events:none;"></div>
 
-            <!-- 1. 如意雲分隔線 -->
-            <div class="ruyi-divider">
+        <header id="main-header">
+            <h1 class="brand-title">吉寶軒</h1>
+            <div class="brand-slogan">
+                <span>傳承</span><span class="sep">・</span><span>鑑光</span><span class="sep">・</span><span>典藏</span>
+            </div>
+
+            <!-- Ruyi cloud divider — rebuilt -->
+            <div class="ruyi-divider" aria-hidden="true">
                 <div class="center-text-line"></div>
-                <!-- 雲紋 SVG (左) -->
-                <svg class="cloud-left" viewBox="0 0 200 60" preserveAspectRatio="xMaxYMid meet">
-                    <!-- 雲頭帶有捲曲細節，內部掏空的如意雲圖案 -->
-                    <path class="ruyi-path"
-                        d="M100,45 C115,58 140,62 160,50 C180,38 185,15 170,5 C155,-5 130,2 125,20 C120,35 135,48 150,45 C162,42 168,28 158,18 C148,8 135,15 138,28 C140,35 148,38 152,32 C125,25 110,50 85,35 C70,25 60,10 45,15 C30,20 22,35 30,48 C38,60 55,60 65,48 C75,35 68,20 55,22 C45,25 42,35 48,42 C52,48 60,48 62,42 C40,40 25,60 10,45 Z"
-                        fill-rule="evenodd" />
-                </svg>
-                <!-- 雲紋 SVG (右) -->
-                <svg class="cloud-right" viewBox="0 0 200 60" preserveAspectRatio="xMaxYMid meet">
-                    <!-- 使用 transform scale(-1, 1) 翻轉即可共用路徑 -->
-                    <path class="ruyi-path"
-                        d="M100,45 C115,58 140,62 160,50 C180,38 185,15 170,5 C155,-5 130,2 125,20 C120,35 135,48 150,45 C162,42 168,28 158,18 C148,8 135,15 138,28 C140,35 148,38 152,32 C125,25 110,50 85,35 C70,25 60,10 45,15 C30,20 22,35 30,48 C38,60 55,60 65,48 C75,35 68,20 55,22 C45,25 42,35 48,42 C52,48 60,48 62,42 C40,40 25,60 10,45 Z"
-                        fill-rule="evenodd" />
-                </svg>
+
+                <div class="cloud-left">
+                    <svg class="ruyi-svg" viewBox="0 0 300 70" preserveAspectRatio="xMaxYMid meet">
+                        <use href="#ruyi-chain" class="ruyi-path" />
+                    </svg>
+                </div>
+                <div class="cloud-right">
+                    <svg class="ruyi-svg" viewBox="0 0 300 70" preserveAspectRatio="xMaxYMid meet">
+                        <use href="#ruyi-chain" class="ruyi-path" />
+                    </svg>
+                </div>
+
+                <div class="ruyi-center"></div>
             </div>
         </header>
 
-        <div id="gallery" class="gallery-container">
-            <div class="loading">載入中...</div>
+        <!-- Category filter — 懸絲標籤 rail (built dynamically from sheet data) -->
+        <div class="category-rail" id="categoryFilter" style="margin-top: 300px;">
+            <button class="cat-btn active" data-cat="all">
+                <span class="cat-glyph">全</span>
+                <span class="cat-label">全部典藏</span>
+            </button>
+            <!-- category tabs injected dynamically from sheet data after fetch -->
         </div>
 
-    </div> <!-- end page-wrapper -->
+        <div id="gallery" class="gallery-container" style="padding-top: 40px;">
+            <div class="loading">載入典藏中 · · ·</div>
+        </div>
+    </div>
 
-    <!-- [新增] 滾動進度指示器 -->
+    <!-- Scroll progress -->
     <div id="scroll-progress-wrap">
         <svg id="scroll-seal" viewBox="0 0 20 20">
             <rect x="2" y="2" width="16" height="16" rx="2" fill="none" stroke="#8a2a2a" stroke-width="1.5" />
-            <text x="10" y="14" text-anchor="middle" font-family="LXGW WenKai TC" font-size="9" fill="#8a2a2a">軒</text>
+            <text x="10" y="14" text-anchor="middle" font-family="Noto Serif TC, serif" font-size="9" fill="#8a2a2a" font-weight="600">軒</text>
         </svg>
         <div id="scroll-progress-track">
             <div id="scroll-progress-bar"></div>
         </div>
     </div>
 
-    <!-- [新增] Lightbox Modal 結構 -->
+    <!-- Modal -->
     <div class="modal-overlay" id="artifactModal">
         <div class="modal-content">
             <div class="modal-close" onclick="closeModal()">✕</div>
@@ -1019,9 +1194,10 @@
             <div class="modal-right">
                 <h2 class="modal-title" id="modalTitle"></h2>
                 <div class="modal-era" id="modalEra"></div>
+                <div class="modal-badges" id="modalBadges"></div>
                 <div class="modal-story" id="modalStory"></div>
                 <div class="modal-tags" id="modalTags"></div>
-                <!-- DP-003: 策展人鑑定摘要（Christie's Lot Details 格式） -->
+                <!-- DP-003: 策展人鑑定摘要 -->
                 <div class="modal-appraisal" id="modalAppraisal">
                     <div class="appraisal-divider">
                         <span class="appraisal-label">鑑定參考</span>
@@ -1030,18 +1206,49 @@
                     <div class="appraisal-row appraisal-price" id="modalRefPrice"></div>
                     <div class="appraisal-note" id="modalDisplayRec"></div>
                 </div>
-                <a href="#contact" class="modal-action" onclick="closeModal()">預約鑑賞</a>
+                <a href="#contact" class="modal-action" onclick="closeModal()">洽詢收藏</a>
             </div>
         </div>
     </div>
 
+    <!-- Tweaks panel -->
+    <div id="tweaks-panel">
+        <h4>TWEAKS</h4>
+        <label>Accent Gold</label>
+        <input id="tweak-gold" type="color" value="#c49a45">
+        <label>Seal Red</label>
+        <input id="tweak-seal" type="color" value="#8a2a2a">
+        <label>Paper Ground</label>
+        <select id="tweak-bg">
+            <option value="rice" selected>宣紙 Rice-paper</option>
+            <option value="silk">素絹 Silk neutral</option>
+            <option value="ink">深墨 Ink dark</option>
+        </select>
+    </div>
+
     <script>
+        /* ============ Tweaks config (editable persistent defaults) ============ */
+        const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+          "gold": "#c49a45",
+          "sealRed": "#8a2a2a",
+          "background": "rice"
+        }/*EDITMODE-END*/;
+
+        /* ============ Data & state ============ */
         const API_URL = "https://script.google.com/macros/s/AKfycbz6wId1wRbY48o7xH2X4T0e7UFlppakZvBYmJn4KybA6uGgzk4CZs8YXQSTZoj2Suhiew/exec";
 
-        // 全域變數儲存展品資料
+        const MATERIAL_KEYWORDS = [
+            /* 金屬 Metals */      '鎏金','銅','青銅','金','銀','錫',
+            /* 玉石 Jade/Stone */  '玉','白玉','翡翠','青玉','和田玉','碧玉','壽山石','田黃','松石','珊瑚','琥珀','水晶','瑪瑙',
+            /* 瓷陶 Ceramics */    '瓷','青花','粉彩','琺瑯','紫砂','汝窯','官窯','哥窯','鈞窯','定窯','龍泉窯',
+            /* 紙織 Paper/Textile */'宣紙','絹','絹本','錦緞','絲綢','織錦','緙絲','棉','麻','羅',
+            /* 木料 Wood */        '紫檀','黃花梨','紅木','楠木','花梨',
+            /* 有機 Organic */     '漆','描漆','螺鈿','象牙','玳瑁','犀角',
+            /* 特殊工藝 Craft */   '景泰藍','掐絲','鑲嵌','雕刻','鎏銀',
+        ];
+
         let artifactsData = [];
 
-        // 觀察者：卡片進場特效
         const revealObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
@@ -1051,51 +1258,42 @@
             });
         }, { threshold: 0.15 });
 
-        // [新增] 觀察者：卡片滑到視野中心時觸發特效
         const centerObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('in-center');
-                } else {
-                    entry.target.classList.remove('in-center');
-                }
+                if (entry.isIntersecting) entry.target.classList.add('in-center');
+                else entry.target.classList.remove('in-center');
             });
         }, { rootMargin: '-30% 0px -30% 0px' });
 
+        /* ============ Boot ============ */
         document.addEventListener('DOMContentLoaded', () => {
+            applyTweaks(TWEAK_DEFAULTS);
             fetchArtifacts();
-            initWebGLFog(); // 啟動 WebGL 雲霧特效
+            initWebGLFog();
+            initTweaks();
+            initCategoryFilter();
 
-            // 點擊 Modal 外部背景關閉
             document.getElementById('artifactModal').addEventListener('click', function (e) {
                 if (e.target === this) closeModal();
             });
 
-            // 滾動監聽：進度條與 Sticky Header
             const header = document.getElementById('main-header');
             const sentinel = document.getElementById('header-sentinel');
             const progressBar = document.getElementById('scroll-progress-bar');
 
-            // 使用 IntersectionObserver 監控 Header 切換
             const headerObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
-                    if (!entry.isIntersecting) {
-                        header.classList.add('header-compact');
-                    } else {
-                        header.classList.remove('header-compact');
-                    }
+                    if (!entry.isIntersecting) header.classList.add('header-compact');
+                    else header.classList.remove('header-compact');
                 });
             }, { threshold: 0 });
 
-            if (sentinel) {
-                headerObserver.observe(sentinel);
-            }
+            if (sentinel) headerObserver.observe(sentinel);
 
             let ticking = false;
             window.addEventListener('scroll', () => {
                 if (!ticking) {
                     window.requestAnimationFrame(() => {
-                        // 滾動進度
                         const scrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
                         const maxScroll = Math.round(scrollHeight - window.innerHeight);
                         if (maxScroll > 0) {
@@ -1103,12 +1301,9 @@
                             progress = Math.min(Math.max(progress, 0), 100);
                             progressBar.style.height = `${progress}%`;
                         }
-
-                        // [新增] 強制鎖定底部 Header 狀態防 iOS 回彈抖動
                         if (window.scrollY > 0 && window.scrollY >= maxScroll - 50) {
                             header.classList.add('header-compact');
                         }
-
                         ticking = false;
                     });
                     ticking = true;
@@ -1116,12 +1311,132 @@
             }, { passive: true });
         });
 
-        // 打開 Modal 並填入資料
+        /* ============ Category filter (懸絲標籤 rail — dynamic) ============ */
+        // Split a raw category cell into tokens. Handles full-width 、 , , , / , ／ .
+        function splitCategoryCell(raw) {
+            if (!raw) return [];
+            return String(raw)
+                .split(/[、,\/／]/)
+                .map(s => s.trim())
+                .filter(Boolean);
+        }
+
+        // Build hanging-tag buttons for each category found in sheet data.
+        // Preserves the "all" tab; appends one .cat-btn per discovered category,
+        // sorted by frequency desc then name.
+        function buildCategoryFilter() {
+            const bar = document.getElementById('categoryFilter');
+            if (!bar) return;
+            // Remove any previously-injected dynamic buttons
+            bar.querySelectorAll('.cat-btn[data-dynamic]').forEach(b => b.remove());
+
+            const counts = new Map();
+            artifactsData.forEach(item => {
+                splitCategoryCell(item.category).forEach(c => {
+                    counts.set(c, (counts.get(c) || 0) + 1);
+                });
+            });
+
+            const sorted = [...counts.entries()].sort((a, b) => {
+                if (b[1] !== a[1]) return b[1] - a[1];
+                return a[0].localeCompare(b[0], 'zh-Hant');
+            });
+
+            sorted.forEach(([cat]) => {
+                const btn = document.createElement('button');
+                btn.className = 'cat-btn';
+                btn.dataset.cat = cat;
+                btn.dataset.dynamic = '1';
+                // Glyph = first character of category name, label = full name
+                const glyph = cat.charAt(0);
+                btn.innerHTML =
+                    `<span class="cat-glyph">${glyph}</span>` +
+                    `<span class="cat-label">${cat}</span>`;
+                bar.appendChild(btn);
+            });
+
+            initCategoryFilter();
+        }
+
+        function initCategoryFilter() {
+            const btns = document.querySelectorAll('.cat-btn');
+            const gallery = document.getElementById('gallery');
+            let emptyEl = null;
+            btns.forEach(btn => {
+                if (btn.dataset.bound) return;
+                btn.dataset.bound = '1';
+                btn.addEventListener('click', () => {
+                    btns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const cat = btn.dataset.cat;
+                    let visible = 0;
+                    document.querySelectorAll('.card').forEach(card => {
+                        const cats = splitCategoryCell(card.dataset.category);
+                        const match = (cat === 'all' || cats.includes(cat));
+                        card.style.display = match ? '' : 'none';
+                        if (match) visible++;
+                    });
+                    if (emptyEl) { emptyEl.remove(); emptyEl = null; }
+                    if (visible === 0) {
+                        emptyEl = document.createElement('div');
+                        emptyEl.className = 'empty-state';
+                        emptyEl.innerHTML = '<span class="empty-glyph">虛</span><p>此專場尚無典藏</p>';
+                        gallery.appendChild(emptyEl);
+                    }
+                });
+            });
+        }
+
+        /* ============ Materials extraction ============ */
+        function extractMaterials(tagsStr) {
+            if (!tagsStr) return [];
+            const tokens = tagsStr.split(/\s+/).filter(Boolean);
+            const found = [];
+            const seen = new Set();
+            tokens.forEach(t => {
+                const clean = t.replace(/^#/, '').trim();
+                if (!clean) return;
+                MATERIAL_KEYWORDS.forEach(m => {
+                    if (clean.includes(m) && !seen.has(m)) {
+                        seen.add(m);
+                        found.push(m);
+                    }
+                });
+            });
+            return found;
+        }
+
+        function renderBadges(materials) {
+            if (!materials.length) return '';
+            return materials.map(m =>
+                `<span class="badge">${m}</span>`
+            ).join('');
+        }
+
+        // Modal-only variant of the badge — matches Unit 4 .mat-badge style.
+        function renderModalBadges(materials) {
+            if (!materials.length) return '';
+            return materials.map(m =>
+                `<span class="mat-badge">${m}</span>`
+            ).join('');
+        }
+
+        function extractMaterialsAll(item) {
+            const seen = new Set();
+            const out = [];
+            const sources = [item.tags || '', item.story || '', item.itemName || ''];
+            const combined = sources.join(' ');
+            MATERIAL_KEYWORDS.forEach(m => {
+                if (combined.includes(m) && !seen.has(m)) { seen.add(m); out.push(m); }
+            });
+            return out;
+        }
+
+        /* ============ Modal ============ */
         function openModal(index) {
             const item = artifactsData[index];
             if (!item) return;
 
-            // 處理圖片 HD 解析度 (若能取得 ID，則請求大張尺寸 w2000)
             let highResUrl = item.imageUrl || 'https://via.placeholder.com/800x800?text=No+Image';
             if (item.imageUrl) {
                 const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -1129,23 +1444,32 @@
             }
 
             document.getElementById('modalImg').src = highResUrl;
-            document.getElementById('modalImg').alt = item.itemName;
-            document.getElementById('modalTitle').textContent = item.itemName;
+            document.getElementById('modalImg').alt = item.itemName || '';
+            document.getElementById('modalTitle').textContent = item.itemName || '';
             document.getElementById('modalEra').textContent = item.era || '年代待考';
+
+            const materials = extractMaterialsAll(item);
+            document.getElementById('modalBadges').innerHTML = renderModalBadges(materials);
+
             document.getElementById('modalStory').textContent = item.story || '暫無故事描述。';
 
-            const tagsHtml = item.tags ? item.tags.split(' ').map(t => `<span class="tag">${t.replace('#', '')}</span>`).join('') : '';
+            const tagsHtml = item.tags
+                ? item.tags.split(/[\s，,、]+/).filter(Boolean)
+                    .map(t => { const c = t.replace(/^[#＃]/, '').replace(/[，,、]$/, '').trim(); return c ? `<span class="tag">#${c}</span>` : ''; })
+                    .join('')
+                : '';
             document.getElementById('modalTags').innerHTML = tagsHtml;
 
-            // DP-003: 填入鑑定摘要三欄位
-            document.getElementById('modalRefItem').textContent   = item.refItem  ? `參考拍品：${item.refItem}` : '';
-            document.getElementById('modalRefPrice').textContent  = item.refPrice ? item.refPrice : '';
-            document.getElementById('modalDisplayRec').textContent = item.displayRecommendation || '';
+            // DP-003: 鑑定參考欄位
             const appraisalEl = document.getElementById('modalAppraisal');
-            appraisalEl.style.display =
-                (item.refItem || item.refPrice || item.displayRecommendation) ? 'block' : 'none';
+            document.getElementById('modalRefItem').textContent    = item.refItem    ? `參考拍品：${item.refItem}` : '';
+            document.getElementById('modalRefPrice').textContent   = item.refPrice   || '';
+            document.getElementById('modalDisplayRec').textContent = item.displayRecommendation || '';
+            if (appraisalEl) {
+                appraisalEl.style.display =
+                    (item.refItem || item.refPrice || item.displayRecommendation) ? 'block' : 'none';
+            }
 
-            // 防止背景捲動
             document.body.style.overflow = 'hidden';
             document.getElementById('artifactModal').classList.add('active');
         }
@@ -1155,94 +1479,89 @@
             document.body.style.overflow = '';
         }
 
-        // -----------------------------------------------------------------
-        // [修改] WebGL 雲霧 FBM Shader
-        // -----------------------------------------------------------------
+        /* ============ WebGL fog (preserved) ============ */
         function initWebGLFog() {
             const canvas = document.getElementById('glCanvas');
             const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-            if (!gl) {
-                console.warn("WebGL not supported");
-                return;
-            }
+            if (!gl) { console.warn("WebGL not supported"); return; }
 
-            // Vertex Shader: 全屏鋪滿
             const vsSource = `
                 attribute vec2 position;
-                void main() {
-                    gl_Position = vec4(position, 0.0, 1.0);
-                }
-            `;
+                void main() { gl_Position = vec4(position, 0.0, 1.0); }`;
 
-            // Fragment Shader: FBM 運算
-            // 中文註解：
-            // - 調整 fbm() 中 time 的乘數可以改變雲霧流動速度
-            // - 改變 fogColor 可以調整雲的顏色
-            // - 調整 smoothstep 來改變雲霧的透度與邊緣柔和度
             const fsSource = `
                 precision highp float;
                 uniform vec2 u_resolution;
                 uniform float u_time;
                 uniform vec2 u_mouse;
 
-                float random(vec2 st) {
-                    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
-                }
+                float random(vec2 st) { return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123); }
 
                 float noise(vec2 st) {
-                    vec2 i = floor(st);
-                    vec2 f = fract(st);
-
+                    vec2 i = floor(st); vec2 f = fract(st);
                     float a = random(i);
                     float b = random(i + vec2(1.0, 0.0));
                     float c = random(i + vec2(0.0, 1.0));
                     float d = random(i + vec2(1.0, 1.0));
-
                     vec2 u = f * f * (3.0 - 2.0 * f);
-
-                    return mix(a, b, u.x) +
-                           (c - a) * u.y * (1.0 - u.x) +
-                           (d - b) * u.x * u.y;
+                    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
                 }
 
+                /* 6 octaves — more complex cloud silhouette */
                 float fbm(vec2 st) {
-                    float value = 0.0;
-                    float amplitude = 0.5;
-                    for (int i = 0; i < 5; i++) {
-                        value += amplitude * noise(st);
-                        st *= 2.0;
-                        amplitude *= 0.5;
-                    }
-                    return value;
+                    float v = 0.0; float amp = 0.5;
+                    for (int i = 0; i < 6; i++) { v += amp * noise(st); st *= 2.0; amp *= 0.5; }
+                    return v;
                 }
 
                 void main() {
                     vec2 uv = gl_FragCoord.xy / u_resolution.xy;
-                    uv.x *= u_resolution.x / u_resolution.y;
+                    float aspect = u_resolution.x / u_resolution.y;
+                    uv.x *= aspect;
 
-                    // 滑鼠微幅擾動
-                    vec2 mouseOffset = (u_mouse - 0.5) * 0.1;
-                    
-                    vec2 q = vec2(0.);
-                    q.x = fbm(uv + 0.1 * u_time);
-                    q.y = fbm(uv + vec2(1.0) + vec2(0.0, 0.05 * u_time));
+                    vec2 mouse = (u_mouse - 0.5) * 0.06;
 
-                    vec2 r = vec2(0.);
-                    r.x = fbm(uv + 1.0 * q + vec2(1.7, 9.2) + 0.02 * u_time + mouseOffset);
-                    r.y = fbm(uv + 1.0 * q + vec2(8.3, 2.8) + 0.03 * u_time - mouseOffset);
+                    /* ── Layer A: 大雲形（低頻，慢漂） */
+                    vec2 driftA = vec2(u_time * 0.016, u_time * 0.005);
+                    vec2 qA;
+                    qA.x = fbm(uv * 0.85 + driftA);
+                    qA.y = fbm(uv * 0.85 + vec2(5.2, 1.3) + driftA * 0.6);
+                    vec2 rA;
+                    rA.x = fbm(uv * 0.85 + qA + vec2(1.7, 9.2) + 0.012 * u_time + mouse);
+                    rA.y = fbm(uv * 0.85 + qA + vec2(8.3, 2.8) + 0.018 * u_time - mouse);
+                    float cloudA = fbm(uv * 0.85 + rA);
 
-                    float f = fbm(uv + r);
+                    /* ── Layer B: 細霧絲（高頻，稍快） */
+                    vec2 driftB = vec2(u_time * 0.024, -u_time * 0.003);
+                    vec2 qB;
+                    qB.x = fbm(uv * 2.2 + driftB);
+                    qB.y = fbm(uv * 2.2 + vec2(3.1, 0.8) + driftB * 0.7);
+                    float cloudB = fbm(uv * 2.2 + qB * 0.6 + 0.020 * u_time);
 
-                    // 淡金色與透明底漸層混合
-                    vec3 fogColor = vec3(0.96, 0.94, 0.90);
-                    
-                    // 用於決定不透明度
-                    float alpha = smoothstep(0.3, 0.7, f + 0.1 * sin(u_time * 0.5)); 
-                    alpha *= 0.6; // 降低不透明度，不喧賓奪主
-                    
+                    /* 合層：大形主導，細絲添細節 */
+                    float f = cloudA * 0.68 + cloudB * 0.32;
+
+                    /* ── 柔和 alpha 曲線（寬範圍，無硬邊） */
+                    float alpha = smoothstep(0.24, 0.58, f);
+
+                    /* ── 山腰垂直遮罩：上方 20% 淡化，下方 35% 淡化，中段最濃 */
+                    float vy = gl_FragCoord.y / u_resolution.y;
+                    float vertMask = smoothstep(0.0, 0.28, vy) * smoothstep(1.0, 0.52, vy);
+                    alpha *= vertMask;
+
+                    /* ── 整體壓低透度（輕薄縹霧，山水仍透出） */
+                    alpha *= 0.20;
+
+                    /* ── 呼吸脈動（非常慢，避免閃爍） */
+                    alpha *= (0.86 + 0.14 * sin(u_time * 0.22 + cloudA * 3.14));
+
+                    /* ── 雲色：雲心暖白，雲邊微灰 */
+                    vec3 rimCol  = vec3(0.89, 0.87, 0.83);
+                    vec3 coreCol = vec3(0.97, 0.95, 0.91);
+                    vec3 fogColor = mix(rimCol, coreCol, smoothstep(0.32, 0.68, f));
+
                     gl_FragColor = vec4(fogColor, alpha);
-                }
-            `;
+                }`;
 
             function compileShader(gl, type, source) {
                 const shader = gl.createShader(type);
@@ -1254,18 +1573,11 @@
 
             const vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
             const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
-
             const program = gl.createProgram();
-            gl.attachShader(program, vs);
-            gl.attachShader(program, fs);
-            gl.linkProgram(program);
-            gl.useProgram(program);
+            gl.attachShader(program, vs); gl.attachShader(program, fs);
+            gl.linkProgram(program); gl.useProgram(program);
 
-            const vertices = new Float32Array([
-                -1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
-                -1.0, 1.0, 1.0, -1.0, 1.0, 1.0,
-            ]);
-
+            const vertices = new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
             const buffer = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
             gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -1290,8 +1602,7 @@
                 gl.viewport(0, 0, canvas.width, canvas.height);
                 gl.uniform2f(resLoc, canvas.width, canvas.height);
             }
-            window.addEventListener('resize', resize);
-            resize();
+            window.addEventListener('resize', resize); resize();
 
             let startTime = performance.now();
             gl.enable(gl.BLEND);
@@ -1301,8 +1612,7 @@
                 const dt = (time - startTime) * 0.001;
                 gl.uniform1f(timeLoc, dt);
                 gl.uniform2f(mouseLoc, mouseX, mouseY);
-
-                gl.clearColor(0.0, 0.0, 0.0, 0.0);
+                gl.clearColor(0, 0, 0, 0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
                 requestAnimationFrame(render);
@@ -1310,6 +1620,7 @@
             requestAnimationFrame(render);
         }
 
+        /* ============ Artifacts fetch + render ============ */
         async function fetchArtifacts() {
             const gallery = document.getElementById('gallery');
             try {
@@ -1317,49 +1628,52 @@
                 const json = await res.json();
                 if (json.success && json.data.length > 0) {
                     gallery.innerHTML = '';
-                    artifactsData = json.data; // 儲存至全域供 Modal 使用
+                    artifactsData = json.data;
 
                     json.data.forEach((item, index) => {
                         let imageUrl = 'https://via.placeholder.com/400x400?text=No+Image';
                         if (item.imageUrl) {
                             const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-                            if (idMatch) {
-                                imageUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
-                            }
+                            if (idMatch) imageUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
                         }
-                        const tagsHtml = item.tags ? item.tags.split(' ').map(t => `<span class="tag">${t.replace('#', '')}</span>`).join('') : '';
+                        // Split by space OR Chinese/ASCII commas or 、 — handles "#銅爐，#文房，" format
+                        const tagsHtml = item.tags
+                            ? item.tags.split(/[\s，,、]+/).filter(Boolean)
+                                .map(t => { const c = t.replace(/^[#＃]/, '').replace(/[，,、]$/, '').trim(); return c ? `<span class="tag">#${c}</span>` : ''; })
+                                .join('')
+                            : '';
 
                         const categoryText = item.category || '藏品';
                         const char1 = categoryText.substring(0, 1) || '藏';
                         const char2 = categoryText.substring(1, 2) || '品';
 
-                        // 判斷奇偶數，交錯佈局與進場方向
                         const isOdd = index % 2 !== 0;
                         const layoutClass = isOdd ? 'odd' : 'even';
                         const inClass = isOdd ? 'from-left' : 'from-right';
 
-                        // DP-002: 依 category 自動分配卡片比例變體
-                        const portraitCats  = ['書畫', '瓷器', '玉器', '雜項'];
-                        const landscapeCats = ['銅器', '傢俱', '文房', '金屬'];
+                        // DP-002: assign proportion variant based on category
+                        const portraitCats  = ['汝窯', '玉珮', '陶版畫'];
+                        const landscapeCats = ['器鼎', '龍銀'];
                         const cat = item.category || '';
                         const variant = index === 0 ? 'feature'
-                            : portraitCats.some(c => cat.includes(c))  ? 'portrait'
-                            : landscapeCats.some(c => cat.includes(c)) ? 'landscape'
-                            : 'portrait'; // 預設縱版
+                            : portraitCats.includes(cat)  ? 'portrait'
+                            : landscapeCats.includes(cat) ? 'landscape'
+                            : 'portrait';
 
                         const card = document.createElement('div');
                         card.className = `card card--${variant} ${layoutClass} ${inClass}`;
                         card.style.cursor = 'pointer';
+                        card.dataset.category = item.category || '';
                         card.setAttribute('onclick', `openModal(${index})`);
 
-                        // 首 6 張直接顯示避免白屏
-                        if (index < 6) {
-                            card.classList.add('is-visible');
-                        }
+                        if (index < 6) card.classList.add('is-visible');
+
+                        const materials = extractMaterialsAll(item);
+                        const badgesHtml = renderBadges(materials);
 
                         card.innerHTML = `
                             <div class="img-box">
-                                <img class="antique-img" src="${imageUrl}" loading="lazy" alt="${item.itemName}">
+                                <img class="antique-img" src="${imageUrl}" loading="lazy" alt="${item.itemName || ''}">
                                 <div class="vignette-cloud"></div>
                                 <div class="moving-cloud"></div>
                                 <div class="focus-border"></div>
@@ -1373,30 +1687,114 @@
                                         <text class="seal-text" x="50%" y="70%" dominant-baseline="middle" text-anchor="middle">${char2}</text>
                                     </svg>
                                 </div>
-                                <h2 class="item-name">${item.itemName}</h2>
+                                <div class="lot-number">LOT <span class="lot-num-val">${String(index + 1).padStart(3, '0')}</span></div>
+                                <h2 class="item-name">${item.itemName || ''}</h2>
                                 <div class="item-era">${item.era || '年代待考'}</div>
+                                <div class="material-badges">${badgesHtml}</div>
                                 <p class="item-story">${item.story || '暫無故事描述。'}</p>
                                 <div class="tags">${tagsHtml}</div>
                             </div>
                         `;
                         gallery.appendChild(card);
 
-                        // 加入 Observer 監聽
-                        if (index >= 6) {
-                            revealObserver.observe(card);
-                        }
-                        // 手機與中心觸發監聽
+                        if (index >= 6) revealObserver.observe(card);
                         centerObserver.observe(card);
                     });
+
+                    // Build rail from actual category data
+                    buildCategoryFilter();
                 } else {
                     gallery.innerHTML = '<div class="loading">庫房目前空置，或無法取得資料。</div>';
                 }
             } catch (e) {
                 console.error(e);
-                gallery.innerHTML = `<div class="loading" style="color:red;">連線失敗：請檢查 GAS 部署網址。<br><small>${e.message}</small></div>`;
+                gallery.innerHTML = `<div class="loading" style="color:${getComputedStyle(document.documentElement).getPropertyValue('--seal-red')};">連線失敗：請檢查 GAS 部署網址。<br><small style="font-family:var(--font-latin); font-style:italic;">${e.message}</small></div>`;
             }
         }
 
+        /* ============ Tweaks ============ */
+        function applyTweaks(t) {
+            if (!t) return;
+            if (t.gold) document.documentElement.style.setProperty('--gold', t.gold);
+            if (t.gold) document.documentElement.style.setProperty('--gold-500', t.gold);
+            if (t.sealRed) document.documentElement.style.setProperty('--seal-red', t.sealRed);
+            if (t.sealRed) document.documentElement.style.setProperty('--seal-500', t.sealRed);
+            if (t.background) applyBackground(t.background);
+        }
+
+        function applyBackground(mode) {
+            const body = document.body;
+            const bg = document.querySelector('.bg-layer');
+            if (!bg) return;
+            // Shared 山水 底圖 URL across all paper modes.
+            const mountain = "url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp') center center / cover no-repeat";
+            if (mode === 'silk') {
+                body.style.backgroundColor = '#ebe6d8';
+                bg.style.background =
+                    'radial-gradient(ellipse at 30% 40%, rgba(196,154,69,0.10) 0%, transparent 55%),' +
+                    'radial-gradient(ellipse 50% 35% at 85% 25%, rgba(44,44,44,0.05) 0%, transparent 60%),' +
+                    mountain + ',' +
+                    'linear-gradient(170deg, #efe8d5 0%, #e4dcc2 100%)';
+                bg.style.filter = 'sepia(0.02) brightness(0.9) contrast(1.04)';
+            } else if (mode === 'ink') {
+                body.style.backgroundColor = '#1f1d18';
+                bg.style.background =
+                    'radial-gradient(ellipse at 25% 35%, rgba(196,154,69,0.12) 0%, transparent 55%),' +
+                    'radial-gradient(ellipse 80% 60% at 50% 100%, rgba(0,0,0,0.45) 0%, transparent 65%),' +
+                    mountain + ',' +
+                    'linear-gradient(160deg, #2a2720 0%, #18160f 100%)';
+                bg.style.filter = 'sepia(0.08) brightness(0.55) contrast(1.15)';
+                document.documentElement.style.setProperty('--fg-1', '#ece7d6');
+                document.documentElement.style.setProperty('--fg-2', '#c4bfae');
+                return;
+            } else {
+                body.style.backgroundColor = '#eee9dc';
+                bg.style.background =
+                    'linear-gradient(to bottom, rgba(44,44,44,0.06) 0%, transparent 18%),' +
+                    'radial-gradient(ellipse 60% 40% at 15% 60%, rgba(196,154,69,0.07) 0%, transparent 70%),' +
+                    'radial-gradient(ellipse 50% 35% at 85% 25%, rgba(44,44,44,0.04) 0%, transparent 60%),' +
+                    mountain + ',' +
+                    'linear-gradient(168deg, #f0ece2 0%, #e8e3d4 35%, #e3ddd0 65%, #ddd7c8 100%)';
+                bg.style.filter = 'sepia(0.04) brightness(0.88) contrast(1.05)';
+            }
+            document.documentElement.style.setProperty('--fg-1', '#2c2c2c');
+            document.documentElement.style.setProperty('--fg-2', '#4a4a4a');
+        }
+
+        function initTweaks() {
+            const panel = document.getElementById('tweaks-panel');
+            const goldInput = document.getElementById('tweak-gold');
+            const sealInput = document.getElementById('tweak-seal');
+            const bgSelect = document.getElementById('tweak-bg');
+
+            // initial sync
+            goldInput.value = TWEAK_DEFAULTS.gold;
+            sealInput.value = TWEAK_DEFAULTS.sealRed;
+            bgSelect.value = TWEAK_DEFAULTS.background;
+
+            let state = { ...TWEAK_DEFAULTS };
+
+            const push = () => {
+                applyTweaks(state);
+                try {
+                    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: state }, '*');
+                } catch (e) {}
+            };
+
+            goldInput.addEventListener('input', () => { state.gold = goldInput.value; push(); });
+            sealInput.addEventListener('input', () => { state.sealRed = sealInput.value; push(); });
+            bgSelect.addEventListener('change', () => { state.background = bgSelect.value; push(); });
+
+            // Edit-mode protocol
+            window.addEventListener('message', (ev) => {
+                const d = ev.data || {};
+                if (d.type === '__activate_edit_mode') panel.style.display = 'block';
+                else if (d.type === '__deactivate_edit_mode') panel.style.display = 'none';
+            });
+            try {
+                window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+            } catch (e) {}
+        }
     </script>
 </body>
 
