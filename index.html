@@ -105,7 +105,7 @@
                 linear-gradient(to bottom, rgba(44, 44, 44, 0.06) 0%, transparent 18%),
                 radial-gradient(ellipse 60% 40% at 15% 60%, rgba(196, 154, 69, 0.07) 0%, transparent 70%),
                 radial-gradient(ellipse 50% 35% at 85% 25%, rgba(44, 44, 44, 0.04) 0%, transparent 60%),
-                url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp') center center / cover no-repeat,
+                url('./seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp') center center / cover no-repeat,
                 linear-gradient(168deg, #f0ece2 0%, #e8e3d4 35%, #e3ddd0 65%, #ddd7c8 100%);
             filter: sepia(0.04) brightness(0.88) contrast(1.05);
         }
@@ -167,11 +167,14 @@
             box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
         }
 
-        /* Brand mark — override: Ma Shan Zheng covers Simplified 吉 but NOT Traditional 寶軒
-           → per-char fallback creates jarring 2-font mix within one word.
-           Fix: bypass Ma Shan Zheng entirely; all 3 chars render in same 標楷體 family. */
+        /* Brand mark — font strategy:
+           1. LXGW WenKai TC — already loaded from Google Fonts; full TC coverage (吉寶軒 all uniform);
+              warm handwritten style ≈ brush feel without the SC-only Ma Shan Zheng fallback trap.
+           2. 標楷體/DFKai-SB — Windows TW kaishu fallback when Google Fonts blocked by proxy.
+           3. STKaiti/KaiTi excluded from brand-title: STKaiti covers 吉 but misses some TC variants
+              of 寶/軒 → causes per-char mix. LXGW WenKai TC avoids this entirely.  */
         .brand-title {
-            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            font-family: 'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'Noto Serif TC', Georgia, serif;
             font-size: 5rem;
             font-weight: normal;
             color: var(--ink);
@@ -1026,8 +1029,28 @@
                 flex-direction: column !important;
                 width: 100%;
             }
-            .img-box { width: 100%; height: 300px; }
-            .info-box { width: 100%; padding: 30px 24px; }
+
+            /* ⚠️ Card variant rules (.card--portrait/landscape/feature .img-box) have higher
+               CSS specificity than plain .img-box — must override explicitly here or mobile
+               will still use desktop 42%/58%/62% widths and break the column layout. */
+            .img-box,
+            .card--portrait  .img-box,
+            .card--landscape .img-box,
+            .card--feature   .img-box {
+                width: 100% !important;
+                height: 280px;
+            }
+            .info-box,
+            .card--portrait  .info-box,
+            .card--landscape .info-box,
+            .card--feature   .info-box {
+                width: 100% !important;
+                padding: 28px 20px;
+            }
+            /* Gold side-divider line only makes sense in horizontal (desktop) layout */
+            .info-box::before,
+            .card.odd .info-box::before { display: none; }
+
             .item-name { padding-right: 72px; font-size: 1.45rem; min-height: 52px; }
 
             .category-rail {
@@ -1704,7 +1727,7 @@
             const bg = document.querySelector('.bg-layer');
             if (!bg) return;
             // Shared 山水 底圖 URL across all paper modes.
-            const mountain = "url('https://raw.githubusercontent.com/craiglyu/Antique-Pavilion/main/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp') center center / cover no-repeat";
+            const mountain = "url('./seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp') center center / cover no-repeat";
             if (mode === 'silk') {
                 body.style.backgroundColor = '#ebe6d8';
                 bg.style.background =
