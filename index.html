@@ -65,17 +65,18 @@
             --shadow: rgba(0, 0, 0, 0.15);
 
             /* Type tiers — three-layer Chinese system
-               Fallback chain strategy (Windows TC):
+               Fallback chain strategy (multi-platform):
                1. Google web font (may be blocked by SSL proxy)
-               2. 標楷體 / DFKai-SB / BiauKai → bundled kaishu on all Windows TW/HK — CALLIGRAPHIC ✓
-               3. STKaiti / KaiTi → Mac / Simplified-Windows kai alternatives — still calligraphic ✓
-               4. Noto Serif TC → mincho/宋體 style, last resort before system generic
-               ⚠️  CRITICAL: 標楷體 MUST precede Noto Serif TC to avoid mincho fallback on TC systems
-               ⚠️  NEVER put generic 'serif' as last resort without 標楷體 — maps to 新細明體 on Windows TC
-               ⚠️  Ma Shan Zheng covers Simplified chars only; 標楷體 is the per-char TC safety net    */
-            --font-plaque:  'Ma Shan Zheng', '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
-            --font-display: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
-            --font-body:    'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+               2. 標楷體 / DFKai-SB / BiauKai → bundled kaishu on Windows TW/HK — CALLIGRAPHIC ✓
+               3. Kaiti TC → Apple iOS/macOS bundled TC kaishu — CRITICAL for mobile ✓
+               4. STKaiti / KaiTi → macOS ST fonts / Simplified-Windows kai — calligraphic ✓
+               5. Noto Serif TC → last resort (mincho/宋體 style on some systems)
+               ⚠️  'Kaiti TC' MUST appear before STKaiti — iOS has Kaiti TC but NOT STKaiti
+               ⚠️  NEVER put generic 'serif' without kaishu guards — maps to 宋體/新細明體 on TC systems
+               ⚠️  Ma Shan Zheng covers Simplified chars only; 標楷體 is the Windows TC safety net    */
+            --font-plaque:  'Ma Shan Zheng', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            --font-display: '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            --font-body:    'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             --font-latin:   'Cormorant Garamond', Georgia, serif;  /* Latin/numerals only — never use for Chinese text */
         }
 
@@ -177,7 +178,7 @@
            3. STKaiti/KaiTi excluded from brand-title: STKaiti covers 吉 but misses some TC variants
               of 寶/軒 → causes per-char mix. LXGW WenKai TC avoids this entirely.  */
         .brand-title {
-            font-family: 'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'Noto Serif TC', Georgia, serif;
+            font-family: 'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'Noto Serif TC', Georgia, serif;
             font-size: 5rem;
             font-weight: normal;
             color: var(--ink);
@@ -562,7 +563,7 @@
         .card--landscape .img-box  { width: 58%; height: 380px; }
         .card--landscape .info-box { width: 42%; }
         .card--feature .img-box  { width: 62%; height: 520px; }
-        .card--feature .info-box { width: 38%; padding: 50px 40px; }
+        .card--feature .info-box { width: 38%; padding: 16px 40px 50px; justify-content: flex-start; }
 
         /* Seal */
         .seal-wrapper {
@@ -610,16 +611,28 @@
             opacity: 0;
         }
 
-        /* Feature card — seal sits top-left so headline gets full width */
+        /* Feature card — seal + lot-number form a unified header row
+           ┌──────────────────────────────────────────────────────┐
+           │ [印章 60×60]  LOT 001                                │  ← header row (min-height: 60px)
+           │               標題文字（全寬，seal 正下方）           │
+           │               年代 / 材質 / 故事…                    │
+           └──────────────────────────────────────────────────────┘ */
         .card--feature .seal-wrapper {
             top: 16px;
             left: 20px;
             right: auto;
         }
+        .card--feature .lot-number {
+            padding-left: 84px;     /* 20px left + 60px seal + 4px gap */
+            min-height: 60px;       /* matches seal height → perfect row alignment */
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;     /* breathing before title */
+        }
         .card--feature .item-name {
-            padding-left: 84px;   /* seal right edge = 20 + 60 + 4px gap */
             padding-right: 16px;
             min-height: auto;
+            /* no padding-left: title starts below seal, full width available */
         }
         }
 
@@ -979,7 +992,7 @@
         }
         .appraisal-price {
             /* ⚠️ Explicit chain — no CSS var to avoid resolution timing; 標楷體 leads for 新台幣/萬 */
-            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             font-size: 1.25rem;
             color: var(--gold-700);
             letter-spacing: 0.03em;
@@ -1001,7 +1014,7 @@
             border: 1px solid var(--seal-red);
             color: var(--seal-red);
             /* Explicit chain — bypasses CSS var resolution; 標楷體 leads for calligraphic kai style */
-            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             font-weight: 400;
             font-size: 0.9rem;
             letter-spacing: 0.12em;   /* 0.18em 過寬，縮小讓字形更聚合 */
@@ -1128,7 +1141,23 @@
             .card.in-center .focus-border { opacity: 0.8; transform: scale(1); }
 
             .item-name { padding-right: 72px; font-size: 1.4rem; min-height: 48px; }
-            .card--feature .item-name { padding-left: 80px; padding-right: 16px; }
+
+            /* Feature card mobile — push ALL content below the absolute-positioned seal.
+               Seal: top:16px + height:60px = bottom at 76px → padding-top 88px gives 12px gap.
+               This is simpler and more robust than horizontal padding alignment. */
+            .card--feature .info-box {
+                padding-top: 88px !important;   /* clears seal bottom (76px) + 12px gap */
+            }
+            .card--feature .lot-number {
+                padding-left: 0 !important;     /* no horizontal clearing needed */
+                min-height: auto !important;
+                display: block !important;
+                margin-bottom: 8px;
+            }
+            .card--feature .item-name {
+                padding-left: 0 !important;
+                padding-right: 16px !important; /* small breathing room, seal is above */
+            }
 
             /* ── Category rail ── */
             .category-rail {
