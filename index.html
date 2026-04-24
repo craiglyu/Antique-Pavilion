@@ -65,15 +65,14 @@
             --shadow: rgba(0, 0, 0, 0.15);
 
             /* Type tiers — three-layer Chinese system
-               Fallback chain strategy (multi-platform):
+               Fallback chain strategy (Windows TC):
                1. Google web font (may be blocked by SSL proxy)
-               2. 標楷體 / DFKai-SB / BiauKai → bundled kaishu on Windows TW/HK — CALLIGRAPHIC ✓
-               3. Kaiti TC → Apple iOS/macOS bundled TC kaishu — CRITICAL for mobile ✓
-               4. STKaiti / KaiTi → macOS ST fonts / Simplified-Windows kai — calligraphic ✓
-               5. Noto Serif TC → last resort (mincho/宋體 style on some systems)
-               ⚠️  'Kaiti TC' MUST appear before STKaiti — iOS has Kaiti TC but NOT STKaiti
-               ⚠️  NEVER put generic 'serif' without kaishu guards — maps to 宋體/新細明體 on TC systems
-               ⚠️  Ma Shan Zheng covers Simplified chars only; 標楷體 is the Windows TC safety net    */
+               2. 標楷體 / DFKai-SB / BiauKai → bundled kaishu on all Windows TW/HK — CALLIGRAPHIC ✓
+               3. STKaiti / KaiTi → Mac / Simplified-Windows kai alternatives — still calligraphic ✓
+               4. Noto Serif TC → mincho/宋體 style, last resort before system generic
+               ⚠️  CRITICAL: 標楷體 MUST precede Noto Serif TC to avoid mincho fallback on TC systems
+               ⚠️  NEVER put generic 'serif' as last resort without 標楷體 — maps to 新細明體 on Windows TC
+               ⚠️  Ma Shan Zheng covers Simplified chars only; 標楷體 is the per-char TC safety net    */
             --font-plaque:  'Ma Shan Zheng', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             --font-display: '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             --font-body:    'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
@@ -178,7 +177,7 @@
            3. STKaiti/KaiTi excluded from brand-title: STKaiti covers 吉 but misses some TC variants
               of 寶/軒 → causes per-char mix. LXGW WenKai TC avoids this entirely.  */
         .brand-title {
-            font-family: 'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'Noto Serif TC', Georgia, serif;
+            font-family: 'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'Noto Serif TC', Georgia, serif;
             font-size: 5rem;
             font-weight: normal;
             color: var(--ink);
@@ -219,10 +218,9 @@
             color: var(--gold);
             margin-top: 22px;
             letter-spacing: 0.5rem;
-            opacity: 0;
+            opacity: 1;
             max-height: 50px;
             overflow: hidden;
-            animation: fadeIn 2s 2.5s forwards;
             transition: all 0.5s ease;
         }
         .brand-slogan .sep { opacity: 0.5; margin: 0 0.3em; }
@@ -231,6 +229,30 @@
             opacity: 0;
             max-height: 0;
             margin-top: 0;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 1, 1),
+                        max-height 0.3s cubic-bezier(0.4, 0, 1, 1),
+                        margin-top 0.3s cubic-bezier(0.4, 0, 1, 1);
+        }
+
+        /* Staggered entrance — 三詞依序浮現 */
+        .brand-slogan > span:not(.sep) {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(8px);
+            animation: sloganWordIn 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+        .brand-slogan > span:nth-child(1) { animation-delay: 2.5s; }
+        .brand-slogan > span:nth-child(3) { animation-delay: 3.0s; }
+        .brand-slogan > span:nth-child(5) { animation-delay: 3.5s; }
+        .brand-slogan > .sep {
+            display: inline-block;
+            opacity: 0;
+            animation: fadeIn 0.4s ease forwards;
+        }
+        .brand-slogan > span.sep:nth-child(2) { animation-delay: 2.75s; }
+        .brand-slogan > span.sep:nth-child(4) { animation-delay: 3.25s; }
+        @keyframes sloganWordIn {
+            to { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes fadeIn { to { opacity: 1; } }
@@ -525,10 +547,10 @@
             /* Layer 1 (top): 菱格錦 diamond brocade — evokes 錦緞 fabric weave
                32×32 tile: outer diamond outline + inner diamond fill + cardinal dots */
             background-image:
-                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><path d='M16,1 L31,16 L16,31 L1,16 Z' fill='none' stroke='rgba(196,154,69,0.22)' stroke-width='0.8'/><path d='M16,9 L23,16 L16,23 L9,16 Z' fill='rgba(196,154,69,0.08)' stroke='rgba(196,154,69,0.16)' stroke-width='0.6'/><circle cx='16' cy='16' r='1.2' fill='rgba(196,154,69,0.18)'/><circle cx='16' cy='1' r='0.8' fill='rgba(196,154,69,0.13)'/><circle cx='31' cy='16' r='0.8' fill='rgba(196,154,69,0.13)'/><circle cx='16' cy='31' r='0.8' fill='rgba(196,154,69,0.13)'/><circle cx='1' cy='16' r='0.8' fill='rgba(196,154,69,0.13)'/></svg>"),
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><path d='M16,1 L31,16 L16,31 L1,16 Z' fill='none' stroke='rgba(196,154,69,0.40)' stroke-width='0.8'/><path d='M16,9 L23,16 L16,23 L9,16 Z' fill='rgba(196,154,69,0.16)' stroke='rgba(196,154,69,0.28)' stroke-width='0.6'/><circle cx='16' cy='16' r='1.2' fill='rgba(196,154,69,0.32)'/><circle cx='16' cy='1' r='0.8' fill='rgba(196,154,69,0.24)'/><circle cx='31' cy='16' r='0.8' fill='rgba(196,154,69,0.24)'/><circle cx='16' cy='31' r='0.8' fill='rgba(196,154,69,0.24)'/><circle cx='1' cy='16' r='0.8' fill='rgba(196,154,69,0.24)'/></svg>"),
             /* Layer 2 (bottom): 宣紙 fibre noise — organic paper grain */
-                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0.17  0 0 0 0 0.15  0 0 0 0 0.10  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
-            background-color: var(--paper-300);  /* warm fallback if SVG grain fails */
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0.17  0 0 0 0 0.15  0 0 0 0 0.10  0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+            background-color: var(--paper-400);  /* #ede8dc — warmer, brocade now visible */
             background-size: 32px 32px, 180px 180px;
             display: flex;
             flex-direction: column;
@@ -563,6 +585,7 @@
         .card--landscape .img-box  { width: 58%; height: 380px; }
         .card--landscape .info-box { width: 42%; }
         .card--feature .img-box  { width: 62%; height: 520px; }
+        /* Feature info-box: flush-top so seal + lot-number form header row */
         .card--feature .info-box { width: 38%; padding: 16px 40px 50px; justify-content: flex-start; }
 
         /* Seal */
@@ -600,22 +623,21 @@
             width: 100%; height: 100%;
             background: radial-gradient(circle, var(--seal-red) 20%, transparent 70%);
             transform: translate(-50%, -50%) scale(0);
-            opacity: 0.6;
+            opacity: 0.3;
             transition: transform 0.6s ease, opacity 0.6s ease;
             z-index: -1;
             border-radius: 50%;
             pointer-events: none;
         }
         .seal-wrapper:hover .seal-halo {
-            transform: translate(-50%, -50%) scale(2.5);
+            transform: translate(-50%, -50%) scale(1.5);
             opacity: 0;
         }
 
         /* Feature card — seal + lot-number form a unified header row
            ┌──────────────────────────────────────────────────────┐
            │ [印章 60×60]  LOT 001                                │  ← header row (min-height: 60px)
-           │               標題文字（全寬，seal 正下方）           │
-           │               年代 / 材質 / 故事…                    │
+           │               標題文字（全寬，seal 正下方）            │
            └──────────────────────────────────────────────────────┘ */
         .card--feature .seal-wrapper {
             top: 16px;
@@ -624,16 +646,15 @@
         }
         .card--feature .lot-number {
             padding-left: 84px;     /* 20px left + 60px seal + 4px gap */
-            min-height: 60px;       /* matches seal height → perfect row alignment */
+            min-height: 60px;       /* matches seal height → row alignment */
             display: flex;
             align-items: center;
-            margin-bottom: 8px;     /* breathing before title */
+            margin-bottom: 8px;
         }
         .card--feature .item-name {
             padding-right: 16px;
             min-height: auto;
-            /* no padding-left: title starts below seal, full width available */
-        }
+            /* no padding-left: title is full-width below the seal */
         }
 
         /* Lot number — auction catalogue label (FIX-04) */
@@ -992,7 +1013,7 @@
         }
         .appraisal-price {
             /* ⚠️ Explicit chain — no CSS var to avoid resolution timing; 標楷體 leads for 新台幣/萬 */
-            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             font-size: 1.25rem;
             color: var(--gold-700);
             letter-spacing: 0.03em;
@@ -1014,10 +1035,10 @@
             border: 1px solid var(--seal-red);
             color: var(--seal-red);
             /* Explicit chain — bypasses CSS var resolution; 標楷體 leads for calligraphic kai style */
-            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             font-weight: 400;
             font-size: 0.9rem;
-            letter-spacing: 0.12em;   /* 0.18em 過寬，縮小讓字形更聚合 */
+            letter-spacing: 0.12em;
             text-decoration: none;
             transition: background 0.35s ease, color 0.35s ease;
             align-self: flex-start;
@@ -1030,6 +1051,241 @@
             transform: none;
             box-shadow: none;
         }
+
+        /* Tweaks panel */
+        #tweaks-panel {
+            position: fixed;
+            right: 20px; bottom: 20px;
+            width: 260px;
+            background: rgba(247, 244, 237, 0.97);
+            border: 1px solid rgba(196, 154, 69, 0.4);
+            border-radius: 6px;
+            padding: 16px 18px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            color: var(--fg-1);
+            z-index: 500;
+            display: none;
+        }
+
+        /* =========================================================
+           Contact Section — 洽詢典藏
+           ========================================================= */
+        .contact-section {
+            position: relative;
+            background: var(--paper-400);
+            border-top: var(--rule-gold);
+            padding: 80px 40px;
+            text-align: center;
+            overflow: hidden;
+        }
+        .contact-section::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><path d='M16,1 L31,16 L16,31 L1,16 Z' fill='none' stroke='rgba(196,154,69,0.18)' stroke-width='0.8'/><circle cx='16' cy='16' r='1' fill='rgba(196,154,69,0.14)'/></svg>");
+            background-size: 32px 32px;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .contact-inner {
+            position: relative;
+            max-width: 560px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 32px;
+        }
+        .contact-brand {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .contact-seal {
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .contact-seal:hover { transform: rotate(-5deg) scale(1.08); }
+        .contact-title {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 400;
+            color: var(--fg-1);
+            letter-spacing: 0.5rem;
+            margin: 0;
+        }
+        .contact-subtitle {
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+            letter-spacing: 0.4rem;
+            color: var(--gold-700);
+            margin: 0;
+        }
+        .contact-divider {
+            width: 120px;
+            height: 1px;
+            background: linear-gradient(to right,
+                transparent, rgba(196,154,69,0.6), transparent);
+        }
+        .contact-body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .contact-desc {
+            font-family: var(--font-body);
+            font-size: 1rem;
+            line-height: 1.9;
+            color: var(--fg-2);
+            margin: 0;
+            letter-spacing: 0.05em;
+        }
+        .contact-line-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 36px;
+            border: 1px solid #06C755;
+            color: #06C755;
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            letter-spacing: 0.15em;
+            text-decoration: none;
+            border-radius: 3px;
+            background: transparent;
+            transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                        color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                        box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .contact-line-btn:hover {
+            background: #06C755;
+            color: #ffffff;
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(6, 199, 85, 0.25);
+        }
+        .contact-line-btn .line-icon { flex-shrink: 0; }
+        .contact-note {
+            font-family: var(--font-body);
+            font-size: 0.75rem;
+            color: var(--fg-muted);
+            letter-spacing: 0.05em;
+            margin: 0;
+            line-height: 1.7;
+        }
+
+        /* Site Footer */
+        .site-footer {
+            background: var(--ink-900);
+            color: var(--fg-muted);
+            text-align: center;
+            padding: 24px 20px;
+            font-family: var(--font-latin);
+            font-size: 0.78rem;
+            letter-spacing: 0.12em;
+            border-top: 1px solid rgba(196, 154, 69, 0.2);
+        }
+
+        /* Category rail wrap + fade */
+        .category-rail-wrap {
+            position: relative;
+            margin-top: 300px;
+        }
+        .category-rail-wrap::after {
+            content: '';
+            position: absolute;
+            right: 0; top: 0; bottom: 0;
+            width: 48px;
+            background: linear-gradient(to right, transparent, var(--paper-300));
+            pointer-events: none;
+            z-index: 2;
+            display: none;
+        }
+
+        /* Item story fade mask */
+        .item-story-wrap {
+            position: relative;
+            overflow: hidden;
+        }
+        .item-story-wrap::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 2.8em;
+            background: linear-gradient(
+                to bottom,
+                transparent,
+                var(--paper-200)
+            );
+            pointer-events: none;
+        }
+
+        /* Filter transition */
+        .card.filter-hiding {
+            opacity: 0;
+            transform: scale(0.97) translateY(4px);
+            pointer-events: none;
+            transition: opacity 0.22s cubic-bezier(0.4, 0, 1, 1),
+                        transform 0.22s cubic-bezier(0.4, 0, 1, 1);
+        }
+        .card.filter-showing {
+            animation: cardFilterIn 0.36s cubic-bezier(0.25, 1, 0.5, 1) both;
+        }
+        @keyframes cardFilterIn {
+            from { opacity: 0; transform: scale(0.97) translateY(4px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        /* Skeleton loading */
+        @keyframes shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position: 400px 0; }
+        }
+        .skeleton-card {
+            width: 100%;
+            background: var(--paper-200);
+            border-radius: 4px;
+            border: 1px solid rgba(0,0,0,0.05);
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+        .skeleton-card:nth-child(even) { flex-direction: row-reverse; }
+        .skeleton-img {
+            width: 50%; height: 420px;
+            flex-shrink: 0;
+            background: linear-gradient(90deg,
+                var(--paper-500) 0%, var(--paper-400) 50%, var(--paper-500) 100%);
+            background-size: 800px 100%;
+            animation: shimmer 1.6s ease-in-out infinite;
+        }
+        .skeleton-info {
+            width: 50%;
+            padding: 48px 50px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            justify-content: center;
+        }
+        .skeleton-line {
+            height: 10px;
+            border-radius: 5px;
+            background: linear-gradient(90deg,
+                var(--paper-500) 0%, var(--paper-400) 50%, var(--paper-500) 100%);
+            background-size: 800px 100%;
+            animation: shimmer 1.6s ease-in-out infinite;
+        }
+        .skeleton-line:nth-child(1) { width: 30%; animation-delay: 0s; }
+        .skeleton-line:nth-child(2) { width: 60%; height: 24px; animation-delay: 0.1s; }
+        .skeleton-line:nth-child(3) { width: 45%; animation-delay: 0.2s; }
+        .skeleton-line:nth-child(4) { width: 90%; animation-delay: 0.1s; margin-top: 8px; }
+        .skeleton-line:nth-child(5) { width: 85%; animation-delay: 0.15s; }
+        .skeleton-line:nth-child(6) { width: 80%; animation-delay: 0.2s; }
 
         /* Tweaks panel */
         #tweaks-panel {
@@ -1142,24 +1398,27 @@
 
             .item-name { padding-right: 72px; font-size: 1.4rem; min-height: 48px; }
 
-            /* Feature card mobile — push ALL content below the absolute-positioned seal.
-               Seal: top:16px + height:60px = bottom at 76px → padding-top 88px gives 12px gap.
-               This is simpler and more robust than horizontal padding alignment. */
+            /* Feature card mobile — vertical clearance below seal
+               Seal: top:16px + height:60px = 76px → padding-top 88px gives 12px gap */
             .card--feature .info-box {
-                padding-top: 88px !important;   /* clears seal bottom (76px) + 12px gap */
+                padding-top: 88px !important;
             }
             .card--feature .lot-number {
-                padding-left: 0 !important;     /* no horizontal clearing needed */
+                padding-left: 0 !important;
                 min-height: auto !important;
                 display: block !important;
                 margin-bottom: 8px;
             }
             .card--feature .item-name {
                 padding-left: 0 !important;
-                padding-right: 16px !important; /* small breathing room, seal is above */
+                padding-right: 16px !important;
             }
 
             /* ── Category rail ── */
+            .category-rail-wrap {
+                margin-top: 0;
+            }
+            .category-rail-wrap::after { display: block; }
             .category-rail {
                 justify-content: flex-start;
                 overflow-x: auto;
@@ -1176,8 +1435,13 @@
             .modal-content { flex-direction: column; max-height: 88dvh; }
             .modal-left { width: 100%; height: 38dvh; }
             .modal-right { width: 100%; padding: 22px 20px; }
-            .modal-title { font-size: 1.5rem; }
-        }
+            .contact-section { padding: 60px 24px; }
+            .contact-title { font-size: 1.5rem; letter-spacing: 0.3rem; }
+            .contact-line-btn { padding: 14px 28px; font-size: 0.9rem; }
+
+            .skeleton-card { flex-direction: column !important; }
+            .skeleton-img { width: 100% !important; height: 240px !important; }
+            .skeleton-info { width: 100%; padding: 24px 20px; }
 
         /* Accessibility — honor user's motion preference */
         @media (prefers-reduced-motion: reduce) {
@@ -1279,21 +1543,65 @@
         </header>
 
         <!-- Category filter — 懸絲標籤 rail (built dynamically from sheet data) -->
-        <div class="category-rail" id="categoryFilter"
-             role="tablist" aria-label="器物分類篩選"
-             style="margin-top: 300px;">
+        <div class="category-rail-wrap">
+            <div class="category-rail" id="categoryFilter"
+                 role="tablist" aria-label="器物分類篩選">
             <button class="cat-btn active" data-cat="all"
                     role="tab" aria-selected="true" aria-controls="gallery">
                 <span class="cat-glyph">全</span>
                 <span class="cat-label">全部典藏</span>
             </button>
-            <!-- category tabs injected dynamically from sheet data after fetch -->
+                <!-- category tabs injected dynamically from sheet data after fetch -->
+            </div>
         </div>
 
         <div id="gallery" class="gallery-container" style="padding-top: 40px;">
             <div class="loading">載入典藏中<span class="loading-dots"><span>·</span><span>·</span><span>·</span></span></div>
         </div>
     </div>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <div class="contact-inner">
+            <div class="contact-brand">
+                <div class="contact-seal" aria-hidden="true">
+                    <svg viewBox="0 0 50 50" width="56" height="56">
+                        <rect x="5" y="5" width="40" height="40" rx="4"
+                              fill="var(--paper)" stroke="var(--seal-red)" stroke-width="2.5"/>
+                        <text x="50%" y="35%" dominant-baseline="middle" text-anchor="middle"
+                              font-family="var(--font-display)" font-size="13" fill="var(--seal-red)">吉</text>
+                        <text x="50%" y="68%" dominant-baseline="middle" text-anchor="middle"
+                              font-family="var(--font-display)" font-size="13" fill="var(--seal-red)">寶</text>
+                    </svg>
+                </div>
+                <h2 class="contact-title">洽詢典藏</h2>
+                <p class="contact-subtitle">傳承・鑑光・典藏</p>
+            </div>
+            <div class="contact-divider" aria-hidden="true"></div>
+            <div class="contact-body">
+                <p class="contact-desc">
+                    對館藏器物有興趣，歡迎透過 LINE 私訊掌櫃，<br>
+                    我們將於 24 小時內回覆您的詢問。
+                </p>
+                <a class="contact-line-btn"
+                   href="https://line.me/ti/p/[YOUR_LINE_ID]"
+                   target="_blank" rel="noopener noreferrer">
+                    <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <path fill="currentColor"
+                          d="M19.365 9.89c.50 0 .907.41.907.91s-.406.91-.907.91h-1.44v.91h1.44c.5 0 .907.41.907.91s-.406.91-.907.91H17.01a.91.91 0 01-.907-.91V9.89c0-.5.406-.91.907-.91h2.355zm-5.423 3.64a.91.91 0 01-.907.91.915.915 0 01-.73-.365L10.58 11.8v1.73a.91.91 0 01-1.814 0V9.89c0-.5.406-.91.907-.91.283 0 .535.127.701.326l1.727 2.277V9.89c0-.5.406-.91.907-.91s.907.41.907.91v3.64zM8.09 13.53a.91.91 0 01-.907.91.91.91 0 01-.906-.91V9.89c0-.5.406-.91.906-.91s.907.41.907.91v3.64zM6.27 8.07H3.916a.91.91 0 00-.907.91v3.64c0 .5.406.91.907.91H6.27c.5 0 .906-.41.906-.91s-.406-.91-.906-.91H4.823v-.455H6.27c.5 0 .906-.41.906-.91s-.406-.455-.906-.455H4.823v-.455H6.27c.5 0 .906-.41.906-.91s-.406-.91-.906-.91zM12 2C6.477 2 2 6.145 2 11.243c0 4.561 3.614 8.373 8.49 9.088.33.071.779.218.893.5.102.257.067.66.033.92l-.144.866c-.044.257-.203 1.004.88.547 1.082-.457 5.84-3.44 7.97-5.89C21.397 15.59 22 13.496 22 11.243 22 6.145 17.523 2 12 2z"/>
+                    </svg>
+                    LINE 洽詢掌櫃
+                </a>
+                <p class="contact-note">
+                    ※ 本館典藏圖片及鑑定資料受著作權保護，未經授權不得轉載。
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="site-footer">
+        © 2026 吉寶軒 Jibao Xuan &nbsp;·&nbsp; 典藏器物圖片及資料受著作權保護
+    </footer>
 
     <!-- Scroll progress -->
     <div id="scroll-progress-wrap">
@@ -1317,8 +1625,6 @@
                 <h2 class="modal-title" id="modalTitle"></h2>
                 <div class="modal-era" id="modalEra"></div>
                 <div class="modal-badges" id="modalBadges"></div>
-                <div class="modal-story" id="modalStory"></div>
-                <div class="modal-tags" id="modalTags"></div>
                 <!-- DP-003: 策展人鑑定摘要 -->
                 <div class="modal-appraisal" id="modalAppraisal">
                     <div class="appraisal-divider">
@@ -1328,7 +1634,12 @@
                     <div class="appraisal-row appraisal-price" id="modalRefPrice"></div>
                     <div class="appraisal-note" id="modalDisplayRec"></div>
                 </div>
-                <a href="#contact" class="modal-action" onclick="closeModal()">洽詢收藏</a>
+                <div class="modal-story" id="modalStory"></div>
+                <div class="modal-tags" id="modalTags"></div>
+                <button class="modal-action"
+                        onclick="closeModal(); setTimeout(() => document.getElementById('contact').scrollIntoView({behavior:'smooth'}), 280);">
+                    洽詢收藏
+                </button>
             </div>
         </div>
     </div>
@@ -1503,20 +1814,46 @@
                     btn.classList.add('active');
                     btn.setAttribute('aria-selected', 'true');
                     const cat = btn.dataset.cat;
-                    let visible = 0;
-                    document.querySelectorAll('.card').forEach(card => {
+
+                    // Animated filter transition
+                    const cards = document.querySelectorAll('.card');
+                    const toHide = [];
+                    const toShow = [];
+                    cards.forEach(card => {
                         const cats = splitCategoryCell(card.dataset.category);
                         const match = (cat === 'all' || cats.includes(cat));
-                        card.style.display = match ? '' : 'none';
-                        if (match) visible++;
+                        if (match) toShow.push(card);
+                        else toHide.push(card);
                     });
-                    if (emptyEl) { emptyEl.remove(); emptyEl = null; }
-                    if (visible === 0) {
-                        emptyEl = document.createElement('div');
-                        emptyEl.className = 'empty-state';
-                        emptyEl.innerHTML = '<span class="empty-glyph">虛</span><p>此專場尚無典藏</p>';
-                        gallery.appendChild(emptyEl);
-                    }
+
+                    // Phase 1: fade out non-matching cards
+                    toHide.forEach(card => {
+                        card.classList.remove('filter-showing');
+                        card.classList.add('filter-hiding');
+                    });
+
+                    // Phase 2: after exit completes (220ms), hide + show matching
+                    setTimeout(() => {
+                        toHide.forEach(card => {
+                            card.classList.remove('filter-hiding');
+                            card.style.display = 'none';
+                        });
+                        toShow.forEach((card, i) => {
+                            card.style.display = '';
+                            card.classList.remove('filter-hiding');
+                            card.classList.add('filter-showing');
+                            card.style.animationDelay = `${Math.min(i, 4) * 60}ms`;
+                        });
+                        // visible count for empty state
+                        const visible = toShow.length;
+                        if (emptyEl) { emptyEl.remove(); emptyEl = null; }
+                        if (visible === 0) {
+                            emptyEl = document.createElement('div');
+                            emptyEl.className = 'empty-state';
+                            emptyEl.innerHTML = '<span class="empty-glyph">虛</span><p>此專場尚無典藏</p>';
+                            gallery.appendChild(emptyEl);
+                        }
+                    }, 240);
                 });
             });
         }
@@ -1571,7 +1908,7 @@
             const item = artifactsData[index];
             if (!item) return;
 
-            let highResUrl = item.imageUrl || 'https://via.placeholder.com/800x800?text=No+Image';
+            let highResUrl = item.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='80' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='18' fill='%238a6f2f' letter-spacing='6' opacity='0.6'>暫無圖片</text></svg>";
             if (item.imageUrl) {
                 const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
                 if (idMatch) highResUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w2000`;
@@ -1762,6 +2099,24 @@
         async function fetchArtifacts() {
             const gallery = document.getElementById('gallery');
             try {
+                // Show skeleton cards during load
+                gallery.innerHTML = [0,1,2].map((i) => `
+                    <div class="skeleton-card">
+                        ${i % 2 === 0
+                            ? '<div class="skeleton-img"></div><div class="skeleton-info">' +
+                              '<div class="skeleton-line"></div><div class="skeleton-line"></div>' +
+                              '<div class="skeleton-line"></div><div class="skeleton-line"></div>' +
+                              '<div class="skeleton-line"></div><div class="skeleton-line"></div>' +
+                              '</div>'
+                            : '<div class="skeleton-info">' +
+                              '<div class="skeleton-line"></div><div class="skeleton-line"></div>' +
+                              '<div class="skeleton-line"></div><div class="skeleton-line"></div>' +
+                              '<div class="skeleton-line"></div><div class="skeleton-line"></div>' +
+                              '</div><div class="skeleton-img"></div>'
+                        }
+                    </div>
+                `).join('');
+
                 const res = await fetch(API_URL);
                 const json = await res.json();
                 if (json.success && json.data.length > 0) {
@@ -1769,7 +2124,7 @@
                     artifactsData = json.data;
 
                     json.data.forEach((item, index) => {
-                        let imageUrl = 'https://via.placeholder.com/400x400?text=No+Image';
+                        let imageUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='48' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='13' fill='%238a6f2f' letter-spacing='4' opacity='0.6'>暫無圖片</text></svg>";
                         if (item.imageUrl) {
                             const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
                             if (idMatch) imageUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
@@ -1829,7 +2184,9 @@
                                 <h2 class="item-name">${item.itemName || ''}</h2>
                                 <div class="item-era">${item.era || '年代待考'}</div>
                                 <div class="material-badges">${badgesHtml}</div>
-                                <p class="item-story">${item.story || '暫無故事描述。'}</p>
+                                <div class="item-story-wrap">
+                                    <p class="item-story">${item.story || '暫無故事描述。'}</p>
+                                </div>
                                 <div class="tags">${tagsHtml}</div>
                             </div>
                         `;
