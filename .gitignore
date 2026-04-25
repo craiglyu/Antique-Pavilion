@@ -1,0 +1,59 @@
+# ════════════════════════════════════════════════════
+# 吉寶軒 AP 專案 .gitignore
+# 原則：只追蹤部署必要 + Bot 源碼 + 文件
+# ════════════════════════════════════════════════════
+
+# ── 🔒 敏感資料 — 絕不入 Git ─────────────────────────
+.env.antique
+.env
+*.env
+
+# GAS 腳本含 hardcode API keys（本地參考用，不入 Git）
+memory/Antique_GAS_v9_Discord.md
+memory/Antique_analysis_GAS.md
+memory/Antique_analysis_GAS_bak5.md
+
+# ── 🤖 自動生成的狀態檔 ──────────────────────────────
+feedback_state.json
+bot_state.json
+memory/agent_inbox.md
+memory/opus_inbox/
+memory/opus_rulings/
+memory/VETO_ACTIVE.json
+
+# ── 🗑️ 歷史技術債 / 備份檔 ────────────────────────────
+*.bak
+*.bak.*
+scripts/ap_org_bot\ -\ 複製.py
+index_ByClaudeDesign.html
+update_index.py
+
+# 舊版單頁 style / script（已整合進 index.html）
+style.css
+app.js
+
+# 奇怪的無副檔名圖片
+34090585-5eba2410dabe27645a9fe8d9a7db559c.jpg!waterxwebp320x556
+
+# ── 🎨 大型素材資料夾（本地保留，不佔 Git 空間）────────
+# AI 生成背景圖（網站使用 inline SVG，不依賴這些）
+Design/
+Marketing/
+
+# 設計系統探索資料夾（JSX/React，不符合純 HTML 技術棧）
+Jibao\ Xuan\ Design\ System/
+
+# ── ⚙️ Claude Code 本地設定 ────────────────────────────
+.claude/settings.local.json
+# .claude/commands/ 保留入 Git（自訂 Skills）
+
+# ── 🐍 Python 暫存 ────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# ── 💻 OS 雜檔 ────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
