@@ -1405,6 +1405,7 @@
             }
             .card--feature .lot-number {
                 padding-left: 0 !important;
+                padding-right: 0 !important;  /* desktop 88px seal-clearance not needed on mobile */
                 min-height: auto !important;
                 display: block !important;
                 margin-bottom: 8px;
@@ -1412,6 +1413,18 @@
             .card--feature .item-name {
                 padding-left: 0 !important;
                 padding-right: 16px !important;
+            }
+
+            /* Lot-number: remove desktop right-padding (seal is not at right on mobile) */
+            .lot-number {
+                padding-right: 0 !important;
+                min-height: auto;
+            }
+
+            /* Brand title: smaller font-size prevents letter-spacing overflow at tablet
+               5rem + 1.5rem × 3 gaps = ~312px at 768px → 3.5rem + 1.5rem × 3 = ~240px ✅ */
+            .brand-title {
+                font-size: 3.5rem;
             }
 
             /* ── Category rail ── */
