@@ -1,0 +1,71 @@
+# Authentication Log DB schema migration — v1 → v2
+#
+# Why: Curator pull-pending CLI currently flags every entry 待重審 because
+# the DB has no era/category select fields. Adding them lets Curator R3
+# (missing required fields) pass and reach proper R4 (confidence threshold).
+#
+# Triggered by: Council topic ap-2026-04-30-133428-001 follow-up CUR-T-001
+# Applied via: scripts/ap_authlog_schema_migrate.py --apply
+#
+# After applying, ap_discord_bot.py (the authentication pipeline) should also
+# write era/category into newly-created entries — that part is covered by the
+# v2.0 GAS deployment (see memory/Antique_GAS_v9_Discord.md). This migration
+# only adds the SCHEMA; it does NOT backfill existing entries (Sprint 3 may
+# add a separate backfill pass once GAS is updated to emit categorical data).
+
+schema_version: 1
+migration_id: 2026-04-30_auth_log_v1_to_v2
+target_db: NOTION_AUTH_LOG_DB
+description: "Add era / category select properties + isValid checkbox to Authentication Log DB"
+
+from_version: 1
+to_version: 2
+
+# Properties to ADD. Notion select options below match CLAUDE.md §4 (era 9-enum)
+# and a starter set of category values that align with frontend filter UI.
+add_properties:
+
+  era:
+    type: select
+    options:
+      - {name: "史前與高古",     color: "brown"}
+      - {name: "唐宋元(含之前)", color: "orange"}
+      - {name: "明朝",           color: "yellow"}
+      - {name: "清朝",           color: "red"}
+      - {name: "民國",           color: "purple"}
+      - {name: "近現代",         color: "blue"}
+      - {name: "外國骨董",       color: "pink"}
+      - {name: "時代不詳",       color: "gray"}
+      - {name: "其他",           color: "default"}
+
+  category:
+    type: select
+    options:
+      - {name: "瓷器",   color: "blue"}
+      - {name: "銅器",   color: "yellow"}
+      - {name: "玉器",   color: "green"}
+      - {name: "書畫",   color: "purple"}
+      - {name: "雜項",   color: "gray"}
+      - {name: "其他",   color: "default"}
+
+  isValid:
+    type: checkbox
+    description: "Gemini Validity flag — false = 圖像不可用 / 非骨董 / 仿品標示明確"
+
+# Properties to RENAME (none in this migration).
+rename_properties: {}
+
+# Properties to REMOVE (none — additive migration; no destructive change).
+remove_properties: []
+
+# Backfill rules for existing entries.
+# Sprint 2: do NOT backfill automatically. Existing entries' era/category will
+# remain blank until Curator manually reviews + sets via Notion UI, OR until
+# Sprint 3 backfill pass runs (with explicit Craig sign-off).
+backfill: noop
+
+# Verification queries to run AFTER migration.
+verification:
+  - "Curator pull-pending again — expect at least one entry NOT in 待重審 (因為新條目可填 era/category)"
+  - "Manually inspect Notion Auth Log DB — confirm 3 new properties visible in DB schema"
+  - "Read GAS analyzeWithGemini() — confirm response_schema includes 'era' (already present)"

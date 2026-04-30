@@ -144,13 +144,15 @@ def cmd_review(args: argparse.Namespace) -> int:
 
 
 def cmd_pull_pending(args: argparse.Namespace) -> int:
-    """Sprint 1 read-only: query Notion Auth Log for curator_status='未審'."""
+    """Pull curator_status='未審' from Notion Auth Log; review; optionally write back."""
     # Local import keeps `classify`/`review` working when notion_writer is missing.
+    from ap_org_bot.agents._domain.ap.curator import Verdict
     from ap_org_bot.infra.notion_client import (
         DB_AUTH_LOG,
         extract_property_value,
         is_enabled,
         query_database,
+        update_page_properties,
     )
 
     if not is_enabled():
@@ -222,9 +224,35 @@ def cmd_pull_pending(args: argparse.Namespace) -> int:
 
     if args.apply:
         print()
-        print("ℹ️  --apply 旗標 Sprint 1 尚未實作（write-back 到 Notion）。")
-        print("    Sprint 2 將加：通過→curator_status='通過'，待重審→保留+ping Craig，")
-        print("    衝突/退回→對應 select 值。")
+        print("✏️  --apply: 把 verdict 寫回 Notion curator_status...")
+        # Map verdict → curator_status select value (matches Notion DB enum)
+        verdict_to_status = {
+            Verdict.PASSED: "通過",
+            Verdict.PENDING_REVIEW: "待重審",
+            Verdict.CONFLICT: "衝突",
+            Verdict.REJECTED: "退回",
+        }
+        applied = 0
+        skipped = 0
+        for review in reviews:
+            page_id = review.auth_log_id
+            if not page_id or page_id == "<unknown>":
+                skipped += 1
+                continue
+            target_status = verdict_to_status[review.verdict]
+            result = update_page_properties(
+                page_id,
+                properties={
+                    "Curator 標註": {"select": {"name": target_status}},
+                },
+            )
+            if result is None:
+                print(f"   ❌ {page_id[:8]}…: PATCH failed")
+                skipped += 1
+            else:
+                print(f"   ✅ {page_id[:8]}…: curator_status → {target_status}")
+                applied += 1
+        print(f"\n   {applied} written, {skipped} skipped.")
 
     return 0 if summary["衝突"] == 0 and summary["退回"] == 0 else 1
 

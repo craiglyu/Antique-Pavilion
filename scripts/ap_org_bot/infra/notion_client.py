@@ -43,6 +43,7 @@ try:
         extract_property_value,
         is_enabled,
         query_database,
+        update_page_properties,
     )
 
     AVAILABLE = True
@@ -77,6 +78,9 @@ except Exception as e:
     def extract_property_value(*_args, **_kwargs):  # type: ignore[no-redef]
         return None
 
+    def update_page_properties(*_args, **_kwargs):  # type: ignore[no-redef]
+        return None
+
 
 __all__ = [
     "AVAILABLE",
@@ -89,6 +93,7 @@ __all__ = [
     "create_incident",
     "query_database",
     "extract_property_value",
+    "update_page_properties",
     # DB ID env shortcuts (Sprint 1 Curator + future Sprint reconciler)
     "DB_TOPICS",
     "DB_DECISIONS",

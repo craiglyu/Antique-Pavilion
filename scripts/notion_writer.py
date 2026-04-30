@@ -162,6 +162,56 @@ def query_database(
     return all_results
 
 
+def _patch(path: str, payload: dict) -> Optional[dict]:
+    """Sync PATCH to Notion API. Used to update page properties.
+
+    Returns dict on success, None on failure. Mirrors _post() error handling.
+    """
+    if not NOTION_API_KEY:
+        return None
+
+    url = f"{NOTION_API_BASE}{path}"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method="PATCH")
+    req.add_header("Authorization", f"Bearer {NOTION_API_KEY}")
+    req.add_header("Notion-Version", NOTION_VERSION)
+    req.add_header("Content-Type", "application/json")
+
+    ctx = ssl._create_unverified_context()
+
+    try:
+        with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:500]
+        log.error("[notion] PATCH HTTP %d on %s: %s", e.code, path, body)
+        return None
+    except Exception as e:
+        log.error("[notion] PATCH %s on %s: %s", type(e).__name__, path, e)
+        return None
+
+
+def update_page_properties(page_id: str, properties: dict) -> Optional[dict]:
+    """Patch a single Notion page's properties.
+
+    Args:
+        page_id: Notion page UUID (with or without dashes).
+        properties: {prop_name: prop_value_block} — same shape as create_xxx() builds.
+
+    Returns:
+        Notion API response dict on success, None on failure or if Notion disabled.
+
+    Example — Curator write-back:
+        update_page_properties(
+            page_id="abc-123-...",
+            properties={"Curator 標註": _select("通過")},
+        )
+    """
+    if not (NOTION_API_KEY and page_id):
+        return None
+    return _patch(f"/pages/{page_id}", {"properties": properties})
+
+
 def extract_property_value(page: dict, property_name: str) -> object:
     """Extract a Python value from a Notion page property block.
 
