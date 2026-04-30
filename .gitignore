@@ -28,6 +28,10 @@ memory/ap_council_state/*.json
 !memory/ap_council_state/_schema.json
 memory/agent_tasks.yaml
 
+# Sprint 2 catchup_protocol watermark store
+memory/ap_catchup/*.json
+!memory/ap_catchup/_schema.json
+
 # ── 🗑️ 歷史技術債 / 備份檔 ────────────────────────────
 *.bak
 *.bak.*

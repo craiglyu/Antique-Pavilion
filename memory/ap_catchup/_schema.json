@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "AP Catchup Protocol Watermark",
+  "description": "One JSON file per SourceType under memory/ap_catchup/<source>.json. Records the bot's last-known checkpoint so a restart / outage doesn't double-process events. Sprint 2 wires the read side; Sprint 3 wires active replay.",
+  "type": "object",
+  "required": ["source", "value", "updated_at", "schema_version"],
+  "properties": {
+    "source": {
+      "type": "string",
+      "enum": [
+        "discord_feedback",
+        "gemini_calls",
+        "notion_writes",
+        "council_state",
+        "bot_heartbeat"
+      ],
+      "description": "Watermark source type; one file per source."
+    },
+    "value": {
+      "type": "string",
+      "description": "Opaque checkpoint — Discord message_id / ISO timestamp / Notion page_id depending on source."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "extra": {
+      "type": "object",
+      "description": "Source-specific metadata (e.g., per-channel breakdown for discord_feedback)"
+    }
+  }
+}

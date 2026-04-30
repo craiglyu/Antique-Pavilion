@@ -38,6 +38,7 @@ OPUS_INBOX_DIR: Path = MEMORY_DIR / "opus_inbox"
 OPUS_RULINGS_DIR: Path = MEMORY_DIR / "opus_rulings"
 AGENT_INBOX_FILE: Path = MEMORY_DIR / "agent_inbox.md"
 VETO_FILE: Path = MEMORY_DIR / "VETO_ACTIVE.json"
+CATCHUP_DIR: Path = MEMORY_DIR / "ap_catchup"  # Sprint 2 — watermark store
 
 # Tests (relative to project root, used by conftest.py)
 TESTS_DIR: Path = PROJECT_ROOT / "tests"
@@ -45,5 +46,6 @@ TESTS_DIR: Path = PROJECT_ROOT / "tests"
 
 def ensure_runtime_dirs() -> None:
     """Create gitignored runtime directories on bot startup. Idempotent."""
-    for d in (MEMORY_DIR, COUNCIL_STATE_DIR, OPUS_INBOX_DIR, OPUS_RULINGS_DIR):
+    for d in (MEMORY_DIR, COUNCIL_STATE_DIR, OPUS_INBOX_DIR, OPUS_RULINGS_DIR,
+              CATCHUP_DIR):
         d.mkdir(parents=True, exist_ok=True)
