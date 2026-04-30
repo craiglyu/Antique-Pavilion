@@ -53,11 +53,12 @@ def test_idempotent_same_state_is_noop():
     assert t.state == State.NEW
 
 
-def test_phase_states_unreachable_under_pilot():
-    """Sprint 3 will lift this; for now blueprint phases are stubs."""
-    t = Topic(topic_id="x")
-    transition(t, State.STRUCTURED, actor="test")
-    assert not can_transition(State.STRUCTURED, State.PHASE1_INDEPENDENT)
+def test_phase_states_now_reachable_via_full_path():
+    """Sprint 2 lifted the Sprint 1 restriction — STRUCTURED can advance to
+    either AWAITING_SIGNOFF (pilot path) or PHASE1_INDEPENDENT (full 9-state).
+    Detailed phase tests live in test_council_9state.py."""
+    assert can_transition(State.STRUCTURED, State.AWAITING_SIGNOFF)
+    assert can_transition(State.STRUCTURED, State.PHASE1_INDEPENDENT)
 
 
 def test_audit_log_grows_per_transition():

@@ -45,8 +45,12 @@ from ap_org_bot.council.persistence import (  # noqa: E402
 )
 from ap_org_bot.council.state_machine import (  # noqa: E402
     IllegalTransitionError,
+    PhaseStateError,
     State,
     Topic,
+    add_phase1_response,
+    add_phase2_debate_round,
+    set_phase3_proposal,
     transition,
 )
 
@@ -115,6 +119,74 @@ def cmd_advance(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_phase1_respond(args: argparse.Namespace) -> int:
+    topic = load_topic(args.topic_id)
+    if topic is None:
+        print(f"topic {args.topic_id} not found", file=sys.stderr)
+        return 1
+    try:
+        add_phase1_response(
+            topic,
+            agent_name=args.agent,
+            stance=args.stance,
+            reasoning=args.reasoning or "",
+            model=args.model,
+        )
+    except PhaseStateError as e:
+        print(f"❌ {e}", file=sys.stderr)
+        return 1
+    save_topic(topic)
+    print(f"{topic.topic_id} phase1 ← {args.agent}: {args.stance[:60]}")
+    print(f"  ({len(topic.phase1_responses)} agent(s) have responded)")
+    return 0
+
+
+def cmd_phase2_debate(args: argparse.Namespace) -> int:
+    topic = load_topic(args.topic_id)
+    if topic is None:
+        print(f"topic {args.topic_id} not found", file=sys.stderr)
+        return 1
+    rounds = json.loads(args.rounds_json) if args.rounds_json else []
+    try:
+        add_phase2_debate_round(
+            topic,
+            divergence_point=args.divergence,
+            rounds=rounds,
+            convergence=args.convergence or "",
+        )
+    except PhaseStateError as e:
+        print(f"❌ {e}", file=sys.stderr)
+        return 1
+    save_topic(topic)
+    print(f"{topic.topic_id} phase2 debate appended")
+    return 0
+
+
+def cmd_phase3_integrate(args: argparse.Namespace) -> int:
+    topic = load_topic(args.topic_id)
+    if topic is None:
+        print(f"topic {args.topic_id} not found", file=sys.stderr)
+        return 1
+    follow_up_tasks = (
+        json.loads(args.follow_up_json) if args.follow_up_json else []
+    )
+    try:
+        set_phase3_proposal(
+            topic,
+            tldr=args.tldr,
+            recommended=args.recommended or "",
+            reasoning=args.reasoning or "",
+            follow_up_tasks=follow_up_tasks,
+            model=args.model,
+        )
+    except PhaseStateError as e:
+        print(f"❌ {e}", file=sys.stderr)
+        return 1
+    save_topic(topic)
+    print(f"{topic.topic_id} phase3 proposal set: {args.tldr[:60]}")
+    return 0
+
+
 def cmd_signoff(args: argparse.Namespace) -> int:
     topic = load_topic(args.topic_id)
     if topic is None:
@@ -176,6 +248,34 @@ def build_parser() -> argparse.ArgumentParser:
     p_so.add_argument("decision", choices=["approve", "reject"])
     p_so.add_argument("--actor", default="cli")
 
+    # ── Sprint 2: 9-state phase helpers ────────────────────────────
+    p_p1 = sub.add_parser("phase1-respond",
+                          help="Phase 1 (independent stance) — one agent's response")
+    p_p1.add_argument("topic_id")
+    p_p1.add_argument("agent", help="agent name (PM / UX / Designer / ...)")
+    p_p1.add_argument("stance", help="agent's position (one line)")
+    p_p1.add_argument("--reasoning", help="why (full text)")
+    p_p1.add_argument("--model", default="haiku",
+                      help="model used (haiku/sonnet/opus, default haiku)")
+
+    p_p2 = sub.add_parser("phase2-debate",
+                          help="Phase 2 (debate) — record one divergence round")
+    p_p2.add_argument("topic_id")
+    p_p2.add_argument("divergence", help="the divergence point being debated")
+    p_p2.add_argument("--convergence", help="PM's resolution / 'no convergence'")
+    p_p2.add_argument("--rounds-json", dest="rounds_json",
+                      help="JSON array of round dicts [{agent, position, response}]")
+
+    p_p3 = sub.add_parser("phase3-integrate",
+                          help="Phase 3 (integration) — set the integrated proposal")
+    p_p3.add_argument("topic_id")
+    p_p3.add_argument("tldr", help="one-line proposal summary")
+    p_p3.add_argument("--recommended", help="recommended option name")
+    p_p3.add_argument("--reasoning", help="why this option")
+    p_p3.add_argument("--follow-up-json", dest="follow_up_json",
+                      help="JSON array of {task_id, agent, description} dicts")
+    p_p3.add_argument("--model", default="sonnet")
+
     return parser
 
 
@@ -188,6 +288,9 @@ def main(argv: list[str] | None = None) -> int:
         "show": cmd_show,
         "advance": cmd_advance,
         "signoff": cmd_signoff,
+        "phase1-respond": cmd_phase1_respond,
+        "phase2-debate": cmd_phase2_debate,
+        "phase3-integrate": cmd_phase3_integrate,
     }
     return handlers[args.cmd](args)
 

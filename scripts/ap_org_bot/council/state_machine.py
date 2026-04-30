@@ -38,19 +38,40 @@ class State(str, Enum):
     ARCHIVED = "ARCHIVED"
 
 
-# Sprint 1 only allows the linear pilot path.
+# Sprint 2: 9-state path active. Sprint 1 "pilot short-circuit"
+# (STRUCTURED → AWAITING_SIGNOFF) is preserved alongside full 9-state path,
+# so PMs can pick simple-PM-integration vs full multi-agent debate per topic.
 ALLOWED_TRANSITIONS: dict[State, set[State]] = {
-    State.NEW:               {State.STRUCTURED, State.REJECTED},
-    State.STRUCTURED:        {State.AWAITING_SIGNOFF, State.REJECTED},
-    State.AWAITING_SIGNOFF:  {State.SIGNED_OFF, State.REJECTED},
-    State.SIGNED_OFF:        {State.ARCHIVED},
-    State.REJECTED:          {State.ARCHIVED, State.REOPENED},
-    State.REOPENED:          {State.NEW},
-    State.ARCHIVED:          set(),
-    # Phase states unreachable under pilot rules; populated in Sprint 3.
-    State.PHASE1_INDEPENDENT: set(),
-    State.PHASE2_DEBATE: set(),
-    State.PHASE3_INTEGRATION: set(),
+    State.NEW: {State.STRUCTURED, State.REJECTED},
+
+    State.STRUCTURED: {
+        State.AWAITING_SIGNOFF,        # pilot path (PM directly integrates)
+        State.PHASE1_INDEPENDENT,      # full 9-state path
+        State.REJECTED,
+    },
+
+    State.PHASE1_INDEPENDENT: {
+        State.PHASE2_DEBATE,           # standard — proceed to debate
+        State.PHASE3_INTEGRATION,      # skip if no divergence
+        State.AWAITING_SIGNOFF,        # PM short-circuit (e.g. all agents agreed)
+        State.REJECTED,
+    },
+
+    State.PHASE2_DEBATE: {
+        State.PHASE3_INTEGRATION,
+        State.REJECTED,
+    },
+
+    State.PHASE3_INTEGRATION: {
+        State.AWAITING_SIGNOFF,
+        State.REJECTED,
+    },
+
+    State.AWAITING_SIGNOFF: {State.SIGNED_OFF, State.REJECTED},
+    State.SIGNED_OFF: {State.ARCHIVED},
+    State.REJECTED: {State.ARCHIVED, State.REOPENED},
+    State.REOPENED: {State.NEW},
+    State.ARCHIVED: set(),
 }
 
 TERMINAL_STATES = {State.ARCHIVED}
@@ -202,3 +223,131 @@ def transition(
     log.info("[council] topic %s %s → %s (by %s)",
              topic.topic_id, prev.value, target.value, actor)
     return topic
+
+
+# ── Phase 1/2/3 helpers (Sprint 2 — 9-state path) ──────────────────
+
+
+class PhaseStateError(RuntimeError):
+    """Caller tried a phase op but the topic is in the wrong state."""
+
+
+def add_phase1_response(
+    topic: Topic,
+    *,
+    agent_name: str,
+    stance: str,
+    reasoning: str = "",
+    model: str = "haiku",
+) -> Topic:
+    """Record one agent's independent stance during PHASE1_INDEPENDENT.
+
+    Per blueprint v1.1 §3.2: Phase 1 = each agent posts in parallel without
+    seeing others' replies. This helper just appends to phase1_responses dict;
+    the actual parallelism happens at the agent invocation layer (Sprint 3).
+    """
+    if topic.state != State.PHASE1_INDEPENDENT:
+        raise PhaseStateError(
+            f"add_phase1_response requires PHASE1_INDEPENDENT, got {topic.state.value}"
+        )
+    topic.phase1_responses[agent_name] = {
+        "timestamp": _now_utc(),
+        "stance": stance,
+        "reasoning": reasoning,
+        "model": model,
+    }
+    topic.updated_at = _now_utc()
+    log.info("[council] %s phase1 ← %s: %s", topic.topic_id, agent_name, stance[:40])
+    return topic
+
+
+def add_phase2_debate_round(
+    topic: Topic,
+    *,
+    divergence_point: str,
+    rounds: list[dict],
+    convergence: str,
+) -> Topic:
+    """Append one debate round for one divergence point in PHASE2_DEBATE.
+
+    `rounds` is a list of {agent, position, response} dicts (1-2 rounds typical).
+    `convergence` is PM's summary of what got resolved (or "no convergence").
+    """
+    if topic.state != State.PHASE2_DEBATE:
+        raise PhaseStateError(
+            f"add_phase2_debate_round requires PHASE2_DEBATE, got {topic.state.value}"
+        )
+    topic.phase2_debate.append({
+        "timestamp": _now_utc(),
+        "divergence_point": divergence_point,
+        "rounds": list(rounds),
+        "convergence": convergence,
+    })
+    topic.updated_at = _now_utc()
+    log.info(
+        "[council] %s phase2 debate: %s (%d rounds) → %s",
+        topic.topic_id, divergence_point[:40], len(rounds), convergence[:40],
+    )
+    return topic
+
+
+def set_phase3_proposal(
+    topic: Topic,
+    *,
+    tldr: str,
+    recommended: str = "",
+    reasoning: str = "",
+    follow_up_tasks: Optional[list[dict]] = None,
+    options_considered: Optional[list[dict]] = None,
+    body: str = "",
+    embed_message_id: Optional[str] = None,
+    model: str = "sonnet",
+) -> Topic:
+    """Set the integrated proposal during PHASE3_INTEGRATION.
+
+    Mirrors fields to `pilot_proposal` so the reaction handler / embed renderer
+    don't have to branch on path. The 9-state path overwrites pilot_proposal
+    with the integrated phase3 content; the Sprint 1 short-circuit path leaves
+    pilot_proposal untouched.
+    """
+    if topic.state != State.PHASE3_INTEGRATION:
+        raise PhaseStateError(
+            f"set_phase3_proposal requires PHASE3_INTEGRATION, got {topic.state.value}"
+        )
+    timestamp = _now_utc()
+    topic.phase3_proposal = {
+        "timestamp": timestamp,
+        "tldr": tldr,
+        "recommended": recommended,
+        "reasoning": reasoning,
+        "follow_up_tasks": list(follow_up_tasks or []),
+        "options_considered": list(options_considered or []),
+        "body": body,
+        "embed_message_id": embed_message_id,
+        "model": model,
+    }
+    # Mirror to pilot_proposal so existing embed/reaction code works unchanged.
+    topic.pilot_proposal = {
+        **(topic.pilot_proposal or {}),
+        "tldr": tldr,
+        "recommended": recommended,
+        "reasoning": reasoning,
+        "follow_up_tasks": list(follow_up_tasks or []),
+        "options_considered": list(options_considered or []),
+        "phase3_synced_at": timestamp,
+    }
+    topic.updated_at = timestamp
+    log.info("[council] %s phase3 proposal set: %s", topic.topic_id, tldr[:60])
+    return topic
+
+
+def proposal_for_embed(topic: Topic) -> dict:
+    """Return the right proposal block for embed rendering — phase3 if set,
+    else fall back to pilot_proposal (Sprint 1 path).
+
+    Used by discord_io/council_embed.py to surface AWAITING_SIGNOFF data without
+    branching on path.
+    """
+    if topic.phase3_proposal:
+        return topic.phase3_proposal
+    return topic.pilot_proposal

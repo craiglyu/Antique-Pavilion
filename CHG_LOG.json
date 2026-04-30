@@ -3,6 +3,69 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-04-30T22:00:00Z",
+      "category": "feat",
+      "scope": "sprint-2.batch",
+      "version_from": "v0.2.0-rc1",
+      "version_to": "v0.3.0-rc1",
+      "summary": "Sprint 2 全力衝刺 — 6 blocks 一次性 ship: Curator --apply / Auth Log schema migration / catchup_protocol skeleton / audit_runner skeleton / Council 9-state extension / notion_reconciler drift mode. 78 個 new tests, 全套 183 passed in 6.87s.",
+      "rationale": "Craig 指示「全做完」+ 充足額度 → batch-deliver 整個 Sprint 2 範圍. 每 block fully tested + integrated, 跨 block dependencies cleanly factored.",
+      "breaking": false,
+      "rollback": "git revert <each block commit>; CLI tools standalone usable",
+      "blocks": [
+        {
+          "id": "B1",
+          "name": "Curator --apply write-back to Notion",
+          "files": ["notion_writer.py: _patch + update_page_properties", "notion_client.py: re-export", "ap_curator_runner.py: --apply"],
+          "tests": "0 new (validated via existing 109 regression)"
+        },
+        {
+          "id": "B2",
+          "name": "Auth Log DB schema migration spec + CLI",
+          "files": ["config/migrations/2026-04-30_auth_log_v1_to_v2.yaml", "scripts/ap_authlog_schema_migrate.py"],
+          "tests": "0 new (CLI smoke verified)",
+          "schema_change": "Adds era (select 9-enum) + category (select 6 options) + isValid (checkbox) to Auth Log DB"
+        },
+        {
+          "id": "B3",
+          "name": "catchup_protocol skeleton",
+          "files": ["scripts/ap_org_bot/handlers/catchup_protocol.py", "memory/ap_catchup/{_schema.json, README.md}"],
+          "tests": "20 new (test_catchup_protocol.py)",
+          "components": "WatermarkStore + 5 SourceTypes + CatchupCoordinator.on_bot_startup() + heartbeat()"
+        },
+        {
+          "id": "B4",
+          "name": "audit_runner 4-rule MVP",
+          "files": ["scripts/ap_org_bot/audit/{__init__.py, context.py, rules.py, scoring.py}", "scripts/ap_audit_runner.py"],
+          "tests": "24 new (test_audit.py)",
+          "rules": "AP-1 廣告腔 / AP-5 合規聲明 / AP-6 Schema.org / AP-7 alt 屬性"
+        },
+        {
+          "id": "B5",
+          "name": "Council 9-state extension",
+          "files": ["state_machine.py: ALLOWED_TRANSITIONS + add_phase1_response/add_phase2_debate_round/set_phase3_proposal/proposal_for_embed", "ap_council_runner.py: phase1-respond/phase2-debate/phase3-integrate CLI"],
+          "tests": "19 new (test_council_9state.py) + 1 fix (test_council.py)",
+          "compatibility": "Sprint 1 pilot path (STRUCTURED→AWAITING_SIGNOFF) preserved alongside full 9-state path"
+        },
+        {
+          "id": "B6",
+          "name": "notion_reconciler drift mode",
+          "files": ["scripts/ap_org_bot/reconciler/{__init__.py, notion_diff.py}", "scripts/ap_notion_reconciler.py"],
+          "tests": "11 new (test_notion_reconciler.py)",
+          "diff_kinds": "missing / extra / type_mismatch / option_diff",
+          "scope": "drift mode only (read-only); enforce mode deferred to Sprint 3"
+        }
+      ],
+      "test_growth": "Sprint 0 51 → Sprint 1 109 → Sprint 2 183 (78 new tests, 6.87s)",
+      "follow_up": [
+        "Sprint 3: Council 9-state daemon (auto-trigger Phase 1/2/3 via agent registry)",
+        "Sprint 3: catchup_protocol active replay (re-scan #ap-feedback since last watermark, Gemini quota reconcile)",
+        "Sprint 3: audit_runner AP-2/3/4/8 (Lighthouse + 中文 NLP + GAS 版本標籤)",
+        "Sprint 3: notion_reconciler enforce mode (auto-PATCH dev/staging)",
+        "Craig 端: Phase A NOTION_API_KEY 設好後跑 ap_authlog_schema_migrate.py apply"
+      ]
+    },
+    {
       "ts": "2026-04-30T20:30:00Z",
       "category": "feat",
       "scope": "curator.notion_integration",
