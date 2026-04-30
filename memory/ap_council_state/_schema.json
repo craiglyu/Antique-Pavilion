@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "AP Council Topic State",
+  "description": "Shape of memory/ap_council_state/<topic_id>.json. Sprint 1 pilot uses a subset; Sprint 3 will populate phase1/phase2/phase3 fields.",
+  "type": "object",
+  "required": ["topic_id", "schema_version", "state", "audit_log"],
+  "properties": {
+    "topic_id": {
+      "type": "string",
+      "pattern": "^ap-\\d{4}-\\d{2}-\\d{2}-\\d{6}-\\d{3}$",
+      "description": "Unique per Council topic; collision-safe within same second."
+    },
+    "schema_version": {"type": "integer", "minimum": 1},
+    "state": {
+      "type": "string",
+      "enum": [
+        "NEW", "STRUCTURED", "AWAITING_SIGNOFF",
+        "SIGNED_OFF", "REJECTED", "REOPENED", "ARCHIVED",
+        "PHASE1_INDEPENDENT", "PHASE2_DEBATE", "PHASE3_INTEGRATION"
+      ]
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "topic": {
+      "type": "object",
+      "properties": {
+        "raw_input": {"type": "string"},
+        "structured": {
+          "type": "object",
+          "properties": {
+            "problem": {"type": "string"},
+            "goal": {"type": "string"},
+            "constraints": {"type": "string"},
+            "expected_output": {"type": "string"}
+          }
+        },
+        "topic_type": {
+          "type": "string",
+          "description": "Matches a key under topics: in config/council_routing.yaml"
+        }
+      }
+    },
+    "convened": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Agent keys that would have been convened per routing.yaml"
+    },
+    "pilot_proposal": {
+      "type": "object",
+      "description": "Sprint 1 pilot — PM writes a manual proposal here while Phase 1/2/3 are unimplemented",
+      "properties": {
+        "tldr": {"type": "string"},
+        "follow_up_tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["task_id", "agent", "description"],
+            "properties": {
+              "task_id": {"type": "string"},
+              "agent": {"type": "string"},
+              "description": {"type": "string"},
+              "due": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "phase1_responses": {
+      "type": "object",
+      "description": "Sprint 3 — per-agent independent stance. Empty in Sprint 1."
+    },
+    "phase2_debate": {
+      "type": "array",
+      "description": "Sprint 3 — divergence point + debate rounds. Empty in Sprint 1."
+    },
+    "phase3_proposal": {
+      "type": "object",
+      "description": "Sprint 3 — final integrated proposal. Empty in Sprint 1."
+    },
+    "signoff": {
+      "type": "object",
+      "properties": {
+        "decision": {"type": ["string", "null"], "enum": ["approve", "reject", null]},
+        "decided_by": {"type": ["string", "null"]},
+        "decided_at": {"type": ["string", "null"], "format": "date-time"},
+        "reaction": {"type": ["string", "null"]}
+      }
+    },
+    "dispatched_tasks": {
+      "type": "array",
+      "items": {"type": "object"},
+      "description": "Tasks appended to memory/agent_tasks.yaml after SIGNED_OFF"
+    },
+    "audit_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ts", "from", "to", "actor"],
+        "properties": {
+          "ts": {"type": "string", "format": "date-time"},
+          "from": {"type": ["string", "null"]},
+          "to": {"type": "string"},
+          "actor": {"type": "string"},
+          "payload": {"type": "object"}
+        }
+      },
+      "description": "Append-only history of every state transition"
+    }
+  }
+}

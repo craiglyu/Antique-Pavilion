@@ -1,0 +1,64 @@
+# Sign-off tier matrix — which decisions need Craig vs. PM-authorized vs. Agent-autonomous.
+#
+# Per blueprint v1.1 §5. The auto_progression_runner.py (Sprint 2) reads this
+# to gate which Council decisions can auto-merge after CI passes.
+
+schema_version: 1
+last_updated: 2026-04-30
+
+# ── Tier 1: Craig MUST sign off ─────────────────────────────────────
+# These bypass auto-merge regardless of CI gate status. Craig clicks ✅ in
+# #council-decisions or in the GitHub PR.
+tier_1:
+  description: "Architectural / brand / public-facing — Craig only"
+  topics:
+    - 網站架構變更
+    - 品牌方向
+    - 新功能上線
+    - 對外宣稱
+  notes: |
+    跨 Agent 衝突無法調解時也升 Tier 1。Hero 改動、首頁文案大改也視為 Tier 1
+    （即使類型是「視覺微調」）。
+
+# ── Tier 2: PM-authorized, after-the-fact reporting ─────────────────
+# Auto-merge eligible if all CI gates green: lighthouse / brand-tone /
+# compliance / audit-runner. Feedback PM digests Tier 2 merges to Craig in
+# the next morning poll (so Craig sees aggregate, not per-PR).
+tier_2:
+  description: "Day-to-day improvements — PM authorizes, Craig sees digest"
+  topics:
+    - SEO meta / schema 微調
+    - 既有內容文案優化
+    - 知識庫條目新增 / 編輯
+    - 視覺微調（不動架構）
+    - 社群日常貼文（在已批准 tone 與主題範圍內）
+  auto_merge:
+    enabled: false  # toggle to true once GitHub branch protection is configured (Sprint 5)
+    required_labels:
+      - lighthouse-passed
+      - brand-tone-passed
+      - compliance-passed
+      - audit-runner-passed
+      - tier-2-or-below
+
+# ── Tier 3: Agent autonomous — Craig sees nothing (unless alert) ────
+tier_3:
+  description: "Routine ops — fire-and-forget"
+  topics:
+    - SRE 例行健檢與告警
+    - Curator 例行品質審核
+    - Librarian 條目入庫與索引
+    - Backend 例行配額監控
+    - Research 排程性掃描
+
+# ── Watchpoints (per blueprint v1.1 §5.4.4) ─────────────────────────
+watchpoints:
+  tier2_post_hoc_veto_rate:
+    threshold: 0.15
+    window_days: 7
+    action: "若 Tier 2 PR Craig 事後駁回率 > 15%，收緊 Tier 2 範圍（移至 Tier 1）"
+
+  auto_rollback_count_per_agent:
+    threshold: 3
+    window_days: 7
+    action: "同一 Agent 連續 3 次觸發 auto-rollback → 暫停該 Agent + 升 Tier 1 議事"

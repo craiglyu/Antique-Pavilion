@@ -1,0 +1,4 @@
+# Reserved for future Notion DB schema migrations.
+# Each file: <YYYY-MM-DD>_<db>_<from>_to_<to>.yaml
+# Format: idempotent transform rules from old schema_version to new.
+# See AP_Sustainability_Roadmap_v0.2.md (優化 #4) for rationale.

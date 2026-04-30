@@ -1,0 +1,137 @@
+# Notion 8-DB Desired State (blueprint v1.1 §6.4 declarative reconciliation).
+#
+# This file is the single source of truth for Notion DB schemas. The future
+# `notion_reconciler.py` (v0.2 §3 Item 9) compares this to actual Notion state:
+# - drift mode (default): print diff, file Council topic for Craig to sign off
+# - enforce mode (dev/staging only): auto-create/modify DBs to match
+#
+# Cross-project fork flow:
+#   1. Copy this file into the new project's config/
+#   2. Edit DB IDs (will be empty initially) and any property tweaks
+#   3. Run `notion_reconciler.py --enforce` to materialize the 8 DBs
+#
+# ⚠️  Sprint 0 leaves IDs and properties placeholder-only. Filling them in is
+#     part of Sprint 3 (drift mode rollout, blueprint v1.1 §10 第五順位).
+
+schema_version: 1
+last_updated: 2026-04-30
+project: antique_pavilion
+status: skeleton  # bumped to "active" once Sprint 3 fills full schemas
+
+databases:
+
+  topics:
+    db_id_env: NOTION_TOPICS_DB
+    description: "議題池 — Craig / Feedback PM / Research 拋進來的議題"
+    properties:
+      議題:
+        type: title
+      狀態:
+        type: select
+        options: [待結構化, 已召集, 議事中, 待簽核, 通過, 否決, 重議]
+      類型:
+        type: select
+        options: [網站架構, 視覺, 內容策略, 維運, 鑑定品質, 行銷活動, 其他]
+      優先級:
+        type: select
+        options: [高, 中, 低]
+      來源:
+        type: select
+        options: [Craig, Feedback PM, Research, Agent]
+      說明:
+        type: rich_text
+      Discord Thread URL:
+        type: url
+
+  decisions:
+    db_id_env: NOTION_DECISIONS_DB
+    description: "已簽核決議 — Council 通過後落帳"
+    properties:
+      決議:
+        type: title
+      簽核狀態:
+        type: select
+        options: [待簽核, 通過, 否決, 重議]
+      決議日期:
+        type: date
+      TL;DR:
+        type: rich_text
+      推薦方案:
+        type: rich_text
+      風險:
+        type: rich_text
+      後續任務:
+        type: rich_text
+      對應議題:
+        type: relation
+        relation_to: topics
+      Discord Thread URL:
+        type: url
+
+  knowledge_base:
+    db_id_env: NOTION_KB_DB
+    description: "骨董知識庫條目（Librarian 維護）"
+    properties:
+      條目: { type: title }
+      朝代: { type: multi_select, options: [史前與高古, 唐宋元(含之前), 明朝, 清朝, 民國, 近現代, 外國骨董, 時代不詳, 其他] }
+      品類: { type: multi_select, options: [瓷器, 銅器, 玉器, 書畫, 雜項, 其他] }
+      窯口流派: { type: rich_text }
+      特徵摘要: { type: rich_text }
+      出處依據: { type: rich_text }
+      審核狀態: { type: select, options: [待審核, 通過, 待重審, 退回] }
+      信心度: { type: number }
+
+  authentication_log:
+    db_id_env: NOTION_AUTH_LOG_DB
+    description: "鑑定原始紀錄（Curator 審核入口）"
+    properties:
+      鑑定: { type: title }
+      上傳時間: { type: date }
+      用戶: { type: rich_text }
+      Gemini 判讀: { type: rich_text }
+      Curator 標註: { type: select, options: [通過, 待重審, 衝突, 退回, 未審] }
+      信心度: { type: number }
+      備註: { type: rich_text }
+
+  content_calendar:
+    db_id_env: NOTION_CONTENT_CALENDAR_DB
+    description: "內容排程（Marketing / Editor / SEO 共用）"
+    properties:
+      標題: { type: title }
+      狀態: { type: select, options: [構思中, 撰寫中, 待審, 已排程, 已發布, 撤回] }
+      類型: { type: select, options: [網站文章, 社群貼文, 電子報, Landing Page, 其他] }
+      負責 Agent: { type: select, options: [SEO, Editor, Marketing, PM] }
+      目標關鍵字: { type: rich_text }
+      備註: { type: rich_text }
+      URL: { type: url }
+
+  incidents:
+    db_id_env: NOTION_INCIDENTS_DB
+    description: "事故紀錄（SRE 寫入）"
+    properties:
+      事件: { type: title }
+      嚴重度: { type: select, options: ["P1 緊急", "P2 高", "P3 中", "P4 低"] }
+      狀態: { type: select, options: [開放, 處理中, 已解決, 誤報] }
+      服務: { type: select, options: [Discord Bot, GAS, Gemini API, GitHub Pages, 其他] }
+      偵測時間: { type: date }
+      Root Cause: { type: rich_text }
+      Resolution: { type: rich_text }
+
+  research_briefs:
+    db_id_env: NOTION_RESEARCH_BRIEFS_DB
+    description: "市場 Brief（Research Agent 每週輸出）"
+    properties:
+      標題: { type: title }
+      週次: { type: rich_text }
+      摘要: { type: rich_text }
+      行動建議: { type: rich_text }
+
+  agent_prompts:
+    db_id_env: NOTION_AGENT_PROMPTS_DB
+    description: "Prompt 版本檔（mirror config/prompts_versioning.yaml）"
+    properties:
+      Agent: { type: title }
+      版本: { type: rich_text }
+      Layer: { type: select, options: [core, domain] }
+      變更摘要: { type: rich_text }
+      上線日: { type: date }

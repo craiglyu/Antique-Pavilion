@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
+  "entries": [
+    {
+      "ts": "2026-04-30T16:00:00Z",
+      "category": "refactor",
+      "scope": "ap_org_bot",
+      "version_from": "v1.2-monolith",
+      "version_to": "v0.2.0-rc1",
+      "summary": "Strangler-fig refactor: 1288-LoC ap_org_bot.py → modular package (infra/discord_io/prompts/agents/handlers/council). Legacy preserved at ap_org_bot_legacy.py. ap_org_bot.py now a thin shim. Adds AgentRegistry, HeadlessAgent base class, all 8 prompts as .md with frontmatter, Council 3-state pilot, budget_gate hard cap, and 6 test files.",
+      "rationale": "Blueprint v1.1 Phase 1/2/3 + Sustainability Roadmap v0.2 全部依賴此重構。優化 #1+#2+#3+#4 為 Sprint 0 起點。",
+      "breaking": false,
+      "rollback": "git checkout HEAD~1 -- scripts/ap_org_bot.py && rm -rf scripts/ap_org_bot/",
+      "files": [
+        "scripts/ap_org_bot/__init__.py",
+        "scripts/ap_org_bot/main.py",
+        "scripts/ap_org_bot/infra/{paths,env,ssl_patch,claude_cli,budget_gate,notion_client}.py",
+        "scripts/ap_org_bot/discord_io/{split,opus_parse,embeds,views}.py",
+        "scripts/ap_org_bot/prompts/_core/{pm,feedback_pm}.md",
+        "scripts/ap_org_bot/prompts/_domain/ap/{designer,dev,marketing,auto_dev,gas_dev,opus_researcher}.md",
+        "scripts/ap_org_bot/agents/{base,context,registry}.py",
+        "scripts/ap_org_bot/agents/_core/{pm,feedback_pm}.py",
+        "scripts/ap_org_bot/agents/_domain/ap/{designer,dev,marketing,auto_dev,gas_dev,opus_researcher,opus_flow}.py",
+        "scripts/ap_org_bot/handlers/{feedback_state,feedback_poll,proposal_actions,message,scheduler,slash}.py",
+        "scripts/ap_org_bot/council/{state_machine,persistence,dispatcher}.py",
+        "scripts/ap_org_bot.py (now thin shim)",
+        "scripts/ap_org_bot_legacy.py (preserved 1288-LoC reference)",
+        "scripts/ap_council_runner.py (NEW — Sprint 1 entry)",
+        "config/{channels,agents,council_routing,signoff_tiers,notion_desired_state}.yaml",
+        "config/migrations/.gitkeep",
+        "memory/ap_council_state/{_schema.json,README.md}",
+        "tests/{conftest,test_infra_env,test_infra_budget_gate,test_discord_io,test_prompts,test_council,test_agents_registry}.py"
+      ]
+    }
+  ]
+}

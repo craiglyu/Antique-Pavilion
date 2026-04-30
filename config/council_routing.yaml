@@ -1,0 +1,61 @@
+# Council Protocol routing table — which agents get convened for each topic type.
+#
+# Per blueprint v1.1 §3.5. The 9-state council_runner reads this at startup,
+# matches the topic type (PM-classified), and announces the convened set.
+# `必出席` agents block phase advancement until they respond; others are advisory.
+
+schema_version: 1
+last_updated: 2026-04-30
+
+topics:
+  # ── 網站架構變更 — 改 Hero、加新 page、調 IA ────────────────────
+  網站架構變更:
+    召集: [UX, Design, Frontend, Backend, SEO]
+    主席: PM
+    必出席: [UX, Frontend]
+    notes: "Tier 1 — must Council before merge"
+
+  # ── 視覺微調 — 顏色、字距、間距 ──────────────────────────────────
+  視覺微調:
+    召集: [Design, Frontend]
+    主席: PM
+    必出席: [Design]
+    notes: "Tier 2 — 三 gate label 全亮可 auto-merge"
+
+  # ── 內容策略 — 新主題、SEO 系列、長文 ───────────────────────────
+  內容策略:
+    召集: [SEO, Editor, Marketing, Curator]
+    主席: PM
+    必出席: [SEO, Editor]
+
+  # ── 新藏品上架 — 從鑑定通過到上線 ──────────────────────────────
+  新藏品上架:
+    召集: [Curator, Librarian, Editor, SEO, Compliance]
+    主席: PM
+    必出席: [Curator, Librarian]
+    notes: "Tier 1 — Compliance gate mandatory"
+
+  # ── 維運事件 — 5xx、Bot crash、配額爆 ─────────────────────────
+  維運事件:
+    召集: [SRE, Backend, DevOps]
+    主席: SRE  # 例外：技術事件由 SRE 主持
+    必出席: [SRE]
+
+  # ── 行銷活動 — 廣告檔期、線下看展邀請 ───────────────────────────
+  行銷活動:
+    召集: [Marketing, SEO, Editor, Compliance]
+    主席: PM
+    必出席: [Marketing]
+
+  # ── 鑑定品質 — Curator 月報、信心度閾值調整 ────────────────────
+  鑑定品質:
+    召集: [Curator, Librarian, Backend]
+    主席: PM
+    必出席: [Curator]
+
+  # ── 其他 / 雜項 ───────────────────────────────────────────────
+  其他:
+    召集: [PM]
+    主席: PM
+    必出席: [PM]
+    notes: "Fallback — PM decides whether to escalate to a more specific topic type"

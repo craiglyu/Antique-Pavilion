@@ -1,0 +1,99 @@
+# Discord channel registry for AP ORG Bot.
+#
+# Single source of truth for: which channel IDs exist, and which agent (if any)
+# is bound to each channel. The bot loads this at startup; on_message dispatches
+# by channel_id → agent_key lookup (no if/elif chain).
+#
+# Adding a new agent-bound channel: add an entry here + ensure the agent_key
+# matches a row in agents.yaml. No bot code change required.
+#
+# IDs stay in sync with .env.antique fallbacks in scripts/ap_org_bot/main.py.
+
+schema_version: 1
+last_updated: 2026-04-30
+
+channels:
+  # ── Existing (Phase 0) ───────────────────────────────────────────────
+  - name: ap-pm
+    id: 1495280076688719942
+    agent: pm
+    trigger_prefix: "!agenda"
+    notes: "PM Agent — coordinator, only fires on '!agenda <topic>'"
+
+  - name: ap-design
+    id: 1495280308143259708
+    agent: designer
+    notes: "Designer Agent — fires on any message"
+
+  - name: ap-frontend
+    id: 1495280247590097059
+    agent: dev
+    notes: "Dev Agent — legacy name #ap-web-dev; renamed in v1.1 blueprint"
+
+  - name: ap-marketing
+    id: 1495678294039990312
+    agent: marketing
+    notes: "Marketing Agent — fires on any message"
+
+  - name: ap-feedback
+    id: 1497066777677398026
+    agent: null
+    notes: "Feedback channel — read-only by Bot; daily 11:00/20:00 poll"
+
+  # ── Phase 1 Council channels (per blueprint v1.1 §4) ────────────────
+  # Add IDs once these are created in Discord.
+  - name: council-topics
+    id: 0
+    agent: null
+    notes: "議題池 — Craig drops new topics here"
+
+  - name: council-meetings
+    id: 0
+    agent: null
+    notes: "Active council threads"
+
+  - name: council-decisions
+    id: 0
+    agent: null
+    notes: "Awaiting-signoff embeds + archived decisions"
+
+  # ── Phase 1 new agent channels (per blueprint v1.1 §4) ──────────────
+  - name: ap-ux
+    id: 0
+    agent: null
+    notes: "UX Agent — Phase 1 new"
+
+  - name: ap-backend
+    id: 0
+    agent: null
+    notes: "Backend Agent — Phase 1 new"
+
+  - name: ap-seo
+    id: 0
+    agent: null
+    notes: "SEO Agent — Phase 1 new"
+
+  - name: ap-editor
+    id: 0
+    agent: null
+    notes: "Editor Agent — Phase 1 new"
+
+  - name: ap-curator
+    id: 0
+    agent: null
+    notes: "Curator Agent — Phase 1 new (AP-specific)"
+
+  - name: ap-knowledge
+    id: 0
+    agent: null
+    notes: "Librarian Agent — Phase 1 new (AP-specific)"
+
+  - name: ap-sre
+    id: 0
+    agent: null
+    notes: "SRE Agent — Phase 1 new"
+
+  - name: ap-alerts
+    id: 0
+    agent: null
+    notes: "SRE alerts only — no agent dispatched"

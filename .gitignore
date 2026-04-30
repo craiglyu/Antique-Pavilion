@@ -21,6 +21,13 @@ memory/opus_inbox/
 memory/opus_rulings/
 memory/VETO_ACTIVE.json
 
+# Sprint 0 新增（拆檔後的 runtime state）
+memory/budget_state.sqlite
+memory/budget_state.sqlite-journal
+memory/ap_council_state/*.json
+!memory/ap_council_state/_schema.json
+memory/agent_tasks.yaml
+
 # ── 🗑️ 歷史技術債 / 備份檔 ────────────────────────────
 *.bak
 *.bak.*

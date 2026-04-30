@@ -1,0 +1,159 @@
+# Agent registry — single source of truth for which agents are active.
+#
+# An entry with `active: false` means the agent class exists but is not loaded
+# (channel binding in channels.yaml will skip dispatch). Useful for staged rollout.
+#
+# Phase column tracks blueprint v1.1 phases (1 = required for production,
+# 2 = added in 4-6 week window, 3 = framework polish).
+
+schema_version: 1
+last_updated: 2026-04-30
+
+agents:
+  # ── Phase 0 (existing, active in production) ──────────────────────
+  - key: pm
+    class: ap_org_bot.agents._core.pm.PMAgent
+    layer: core
+    phase: 0
+    active: true
+    prompt: pm
+    model: claude-sonnet-4-6
+
+  - key: feedback_pm
+    class: ap_org_bot.agents._core.feedback_pm.FeedbackPMAgent
+    layer: core
+    phase: 0
+    active: true
+    prompt: feedback_pm
+    model: claude-sonnet-4-6
+    notes: "Standalone (not channel-bound); fires on cron 11:00/20:00 Asia/Taipei"
+
+  - key: designer
+    class: ap_org_bot.agents._domain.ap.designer.DesignerAgent
+    layer: domain
+    phase: 0
+    active: true
+    prompt: designer
+    model: claude-sonnet-4-6
+
+  - key: dev
+    class: ap_org_bot.agents._domain.ap.dev.DevAgent
+    layer: domain
+    phase: 0
+    active: true
+    prompt: dev
+    model: claude-sonnet-4-6
+
+  - key: marketing
+    class: ap_org_bot.agents._domain.ap.marketing.MarketingAgent
+    layer: domain
+    phase: 0
+    active: true
+    prompt: marketing
+    model: claude-sonnet-4-6
+
+  - key: auto_dev
+    class: ap_org_bot.agents._domain.ap.auto_dev.AutoDevAgent
+    layer: domain
+    phase: 0
+    active: true
+    prompt: auto_dev
+    model: claude-sonnet-4-6
+    notes: "Button-triggered (not channel-bound) — fires when Craig approves a P0/P1/P2 visual proposal"
+
+  - key: gas_dev
+    class: ap_org_bot.agents._domain.ap.gas_dev.GasDevAgent
+    layer: domain
+    phase: 0
+    active: true
+    prompt: gas_dev
+    model: claude-sonnet-4-6
+    notes: "Button-triggered, non-frontend proposals"
+
+  - key: opus_design_researcher
+    class: ap_org_bot.agents._domain.ap.opus_researcher.OpusDesignResearcherAgent
+    layer: domain
+    phase: 0
+    active: true
+    prompt: opus_design_researcher
+    model: claude-sonnet-4-6
+    notes: "Phase 1 of Opus design ruling flow — writes DD package"
+
+  # ── Phase 1 (blueprint v1.1 §2.3-2.12 — implement next) ───────────
+  - key: ux
+    class: null
+    layer: core
+    phase: 1
+    active: false
+    prompt: null
+    notes: "TODO Phase 1 — Wireframe + WCAG AA + 預約看展轉化"
+
+  - key: backend
+    class: null
+    layer: core
+    phase: 1
+    active: false
+    prompt: null
+    notes: "TODO Phase 1 — split from Dev; GAS/Gemini integration"
+
+  - key: seo
+    class: null
+    layer: core
+    phase: 1
+    active: false
+    prompt: null
+    notes: "TODO Phase 1 — long-tail keywords + Schema.org"
+
+  - key: editor
+    class: null
+    layer: core
+    phase: 1
+    active: false
+    prompt: null
+    notes: "TODO Phase 1 — cultural editorial (split from Marketing)"
+
+  - key: sre
+    class: null
+    layer: core
+    phase: 1
+    active: false
+    prompt: null
+    notes: "TODO Phase 1 — Bot heartbeat, Gemini quota, GitHub Pages uptime"
+
+  - key: curator
+    class: null
+    layer: domain
+    phase: 1
+    active: false
+    prompt: null
+    notes: "TODO Phase 1 — Gemini judgment quality gate (AP-specific)"
+
+  - key: librarian
+    class: null
+    layer: domain
+    phase: 1
+    active: false
+    prompt: null
+    notes: "TODO Phase 1 — Notion KB curation (AP-specific)"
+
+  # ── Phase 2 (4-6 weeks after Phase 1) ─────────────────────────────
+  - key: devops
+    class: null
+    layer: core
+    phase: 2
+    active: false
+    prompt: null
+
+  - key: compliance
+    class: null
+    layer: core
+    phase: 2
+    active: false
+    prompt: null
+
+  - key: research
+    class: null
+    layer: core
+    phase: 2
+    active: false
+    prompt: null
