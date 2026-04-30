@@ -7,10 +7,15 @@ Sprint 1 (this file):
 - `thresholds` — print current rule thresholds
 - `eras`     — print the 9-enum
 
+Sprint 1 added:
+- `pull-pending` — query Notion Auth Log DB for curator_status='未審' (read-only,
+  no write-back yet)
+
 Sprint 2 (future):
-- `pull-pending` — query Notion Auth Log DB for curator_status='未審'
+- `pull-pending --apply` — write verdicts back to Notion (curator_status update)
 - `cron`         — daemon mode with scheduled review passes
 - `--llm-judge`  — invoke Sonnet for borderline cases (confidence ∈ [0.7, 0.85])
+- Auth Log DB schema migration (add era / category select properties)
 
 Run examples:
 
@@ -138,6 +143,92 @@ def cmd_review(args: argparse.Namespace) -> int:
     return 0 if (summary["衝突"] == 0 and summary["退回"] == 0) else 1
 
 
+def cmd_pull_pending(args: argparse.Namespace) -> int:
+    """Sprint 1 read-only: query Notion Auth Log for curator_status='未審'."""
+    # Local import keeps `classify`/`review` working when notion_writer is missing.
+    from ap_org_bot.infra.notion_client import (
+        DB_AUTH_LOG,
+        extract_property_value,
+        is_enabled,
+        query_database,
+    )
+
+    if not is_enabled():
+        print("❌ NOTION_API_KEY 未設定 (.env.antique)；無法 pull-pending。",
+              file=sys.stderr)
+        print("   Phase A 啟用步驟見 PHASE_A_SETUP.md。", file=sys.stderr)
+        return 2
+    if not DB_AUTH_LOG:
+        print("❌ NOTION_AUTH_LOG_DB 未設定 (.env.antique)。", file=sys.stderr)
+        return 2
+
+    print(f"🔍 Querying Notion Auth Log DB (curator_status='未審', max {args.limit})...")
+    try:
+        pages = query_database(
+            DB_AUTH_LOG,
+            filter_={"property": "Curator 標註", "select": {"equals": "未審"}},
+            sorts=[{"property": "上傳時間", "direction": "ascending"}],
+            page_size=min(args.limit, 100),
+        )
+    except Exception as e:
+        print(f"❌ Notion query failed: {e}", file=sys.stderr)
+        return 3
+
+    if not pages:
+        print("✨ 無未審條目 — Curator gate 已淨。")
+        return 0
+
+    pages = pages[: args.limit]
+    print(f"\n📋 找到 {len(pages)} 筆未審條目；開始 review...\n")
+
+    # Map Notion page → Curator entry dict.
+    # SCHEMA GAP NOTE: Auth Log DB schema does not currently include era /
+    # category select properties (the only categorical fields are 'Curator 標註'
+    # itself + 'Gemini 判讀' as rich_text). This means most pulled entries will
+    # be flagged 待重審 with reason "missing required fields" — that's the
+    # correct signal that Sprint 2 must add schema migration.
+    entries: list[dict] = []
+    for page in pages:
+        entry: dict[str, Any] = {
+            "auth_log_id": page.get("id", "<unknown>"),
+            "itemName": extract_property_value(page, "鑑定") or "",
+            "confidence": extract_property_value(page, "信心度") or 0.0,
+            "category": "",  # SCHEMA GAP — not in current Auth Log DB
+            "era": "",       # SCHEMA GAP
+            "isValid": True,
+        }
+        entries.append(entry)
+
+    threshold = args.threshold or DEFAULT_CONFIDENCE_THRESHOLD
+    agent = CuratorAgent(confidence_threshold=threshold)
+    reviews = agent.review_batch(entries)
+    summary = agent.summary(reviews)
+
+    for r in reviews:
+        _print_review(r, verbose=not args.brief)
+
+    print("=== summary ===")
+    for verdict, n in summary.items():
+        if n > 0:
+            print(f"  {verdict}: {n}")
+
+    # Diagnostic: if all PENDING_REVIEW, surface the schema gap to Craig.
+    if entries and summary["待重審"] == len(entries):
+        print()
+        print("⚠️  全部 待重審 — 這是 Auth Log DB schema gap 訊號。")
+        print("   原因：DB 內無 era / category select 欄位，Curator 規則 R3 觸發。")
+        print("   Sprint 2 計畫補 schema migration（加 era / category 對應 9-enum + 8-class），")
+        print("   現有條目反向回填，新鑑定也帶這 2 欄位入庫。")
+
+    if args.apply:
+        print()
+        print("ℹ️  --apply 旗標 Sprint 1 尚未實作（write-back 到 Notion）。")
+        print("    Sprint 2 將加：通過→curator_status='通過'，待重審→保留+ping Craig，")
+        print("    衝突/退回→對應 select 值。")
+
+    return 0 if summary["衝突"] == 0 and summary["退回"] == 0 else 1
+
+
 def cmd_thresholds(_args: argparse.Namespace) -> int:
     print(f"confidence_threshold (default): {DEFAULT_CONFIDENCE_THRESHOLD}")
     print(f"required_fields:                {sorted(REQUIRED_FIELDS)}")
@@ -183,6 +274,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_r.add_argument("--brief", action="store_true", help="terse output (verdict only)")
     p_r.add_argument("--json", help="write full JSON output to this path")
 
+    p_p = sub.add_parser(
+        "pull-pending",
+        help="query Notion Auth Log for curator_status='未審' and review (Sprint 1: read-only)",
+    )
+    p_p.add_argument("--limit", type=int, default=20,
+                     help="max entries to fetch (default 20)")
+    p_p.add_argument("--threshold", type=float)
+    p_p.add_argument("--brief", action="store_true")
+    p_p.add_argument("--apply", action="store_true",
+                     help="(Sprint 2) write verdicts back to Notion")
+
     sub.add_parser("thresholds", help="print current rule thresholds")
     sub.add_parser("eras", help="print the 9 valid era values")
 
@@ -195,6 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     handlers = {
         "classify": cmd_classify,
         "review": cmd_review,
+        "pull-pending": cmd_pull_pending,
         "thresholds": cmd_thresholds,
         "eras": cmd_eras,
     }

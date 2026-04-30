@@ -3,6 +3,41 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-04-30T20:30:00Z",
+      "category": "feat",
+      "scope": "curator.notion_integration",
+      "version_from": "v0.1",
+      "version_to": "v0.2",
+      "summary": "Sprint 1 — Notion Auth Log query API + ap_curator_runner pull-pending CLI (read-only). Curator 從 Sheets/JSON-only 變成可從 Notion 拉真實 production 鑑定資料 review.",
+      "rationale": "Sprint 1 Curator MVP 規則層已就位但 input 只能從 CLI args 或 hand-crafted JSON 來。要讓 Curator 真實 protect production 必須能從 Phase A 已啟用的 Notion Authentication Log DB 拉資料。本 commit 加 read-only 整合（write-back 留 Sprint 2）。",
+      "breaking": false,
+      "rollback": "git revert <this commit>; classify/review subcommands 仍可獨立用",
+      "highlights": [
+        "scripts/notion_writer.py: 加 query_database() — paginated POST /databases/{id}/query，最多 10 頁 × 100 entries 防止 runaway",
+        "scripts/notion_writer.py: 加 extract_property_value() — 抽 title/rich_text/select/multi_select/number/date 等 7 種 property type 為 Python 值",
+        "scripts/ap_org_bot/infra/notion_client.py: 重 export 新增 query_database / extract_property_value / DB_TOPICS/DB_DECISIONS/DB_KB/... 7 個 DB ID 環境變數",
+        "scripts/ap_curator_runner.py: 加 pull-pending 子命令",
+        "  filter: { property: 'Curator 標註', select: { equals: '未審' } }",
+        "  sort: 上傳時間 ascending（FIFO）",
+        "  --limit 預設 20 防止一次 pull 太多",
+        "  Notion page → Curator entry 映射: 鑑定→itemName, 信心度→confidence, era/category 留空 (SCHEMA GAP)",
+        "  Diagnostic: 若全部 待重審 → 印出「Auth Log DB schema gap 訊號」提示 Sprint 2 應補 era/category select",
+        "  --apply (Sprint 2) write-back stub — 印出 informational message"
+      ],
+      "files": [
+        "scripts/notion_writer.py (+~75 LoC: query_database + extract_property_value)",
+        "scripts/ap_org_bot/infra/notion_client.py (modified — re-export 6 new symbols + 7 DB ID env vars)",
+        "scripts/ap_curator_runner.py (+~75 LoC: pull-pending subcommand)"
+      ],
+      "schema_gap_surfaced": "Authentication Log DB 缺 era/category select properties。Sprint 2 計畫 (Council 第二場 dogfood topic ap-2026-04-30-133428-001 已記錄) — 加 schema migration + reverse fill",
+      "follow_up": [
+        "Sprint 2: --apply 實作 (write Curator verdict back as curator_status 值)",
+        "Sprint 2: Auth Log DB schema migration 加 era/category select",
+        "Sprint 2: cron daemon mode (每日 10:00/22:00 自動 pull-pending)",
+        "Sprint 2: LLM judgment for borderline cases (confidence ∈ [0.7, 0.85])"
+      ]
+    },
+    {
       "ts": "2026-04-30T20:00:00Z",
       "category": "feat",
       "scope": "council.discord_signoff",

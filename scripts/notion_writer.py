@@ -98,6 +98,109 @@ def _post(path: str, payload: dict) -> Optional[dict]:
         return None
 
 
+# ── Read API: query a database, paginated ────────────────────────
+
+def query_database(
+    database_id: str,
+    *,
+    filter_: Optional[dict] = None,
+    sorts: Optional[list] = None,
+    page_size: int = 100,
+    max_pages: int = 10,
+) -> list[dict]:
+    """Query a Notion database; return flat list of page dicts.
+
+    Args:
+        database_id: Notion DB UUID (without dashes is also accepted by Notion).
+        filter_: Notion filter object (see https://developers.notion.com/reference/post-database-query).
+        sorts: Sort spec list (e.g., [{"property": "建立時間", "direction": "descending"}]).
+        page_size: Per-page result count (max 100, default 100).
+        max_pages: Hard cap on pagination loops to prevent runaway queries
+            (10 × 100 = 1000 entries — far above Sprint 1 needs).
+
+    Returns:
+        List of page objects; empty list if Notion disabled or DB id missing.
+
+    Example — Curator's "fetch unaudited" use case:
+        unaudited = query_database(
+            DB_AUTH_LOG,
+            filter_={"property": "Curator 標註", "select": {"equals": "未審"}},
+            sorts=[{"property": "上傳時間", "direction": "ascending"}],
+        )
+    """
+    if not (NOTION_API_KEY and database_id):
+        return []
+
+    all_results: list[dict] = []
+    next_cursor: Optional[str] = None
+
+    for _ in range(max_pages):
+        payload: dict = {"page_size": page_size}
+        if filter_:
+            payload["filter"] = filter_
+        if sorts:
+            payload["sorts"] = sorts
+        if next_cursor:
+            payload["start_cursor"] = next_cursor
+
+        resp = _post(f"/databases/{database_id}/query", payload)
+        if resp is None:
+            log.error("[notion] query_database failed mid-pagination at cursor=%s",
+                      next_cursor or "<initial>")
+            break
+
+        results = resp.get("results", []) or []
+        all_results.extend(results)
+
+        if not resp.get("has_more"):
+            break
+        next_cursor = resp.get("next_cursor")
+        if not next_cursor:
+            break
+
+    log.info("[notion] query_database(%s) → %d results", database_id[:8], len(all_results))
+    return all_results
+
+
+def extract_property_value(page: dict, property_name: str) -> object:
+    """Extract a Python value from a Notion page property block.
+
+    Handles the most common property types Notion returns:
+    title / rich_text / select / multi_select / number / date / url / checkbox.
+
+    Returns None for unknown / unhandled types — callers must tolerate None.
+    """
+    props = page.get("properties") or {}
+    prop = props.get(property_name)
+    if not prop:
+        return None
+
+    ptype = prop.get("type")
+    val = prop.get(ptype) if ptype else None
+
+    if ptype in ("title", "rich_text"):
+        # list of rich-text segments
+        if not val:
+            return ""
+        return "".join(seg.get("plain_text", "") for seg in val)
+    if ptype == "select":
+        return val.get("name") if val else None
+    if ptype == "multi_select":
+        return [x.get("name") for x in (val or [])]
+    if ptype == "number":
+        return val
+    if ptype == "date":
+        return (val or {}).get("start")
+    if ptype == "url":
+        return val
+    if ptype == "checkbox":
+        return bool(val)
+    if ptype == "people":
+        return [p.get("name") or p.get("id") for p in (val or [])]
+
+    return val  # fallback — caller deals with raw shape
+
+
 # ── Property builders ───────────────────────────────────────────
 
 def _title(text: str) -> dict:

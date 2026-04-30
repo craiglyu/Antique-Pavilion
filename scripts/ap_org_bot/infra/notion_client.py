@@ -27,19 +27,36 @@ if str(_LEGACY_SCRIPTS_DIR) not in sys.path:
 
 try:
     from notion_writer import (  # type: ignore[import-not-found]
-        is_enabled,
-        create_topic,
-        create_decision,
-        create_content_calendar,
+        DB_AUTH_LOG,
+        DB_CONTENT_CAL,
+        DB_DECISIONS,
+        DB_INCIDENTS,
+        DB_KB,
+        DB_RESEARCH,
+        DB_TOPICS,
         create_authentication_log,
-        create_kb_entry,
+        create_content_calendar,
+        create_decision,
         create_incident,
+        create_kb_entry,
+        create_topic,
+        extract_property_value,
+        is_enabled,
+        query_database,
     )
 
     AVAILABLE = True
 except Exception as e:
     log.warning("[notion_client] notion_writer not loadable: %s", e)
     AVAILABLE = False
+
+    DB_TOPICS = ""
+    DB_DECISIONS = ""
+    DB_KB = ""
+    DB_AUTH_LOG = ""
+    DB_CONTENT_CAL = ""
+    DB_INCIDENTS = ""
+    DB_RESEARCH = ""
 
     def is_enabled() -> bool:  # type: ignore[no-redef]
         return False
@@ -54,6 +71,12 @@ except Exception as e:
     create_kb_entry = _stub  # type: ignore[assignment]
     create_incident = _stub  # type: ignore[assignment]
 
+    def query_database(*_args, **_kwargs):  # type: ignore[no-redef]
+        return []
+
+    def extract_property_value(*_args, **_kwargs):  # type: ignore[no-redef]
+        return None
+
 
 __all__ = [
     "AVAILABLE",
@@ -64,4 +87,14 @@ __all__ = [
     "create_authentication_log",
     "create_kb_entry",
     "create_incident",
+    "query_database",
+    "extract_property_value",
+    # DB ID env shortcuts (Sprint 1 Curator + future Sprint reconciler)
+    "DB_TOPICS",
+    "DB_DECISIONS",
+    "DB_KB",
+    "DB_AUTH_LOG",
+    "DB_CONTENT_CAL",
+    "DB_INCIDENTS",
+    "DB_RESEARCH",
 ]
