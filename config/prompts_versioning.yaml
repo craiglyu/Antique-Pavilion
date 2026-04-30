@@ -1,0 +1,157 @@
+# AP Bot Prompts 版本控管
+# 用途：追蹤 ap_org_bot.py / ap_discord_bot.py 內的 system prompts 跟 Notion Agent Prompts DB 的同步狀態
+# 任何 prompt 改動：1) 改 .py 2) 更新本 yaml 3) 加新 entry 到 Notion Agent Prompts DB
+# 永續層 V0.1 Item 3（mirror Thor docs/memory_infrastructure_roadmap.md）
+schema_version: 1
+last_updated: 2026-04-28
+
+prompts:
+  # ── ap_org_bot.py 內的 prompts ──
+  feedback_pm:
+    file: scripts/ap_org_bot.py
+    line_anchor: PM_SYSTEM_PROMPT
+    current_version: v0.1
+    notion_page_title: "Feedback PM v0.1 (AP baseline)"
+    last_changed: 2026-04-28T03:00
+    change_notes: "v0.1 baseline 灌入 Agent Prompts DB"
+
+  pm:
+    file: scripts/ap_org_bot.py
+    line_anchor: pm_prompt
+    current_version: v0.1
+    notion_page_title: "PM Sonnet v0.1 (AP baseline)"
+    last_changed: 2026-04-28T03:00
+    change_notes: "v0.1 baseline 灌入"
+
+  designer:
+    file: scripts/ap_org_bot.py
+    line_anchor: designer_prompt
+    current_version: v0.1
+    notion_page_title: "Designer Agent v0.1 (AP baseline)"
+    last_changed: 2026-04-28T03:00
+    change_notes: "v0.1 baseline 灌入；Phase B 載 impeccable-audit.md（max-turns 10→18）"
+
+  dev:
+    file: scripts/ap_org_bot.py
+    line_anchor: dev_prompt
+    current_version: v0.1
+    notion_page_title: "Dev Agent v0.1 (AP baseline)"
+    last_changed: 2026-04-28T07:30
+    change_notes: "max-turns 10→12 安全邊界"
+
+  marketing:
+    file: scripts/ap_org_bot.py
+    line_anchor: marketing_prompt
+    current_version: v0.2
+    notion_page_title: "Marketing Agent v0.2 (Voice Layers + scope routing)"
+    last_changed: 2026-04-28T08:15
+    change_notes: |
+      v0.2 升級：
+      1. 引用 copywriting.md Voice Layers（Layer 1 對外 vs Layer 2 對內人話）
+      2. Step 4 改成 scope-by-request routing（不再無腦給 4 段套餐）
+      3. 加 max-turns 8→15
+      4. 禁 meta 描述（「三個框架已載入」這類）
+
+  auto_dev:
+    file: scripts/ap_org_bot.py
+    line_anchor: execution_prompt
+    current_version: v0.1
+    notion_page_title: "Auto-Dev Agent v0.1 (AP autonomous)"
+    last_changed: 2026-04-28T03:00
+    change_notes: "v0.1 baseline"
+
+  gas_dev:
+    file: scripts/ap_org_bot.py
+    line_anchor: gas_prompt
+    current_version: v0.1
+    notion_page_title: "GAS Dev Agent v0.1 (AP backend)"
+    last_changed: 2026-04-28T03:00
+    change_notes: "v0.1 baseline"
+
+  opus_design_researcher:
+    file: scripts/ap_org_bot.py
+    line_anchor: writer_prompt
+    current_version: v0.1
+    notion_page_title: "Opus Design Researcher (DD writer) v0.1"
+    last_changed: 2026-04-28T03:00
+    change_notes: "v0.1 baseline；max-turns 10→12 安全邊界"
+
+# ── .claude/commands/ 內的 skills ──
+skills:
+  audit:
+    file: .claude/commands/audit.md
+    current_version: v0.1
+    layer: core
+    last_changed: 2026-04-25
+    change_notes: "Impeccable 5 維度評分快版"
+
+  polish:
+    file: .claude/commands/polish.md
+    current_version: v0.1
+    layer: core
+    last_changed: 2026-04-25
+    change_notes: "pre-ship refinement gate"
+
+  taste_skill:
+    file: .claude/commands/taste-skill.md
+    current_version: v0.1
+    layer: domain
+    last_changed: 2026-04-25
+    change_notes: "高奢品牌設計規範 + anti-AI-slop"
+
+  emil_skill:
+    file: .claude/commands/emil-skill.md
+    current_version: v0.1
+    layer: domain
+    last_changed: 2026-04-25
+    change_notes: "動畫品質工程"
+
+  impeccable_audit:
+    file: .claude/commands/impeccable-audit.md
+    current_version: v0.1
+    layer: core
+    last_changed: 2026-04-28
+    change_notes: "Phase B 新建 — Designer 載入用 5 維度評分詳細版"
+
+  copywriting:
+    file: .claude/commands/copywriting.md
+    current_version: v0.2
+    layer: domain
+    last_changed: 2026-04-28
+    change_notes: |
+      v0.2 升級：
+      1. 加 Voice Layers 段（Layer 1 對外典雅 vs Layer 2 對內人話）
+      2. Layer 2 ENFORCE 禁用詞清單（轉化漏斗/核心原則/觸達等）
+      3. 10 條對照表（AI 行銷腔 vs 人話）
+      4. Pre-Flight Checklist 分 Layer 1 / Layer 2
+
+  social_content:
+    file: .claude/commands/social-content.md
+    current_version: v0.1
+    layer: domain
+    last_changed: 2026-04-28
+    change_notes: "Phase B 新建 — IG/LINE/FB 差異化策略"
+
+  marketing_psychology:
+    file: .claude/commands/marketing-psychology.md
+    current_version: v0.1
+    layer: domain
+    last_changed: 2026-04-28
+    change_notes: "Phase B 新建 — 三大買家原型 + 信任 funnel"
+
+# Watchpoints（mirror Thor V0.1 monthly review）
+watchpoints:
+  bot_max_turns_failures_per_week:
+    threshold: 5
+    action: "Bump max-turns 或重構 prompt（目前已從 Phase B 教訓改過）"
+  
+  prompt_yaml_drift:
+    description: "ap_org_bot.py 內 prompt 跟此 yaml 紀錄版本不符"
+    threshold: any
+    action: "立刻同步 yaml + Notion"
+  
+  skill_lint_failures:
+    description: "skill_lint.py（待建）跑出 ERROR"
+    threshold: 1
+    action: "PR gate block，修復後才能 commit"
+
