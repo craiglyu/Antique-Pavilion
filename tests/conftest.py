@@ -52,6 +52,10 @@ def isolated_memory_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(budget_mod, "BUDGET_STATE_FILE",
                         fake_memory / "budget_state.sqlite")
     monkeypatch.setattr(budget_mod, "MEMORY_DIR", fake_memory)
+    # Sprint 2 fix: dispatcher writes agent_tasks.yaml — patch its MEMORY_DIR too,
+    # else reaction tests pollute production memory/agent_tasks.yaml.
+    from ap_org_bot.council import dispatcher as dispatcher_mod
+    monkeypatch.setattr(dispatcher_mod, "MEMORY_DIR", fake_memory)
 
     yield fake_memory
 
