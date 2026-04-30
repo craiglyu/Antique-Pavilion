@@ -3,6 +3,40 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-04-30T20:00:00Z",
+      "category": "feat",
+      "scope": "council.discord_signoff",
+      "version_from": null,
+      "version_to": "v0.1",
+      "summary": "Sprint 1 — Discord-native Council sign-off via ✅/❌ reactions on #council-decisions (藍圖 v1.1 §3.4 落地). Replaces CLI-only signoff with < 60-second Craig UX.",
+      "rationale": "藍圖 §0.3 要求「Craig 應該 < 60 秒簽核」— CLI signoff (`python scripts/ap_council_runner.py signoff`) 永遠做不到這個目標。Reaction handler 把 Council 議事閉環成 Discord 原生流程: PM 用 /council-show post embed 到 #council-decisions → Craig ✅/❌ react → 自動 transition + dispatch tasks + edit embed.",
+      "breaking": false,
+      "rollback": "git revert <this commit>; CLI signoff 仍可用",
+      "highlights": [
+        "31 新 tests (council_embed 20 + reaction 11)；全套 109 passed",
+        "discord_io/council_embed.py — Topic→Embed，footer 含 topic_id (load-bearing for reverse lookup)",
+        "handlers/reaction.py — on_raw_reaction_add 過濾鏈：channel/Craig-only/emoji + idempotent + 跨重啟",
+        "💬 reaction 記錄但 NOT transition (Sprint 2 wire reopen flow)",
+        "/council-show <topic_id> 把議題 post 到 #council-decisions 等簽核",
+        "/council-list 列當前 active 議題（最多 10 條 ephemeral）",
+        "Graceful skip: DISCORD_CHANNEL_COUNCIL_DECISIONS=0 時整套靜默 noop（Craig 還沒建頻道也不破）"
+      ],
+      "files": [
+        "scripts/ap_org_bot/discord_io/council_embed.py (NEW, ~190 LoC)",
+        "scripts/ap_org_bot/handlers/reaction.py (NEW, ~210 LoC)",
+        "scripts/ap_org_bot/handlers/slash.py (modified — /council-show + /council-list)",
+        "scripts/ap_org_bot/main.py (modified — wire reaction handler + DISCORD_CHANNEL_COUNCIL_DECISIONS env)",
+        "tests/test_council_embed.py (NEW, 20 tests)",
+        "tests/test_handlers_reaction.py (NEW, 11 tests)"
+      ],
+      "follow_up": [
+        "Craig 在 Discord 建 #council-topics / #council-meetings / #council-decisions 三個頻道",
+        "把 #council-decisions ID 寫進 .env.antique 的 DISCORD_CHANNEL_COUNCIL_DECISIONS",
+        "重啟 bot，看 log [main] Council reaction handler on (#council-decisions=...)",
+        "用 /council-show ap-2026-04-30-085208-001 post 第一場議題 → ✅ react 端到端驗證"
+      ]
+    },
+    {
       "ts": "2026-04-30T18:00:00Z",
       "category": "feat",
       "scope": "agents.curator",

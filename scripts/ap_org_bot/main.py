@@ -50,6 +50,7 @@ from ap_org_bot.handlers.feedback_poll import (  # noqa: E402
 )
 from ap_org_bot.handlers.message import MessageDispatcher  # noqa: E402
 from ap_org_bot.handlers.proposal_actions import ProposalActionHandler  # noqa: E402
+from ap_org_bot.handlers.reaction import CouncilReactionHandler  # noqa: E402
 from ap_org_bot.handlers.scheduler import build_scheduler  # noqa: E402
 from ap_org_bot.handlers.slash import register_slash_commands  # noqa: E402
 from ap_org_bot.infra.claude_cli import HeadlessClient  # noqa: E402
@@ -89,6 +90,11 @@ def main() -> None:
     )
     dev_channel_id = env_int(
         "DISCORD_CHANNEL_AP_DEV", 1495280247590097059
+    )
+    # Sprint 1: #council-decisions for Discord-native sign-off (✅ / ❌ reactions).
+    # Defaults to 0 = "no channel built yet" — handler skips silently in that case.
+    council_decisions_channel_id = env_int(
+        "DISCORD_CHANNEL_COUNCIL_DECISIONS", 0
     )
 
     craig_id, allowed_ids, is_craig, is_authorized = _build_authorization()
@@ -138,6 +144,23 @@ def main() -> None:
         "scripts/ap_curator_runner.py",
         curator.confidence_threshold,
     )
+
+    # Sprint 1: Council reaction handler (✅/❌ on #council-decisions)
+    council_reaction_handler = CouncilReactionHandler(
+        bot,
+        council_decisions_channel_id=council_decisions_channel_id,
+        is_craig=is_craig,
+    )
+    if council_decisions_channel_id > 0:
+        log.info(
+            "[main] Council reaction handler on (#council-decisions=%d) — react ✅/❌ to sign off",
+            council_decisions_channel_id,
+        )
+    else:
+        log.info(
+            "[main] Council reaction handler standby — set DISCORD_CHANNEL_COUNCIL_DECISIONS "
+            "to enable Discord sign-off (CLI signoff still works)"
+        )
 
     # ── Proposal action handler (needs dev_channel after on_ready) ────
     action_holder: dict = {"handler": None}
@@ -211,6 +234,10 @@ def main() -> None:
         await dispatcher.dispatch(message)
         await bot.process_commands(message)
 
+    @bot.event
+    async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+        await council_reaction_handler.on_raw_reaction_add(payload)
+
     # ── Slash commands ────────────────────────────────────────────────
     async def _poll_now_callback():
         await run_feedback_poll(
@@ -225,6 +252,8 @@ def main() -> None:
         is_craig=is_craig,
         is_authorized=is_authorized,
         poll_now=_poll_now_callback,
+        bot=bot,
+        council_decisions_channel_id=council_decisions_channel_id,
     )
 
     bot.run(token, log_handler=None)
