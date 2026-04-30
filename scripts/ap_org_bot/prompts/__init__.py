@@ -43,6 +43,7 @@ _PROMPT_PATHS: dict[str, Path] = {
     "auto_dev":               PROMPTS_DOMAIN_AP_DIR / "auto_dev.md",
     "gas_dev":                PROMPTS_DOMAIN_AP_DIR / "gas_dev.md",
     "opus_design_researcher": PROMPTS_DOMAIN_AP_DIR / "opus_researcher.md",
+    "curator":                PROMPTS_DOMAIN_AP_DIR / "curator.md",  # Sprint 1
 }
 
 

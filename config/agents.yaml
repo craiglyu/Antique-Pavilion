@@ -121,12 +121,16 @@ agents:
     notes: "TODO Phase 1 — Bot heartbeat, Gemini quota, GitHub Pages uptime"
 
   - key: curator
-    class: null
+    class: ap_org_bot.agents._domain.ap.curator.CuratorAgent
     layer: domain
     phase: 1
-    active: false
-    prompt: null
-    notes: "TODO Phase 1 — Gemini judgment quality gate (AP-specific)"
+    active: true
+    prompt: curator
+    model: null  # Sprint 1: rule-based, no LLM call. Sprint 2 will add Sonnet judgment for borderline cases.
+    notes: |
+      Sprint 1 active — rule-based authentication-quality gate.
+      Entry: scripts/ap_curator_runner.py CLI (Sprint 2 will add cron + Notion query).
+      Not channel-message-triggered, so registry binding via channels.yaml is informational only.
 
   - key: librarian
     class: null

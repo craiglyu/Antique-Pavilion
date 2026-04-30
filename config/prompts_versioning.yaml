@@ -69,12 +69,26 @@ prompts:
     change_notes: "v0.1 baseline"
 
   opus_design_researcher:
-    file: scripts/ap_org_bot.py
-    line_anchor: writer_prompt
+    file: scripts/ap_org_bot/prompts/_domain/ap/opus_researcher.md
     current_version: v0.1
     notion_page_title: "Opus Design Researcher (DD writer) v0.1"
-    last_changed: 2026-04-28T03:00
-    change_notes: "v0.1 baseline；max-turns 10→12 安全邊界"
+    last_changed: 2026-04-30T16:00
+    change_notes: "Sprint 0 拆檔搬家：prompt 從 ap_org_bot.py:writer_prompt 抽到 .md 檔，內容 100% 不動"
+
+  curator:
+    file: scripts/ap_org_bot/prompts/_domain/ap/curator.md
+    current_version: v0.1
+    notion_page_title: "Curator Agent v0.1 (AP rule-based MVP)"
+    last_changed: 2026-04-30T18:00
+    change_notes: |
+      Sprint 1 新建（AP Phase 1 第一個新 agent，藍圖 v1.1 §2.11）：
+      - 4 verdict 規則：通過 / 待重審 / 衝突 / 退回
+      - 預設 confidence threshold = 0.8
+      - era 9 枚舉嚴格驗證
+      - 廣告腔禁用詞 6 個（絕世、典藏級、天下無雙等）
+      - 模糊參考標記 8 個（待補、未知、TBD、查無等）
+      - Sprint 1 純規則層；Sprint 2 加 Sonnet judgment for borderline
+      - 入口：scripts/ap_curator_runner.py CLI
 
 # ── .claude/commands/ 內的 skills ──
 skills:

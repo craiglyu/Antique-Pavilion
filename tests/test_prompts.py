@@ -7,11 +7,13 @@ import pytest
 from ap_org_bot.prompts import _PROMPT_PATHS, list_prompts, load_prompt
 
 
-def test_list_prompts_returns_eight_entries():
+def test_list_prompts_returns_all_registered_entries():
+    """Sprint 0 shipped 8; Sprint 1 added curator → 9. Adjust as new agents land."""
     prompts = list_prompts()
-    assert len(prompts) == 8
+    assert len(prompts) == 9
     for required in ["pm", "feedback_pm", "designer", "dev", "marketing",
-                     "auto_dev", "gas_dev", "opus_design_researcher"]:
+                     "auto_dev", "gas_dev", "opus_design_researcher",
+                     "curator"]:
         assert required in prompts
 
 

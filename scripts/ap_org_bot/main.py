@@ -35,6 +35,7 @@ from discord.ext import commands  # noqa: E402
 from ap_org_bot.agents._core.feedback_pm import FeedbackPMAgent  # noqa: E402
 from ap_org_bot.agents._core.pm import PMAgent  # noqa: E402
 from ap_org_bot.agents._domain.ap.auto_dev import AutoDevAgent  # noqa: E402
+from ap_org_bot.agents._domain.ap.curator import CuratorAgent  # noqa: E402
 from ap_org_bot.agents._domain.ap.designer import DesignerAgent  # noqa: E402
 from ap_org_bot.agents._domain.ap.dev import DevAgent  # noqa: E402
 from ap_org_bot.agents._domain.ap.gas_dev import GasDevAgent  # noqa: E402
@@ -119,6 +120,11 @@ def main() -> None:
     auto_dev = AutoDevAgent(claude, is_craig=is_craig, is_authorized=is_authorized)
     gas_dev = GasDevAgent(claude, is_craig=is_craig, is_authorized=is_authorized)
 
+    # Curator (Sprint 1) — rule-based, NOT channel-message-triggered.
+    # Entry: scripts/ap_curator_runner.py CLI. Sprint 2 will add cron + Notion query.
+    # Not registered with AgentRegistry because dispatcher only routes message-triggered agents.
+    curator = CuratorAgent()
+
     registry = AgentRegistry()
     registry.load_yaml()
     for agent in (pm, designer, dev, marketing, auto_dev, gas_dev,
@@ -127,6 +133,11 @@ def main() -> None:
 
     log.info("[main] active agents: %s", registry.active_agent_keys())
     log.info("[main] bound channels: %d", len(registry.channel_ids()))
+    log.info(
+        "[main] Curator on (rule-based, threshold=%.2f) — invoke via "
+        "scripts/ap_curator_runner.py",
+        curator.confidence_threshold,
+    )
 
     # ── Proposal action handler (needs dev_channel after on_ready) ────
     action_holder: dict = {"handler": None}

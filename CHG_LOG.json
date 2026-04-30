@@ -3,6 +3,40 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-04-30T18:00:00Z",
+      "category": "feat",
+      "scope": "agents.curator",
+      "version_from": null,
+      "version_to": "v0.1",
+      "summary": "Sprint 1 第一個新 agent 上線：CuratorAgent 規則層 MVP + CLAUDE.md 單一真理來源 + ap_curator_runner.py CLI。對應 Council topic ap-2026-04-30-085208-001 的 PM 推薦（Curator over UX/SRE）。",
+      "rationale": "AP production Bot 每天跑 Gemini 鑑定但無系統 Curator gate；低信心度判讀 / era 枚舉違規 / 廣告腔殘留會悄悄流入 Sheets 和 GitHub Pages 累積品牌風險。Curator agent 是 AP 護城河（鑑定品質）的守門員。",
+      "breaking": false,
+      "rollback": "git revert <this commit>; agents.yaml curator active=false; ap_curator_runner.py 仍可保留作 dead code",
+      "highlights": [
+        "26 新 tests，全套 pytest 78 passed in 2.73s",
+        "4 verdict: 通過 / 待重審 / 衝突 / 退回",
+        "預設 confidence threshold=0.8（Sprint 1 dogfooding 期間若 Craig 同意可調 0.85）",
+        "era 嚴格驗證 9 枚舉（不可擴張，Tier 1 Council 才能改）",
+        "禁用詞 6 個 + 模糊標記 8 個",
+        "Sprint 2 計畫：加 Sonnet LLM judgment for borderline cases (confidence ∈ [0.7, 0.85])",
+        "Sprint 2 計畫：加 Notion Auth Log DB query (curator_status='未審') + cron",
+        "CLAUDE.md 解決 Dev Agent 在 Sprint 0 production 測試時點名的「無單一真理來源」問題"
+      ],
+      "files": [
+        "CLAUDE.md (NEW)",
+        "scripts/ap_org_bot/prompts/_domain/ap/curator.md (NEW)",
+        "scripts/ap_org_bot/agents/_domain/ap/curator.py (NEW)",
+        "scripts/ap_curator_runner.py (NEW)",
+        "tests/test_agents_curator.py (NEW, 26 tests)",
+        "scripts/ap_org_bot/prompts/__init__.py (curator entry)",
+        "scripts/ap_org_bot/main.py (Curator instantiate + log)",
+        "config/agents.yaml (curator active=true)",
+        "config/channels.yaml (#ap-curator agent binding)",
+        "config/prompts_versioning.yaml (curator v0.1 + opus_researcher 路徑更新)",
+        "tests/test_prompts.py (8→9 prompts assertion)"
+      ]
+    },
+    {
       "ts": "2026-04-30T16:00:00Z",
       "category": "refactor",
       "scope": "ap_org_bot",

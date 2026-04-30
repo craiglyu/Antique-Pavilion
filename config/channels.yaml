@@ -80,8 +80,12 @@ channels:
 
   - name: ap-curator
     id: 0
-    agent: null
-    notes: "Curator Agent — Phase 1 new (AP-specific)"
+    agent: curator
+    notes: |
+      Curator Agent — Sprint 1 active (rule-based MVP).
+      Build the channel in Discord, paste real channel ID here. Until then, ID=0 is a no-op
+      for message dispatch (Curator runs via scripts/ap_curator_runner.py CLI).
+      Sprint 2 will use this channel for batch ping when 待重審 ≥ 3 or 衝突/退回 fires.
 
   - name: ap-knowledge
     id: 0
