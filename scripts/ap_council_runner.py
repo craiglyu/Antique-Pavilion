@@ -219,6 +219,31 @@ def cmd_signoff(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_daemon_poll(args: argparse.Namespace) -> int:
+    """Manually trigger CouncilDaemon.poll_and_advance() once."""
+    import asyncio
+
+    from ap_org_bot.council.daemon import CouncilDaemon
+
+    invoker = None
+    if args.apply:
+        # depends on Session B — RealAgentInvoker not yet built
+        try:
+            from ap_org_bot.agents.invoker import RealAgentInvoker  # type: ignore[import]
+            invoker = RealAgentInvoker()
+        except ImportError:
+            print(
+                "❌ RealAgentInvoker not available (depends on Session B)",
+                file=sys.stderr,
+            )
+            return 1
+
+    daemon = CouncilDaemon(invoker=invoker)
+    run = asyncio.run(daemon.poll_and_advance())
+    print(json.dumps(run.to_dict(), ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ap_council_runner",
@@ -276,6 +301,17 @@ def build_parser() -> argparse.ArgumentParser:
                       help="JSON array of {task_id, agent, description} dicts")
     p_p3.add_argument("--model", default="sonnet")
 
+    # ── Sprint 4: daemon-poll ───────────────────────────────────────────
+    p_dp = sub.add_parser(
+        "daemon-poll",
+        help="manually trigger CouncilDaemon.poll_and_advance() once",
+    )
+    p_dp.add_argument(
+        "--apply",
+        action="store_true",
+        help="actually invoke agents (default: dry-run, no LLM calls)",
+    )
+
     return parser
 
 
@@ -291,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
         "phase1-respond": cmd_phase1_respond,
         "phase2-debate": cmd_phase2_debate,
         "phase3-integrate": cmd_phase3_integrate,
+        "daemon-poll": cmd_daemon_poll,
     }
     return handlers[args.cmd](args)
 
