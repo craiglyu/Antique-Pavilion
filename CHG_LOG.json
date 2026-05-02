@@ -3,6 +3,73 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-05-03T02:00:00Z",
+      "category": "fix",
+      "scope": "ui.emil_audit",
+      "version_from": null,
+      "version_to": null,
+      "summary": "Emil 設計工程審查 P1+P2+P3 全 10 項修正 — Publish/index.html",
+      "rationale": "Emil audit 發現 10 項違反 compositor-only 動畫規則、不完整 accessibility、缺少 OG meta 等問題，本 commit 全數修正。",
+      "breaking": false,
+      "rollback": "git revert <this commit>",
+      "items": [
+        {
+          "id": "P1-01",
+          "rule": "Emil: compositor-only animation (transform 取代 layout property)",
+          "change": "scroll progress bar: transition height → transform: scaleY(0→1), transform-origin: top center"
+        },
+        {
+          "id": "P2-01",
+          "rule": "Emil: no background/padding in scroll transition (paint cost)",
+          "change": "header compact: 移除 padding/background/border-bottom transition；改用 ::before 偽元素做背景 opacity 淡入，transition 只保留 box-shadow"
+        },
+        {
+          "id": "P2-02",
+          "rule": "Emil: no background-position animation (compositor-only)",
+          "change": "skeleton shimmer: 改用 ::after + @keyframes shimmerSlide (translateX -100%→100%) 取代 background-position 動畫"
+        },
+        {
+          "id": "P2-03",
+          "rule": "Emil: clip-path progressive enhancement + reduced-motion",
+          "change": "modal: 加 @supports not (clip-path: inset(0)) fallback 改用 transform:scaleY；prefers-reduced-motion 區塊補 clip-path !important snap"
+        },
+        {
+          "id": "P2-04",
+          "rule": "Emil: backdrop-filter 僅在必要時使用（stacking context cost）",
+          "change": ".category-rail-wrap: 移除 backdrop-filter/−webkit-backdrop-filter；90% 不透明 paper 背景已足夠"
+        },
+        {
+          "id": "P3-01",
+          "rule": "完整度: SEO / Open Graph",
+          "change": "加 description / og:title / og:description / og:type / og:image (placeholder) / twitter:card meta tags"
+        },
+        {
+          "id": "P3-02",
+          "rule": "完整度: LINE button 未設定 ID",
+          "change": "LINE 按鈕 href 改為 # + onclick alert('LINE ID 待設定')，保留 LINE_ID_PLACEHOLDER 註解"
+        },
+        {
+          "id": "P3-03",
+          "rule": "Emil: 統一使用 cubic-bezier easing",
+          "change": ".footer-seal transition: ease → cubic-bezier(0.4, 0, 0.2, 1)"
+        },
+        {
+          "id": "P3-04",
+          "rule": "完整度: 鍵盤可操作性 (WCAG 2.1 SC 2.1.1)",
+          "change": "card: 加 tabindex=0 + role=button + aria-label + Enter/Space keydown handler → openModal()"
+        },
+        {
+          "id": "P3-05",
+          "rule": "Emil: 頁面隱藏時停止 rAF loop（資源節省）",
+          "change": "WebGL fog: 加 visibilitychange listener，document.hidden 時 cancelAnimationFrame；恢復時補償 totalPaused 時間偏移"
+        }
+      ],
+      "files": [
+        "Publish/index.html (10 changes)",
+        "reports/emil_audit_after/verification_report.md (NEW)"
+      ]
+    },
+    {
       "ts": "2026-05-02T08:00:00Z",
       "category": "feat",
       "scope": "sprint-3.batch",
