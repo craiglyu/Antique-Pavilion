@@ -1,0 +1,25 @@
+{
+  "captured_at": "2026-05-02",
+  "viewports": {
+    "1920x1080": {
+      "jsErrors": [],
+      "note": "console.error interception requires pre-injection; run after page load"
+    },
+    "1440x900": {
+      "jsErrors": [],
+      "note": "console.error interception requires pre-injection; run after page load"
+    },
+    "1024x768": {
+      "jsErrors": [],
+      "note": "console.error interception requires pre-injection; run after page load"
+    },
+    "768x1024": {
+      "jsErrors": [],
+      "note": "console.error interception requires pre-injection; run after page load"
+    },
+    "390x844": {
+      "jsErrors": [],
+      "note": "console.error interception requires pre-injection; run after page load"
+    }
+  }
+}

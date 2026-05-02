@@ -1,0 +1,50 @@
+{
+  "captured_at": "2026-05-02",
+  "url": "http://localhost:8000/index.html",
+  "viewport_for_perf": "1440x900",
+  "metrics": {
+    "domInteractive": 79,
+    "domContentLoaded": 139,
+    "loadEventEnd": 141,
+    "transferSize": 0,
+    "fcp": 312,
+    "lcp": null,
+    "imageCount": 86,
+    "imagesWithAlt": 86,
+    "hasCanvas": true,
+    "title": "吉寶軒 Jibao Xuan — 傳承・鑑光・典藏",
+    "viewportWidth": 1440,
+    "viewportHeight": 900
+  },
+  "resources": {
+    "totalResources": 89,
+    "failedResources": [
+      {
+        "name": "https://script.google.com/macros/s/AKfycbz6wId1wRbY48o7xH2X4T0e7UFlppakZvBYmJn4KybA6uGgzk4CZs8YXQSTZoj2Suhiew/exec",
+        "initiatorType": "fetch"
+      },
+      {
+        "name": "https://drive.google.com/thumbnail?id=1klk4rI3txbQ6Is9-2gKlANh98dMf1ess&sz=w1000",
+        "initiatorType": "img"
+      },
+      {
+        "name": "https://drive.google.com/thumbnail?id=1ggbbfHSYruHzVYfmoUTvOdAENptMFioT&sz=w1000",
+        "initiatorType": "img"
+      },
+      {
+        "name": "https://drive.google.com/thumbnail?id=1xyfc9VTGFO-MZPLJxvS5QAUrf2Thmkf8&sz=w1000",
+        "initiatorType": "img"
+      },
+      {
+        "name": "https://drive.google.com/thumbnail?id=11o5mBTPtx34vXAxMVn52LI4A0Nh5scn-&sz=w1000",
+        "initiatorType": "img"
+      }
+    ],
+    "resourceTypes": [
+      "link",
+      "fetch",
+      "css",
+      "img"
+    ]
+  }
+}
