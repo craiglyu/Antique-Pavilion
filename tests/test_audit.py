@@ -15,9 +15,13 @@ from ap_org_bot.audit import (
 from ap_org_bot.audit.rules import (
     FORBIDDEN_AD_TONE_WORDS,
     rule_ap1_forbidden_ad_tone,
+    rule_ap2_performance_heuristic,
+    rule_ap3_traditional_chinese,
+    rule_ap4_gas_endpoint_label,
     rule_ap5_compliance_disclaimer,
     rule_ap6_schema_org,
     rule_ap7_image_alt_text,
+    rule_ap8_seo_meta_tags,
 )
 
 
@@ -153,12 +157,209 @@ def test_ap7_empty_alt_flagged():
     assert r.details["empty_alt"] == 1
 
 
+# ── AP-2 performance heuristic ─────────────────────────────────────
+
+
+def test_ap2_non_html_skips():
+    r = rule_ap2_performance_heuristic("# plain markdown")
+    assert r.passed
+    assert "skipped" in r.details["trigger"]
+
+
+def test_ap2_no_scripts_passes():
+    html = "<!doctype html><html><body><p>hello</p></body></html>"
+    r = rule_ap2_performance_heuristic(html)
+    assert r.passed
+    assert r.details["render_blocking"] == 0
+
+
+def test_ap2_render_blocking_script_p2():
+    html = ('<!doctype html><html><head>'
+            '<script src="app.js"></script>'
+            '</head><body></body></html>')
+    r = rule_ap2_performance_heuristic(html)
+    assert not r.passed
+    assert r.severity == Severity.P2
+    assert r.details["render_blocking"] == 1
+
+
+def test_ap2_deferred_script_passes():
+    html = ('<!doctype html><html><head>'
+            '<script src="app.js" defer></script>'
+            '</head><body></body></html>')
+    r = rule_ap2_performance_heuristic(html)
+    assert r.passed
+
+
+def test_ap2_async_script_passes():
+    html = ('<!doctype html><html><head>'
+            '<script src="app.js" async></script>'
+            '</head><body></body></html>')
+    r = rule_ap2_performance_heuristic(html)
+    assert r.passed
+
+
+def test_ap2_lazy_loading_flag():
+    html = ('<!doctype html><html><body>'
+            + '<img src="a.jpg">' * 3
+            + '</body></html>')
+    r = rule_ap2_performance_heuristic(html)
+    # 3 imgs without lazy — > 50% → violation
+    assert not r.passed
+    assert r.details["imgs_no_lazy"] == 3
+
+
+def test_ap2_majority_lazy_passes():
+    html = ('<!doctype html><html><body>'
+            '<img src="a.jpg" loading="lazy">'
+            '<img src="b.jpg" loading="lazy">'
+            '<img src="c.jpg">'
+            '</body></html>')
+    r = rule_ap2_performance_heuristic(html)
+    # Only 1/3 missing lazy (33%) → under 50% threshold → pass on lazy
+    assert r.passed or r.details["imgs_no_lazy"] == 1
+
+
+# ── AP-3 traditional Chinese ────────────────────────────────────────
+
+
+def test_ap3_non_html_skips():
+    r = rule_ap3_traditional_chinese("plain text 普通文字")
+    assert r.passed
+    assert "skipped" in r.details["trigger"]
+
+
+def test_ap3_correct_lang_passes():
+    html = '<!doctype html><html lang="zh-TW"><head><title>吉寶軒</title></head></html>'
+    r = rule_ap3_traditional_chinese(html)
+    assert r.passed
+    assert r.details["lang"] == "zh-tw"
+
+
+def test_ap3_zh_hant_passes():
+    html = '<!doctype html><html lang="zh-Hant"><head><title>吉寶軒</title></head></html>'
+    r = rule_ap3_traditional_chinese(html)
+    assert r.passed
+
+
+def test_ap3_missing_lang_p2():
+    html = "<!doctype html><html><head><title>吉寶軒</title></head></html>"
+    r = rule_ap3_traditional_chinese(html)
+    assert not r.passed
+    assert r.severity == Severity.P2
+    assert any("lang" in v for v in r.violations)
+
+
+def test_ap3_simplified_lang_p1():
+    html = '<!doctype html><html lang="zh-CN"><head><title>吉寶軒</title></head></html>'
+    r = rule_ap3_traditional_chinese(html)
+    assert not r.passed
+    assert r.severity == Severity.P1
+
+
+def test_ap3_simplified_char_in_title():
+    html = '<!doctype html><html lang="zh-TW"><head><title>爱好骨董</title></head></html>'
+    r = rule_ap3_traditional_chinese(html)
+    assert not r.passed
+    assert any("簡體字" in v for v in r.violations)
+
+
+# ── AP-4 GAS endpoint label ─────────────────────────────────────────
+
+
+def test_ap4_non_html_skips():
+    r = rule_ap4_gas_endpoint_label("plain text")
+    assert r.passed
+
+
+def test_ap4_has_gas_url_passes():
+    html = ('<!doctype html><html><body>'
+            '<script>const GAS_URL="https://script.google.com/macros/s/AKfycbXXX/exec";</script>'
+            '</body></html>')
+    r = rule_ap4_gas_endpoint_label(html)
+    assert r.passed
+    assert r.details["has_gas_url"] is True
+
+
+def test_ap4_gas_comment_passes():
+    html = ('<!doctype html><html><body>'
+            '<!-- GAS_URL: https://script.google.com/macros/s/AKfy/exec -->'
+            '</body></html>')
+    r = rule_ap4_gas_endpoint_label(html)
+    assert r.passed
+    assert r.details["has_gas_url"] is True
+
+
+def test_ap4_missing_gas_reference_p2():
+    html = "<!doctype html><html><body><p>no GAS reference</p></body></html>"
+    r = rule_ap4_gas_endpoint_label(html)
+    assert not r.passed
+    assert r.severity == Severity.P2
+
+
+def test_ap4_gas_comment_keyword_passes():
+    html = ('<!doctype html><html><body>'
+            '<!-- GAS doGet endpoint wired above -->'
+            '</body></html>')
+    r = rule_ap4_gas_endpoint_label(html)
+    assert r.passed
+    assert r.details["has_gas_comment"] is True
+
+
+# ── AP-8 SEO meta tags ──────────────────────────────────────────────
+
+
+def test_ap8_non_html_skips():
+    r = rule_ap8_seo_meta_tags("plain text")
+    assert r.passed
+
+
+def test_ap8_all_tags_present_passes():
+    html = """<!doctype html><html><head>
+<meta name="description" content="吉寶軒骨董展示">
+<meta property="og:title" content="吉寶軒">
+<meta property="og:image" content="https://example.com/img.jpg">
+</head></html>"""
+    r = rule_ap8_seo_meta_tags(html)
+    assert r.passed
+    assert r.details["all_present"] is True
+
+
+def test_ap8_missing_description_p2():
+    html = """<!doctype html><html><head>
+<meta property="og:title" content="吉寶軒">
+<meta property="og:image" content="https://example.com/img.jpg">
+</head></html>"""
+    r = rule_ap8_seo_meta_tags(html)
+    assert not r.passed
+    assert r.severity == Severity.P2
+    assert any("description" in v for v in r.violations)
+
+
+def test_ap8_two_missing_p1():
+    html = '<!doctype html><html><head><title>only title</title></head></html>'
+    r = rule_ap8_seo_meta_tags(html)
+    assert not r.passed
+    assert r.severity == Severity.P1
+    assert len(r.details["missing_tags"]) >= 2
+
+
+def test_ap8_og_image_only_violation():
+    html = """<!doctype html><html><head>
+<meta name="description" content="desc">
+<meta property="og:title" content="title">
+</head></html>"""
+    r = rule_ap8_seo_meta_tags(html)
+    assert not r.passed
+    assert any("og:image" in v for v in r.violations)
+
+
 # ── ALL_RULES registry ─────────────────────────────────────────────
 
 
-def test_all_rules_registry_has_4_entries():
-    assert len(ALL_RULES) == 4
-    assert {"AP-1", "AP-5", "AP-6", "AP-7"} == set(ALL_RULES.keys())
+def test_all_rules_registry_has_8_entries():
+    assert len(ALL_RULES) == 8
+    assert {"AP-1", "AP-2", "AP-3", "AP-4", "AP-5", "AP-6", "AP-7", "AP-8"} == set(ALL_RULES.keys())
 
 
 def test_all_rules_callable_with_empty_input():

@@ -3,6 +3,56 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-05-02T08:00:00Z",
+      "category": "feat",
+      "scope": "sprint-3.batch",
+      "version_from": "v0.3.0-rc1",
+      "version_to": "v0.4.0-rc1",
+      "summary": "Sprint 3 全力衝刺 — 4 blocks 一次性 ship: audit AP-2/3/4/8 (8-rule MVP) / notion_reconciler enforce mode / catchup active replay + Gemini quota reconcile / Council 9-state daemon. 183→253 tests (+70 tests), 3.60s.",
+      "rationale": "Craig 指示「請開始 / Auto-pilot mode 接續 sprint 3」→ 全面交付。每 block 充分測試 + 整合，跨 block dependencies 清晰分層。",
+      "breaking": false,
+      "rollback": "git revert <this commit range>; Sprint 2 state fully preserved",
+      "blocks": [
+        {
+          "id": "B1",
+          "name": "audit_runner AP-2/3/4/8 — 8-rule full set",
+          "files": ["scripts/ap_org_bot/audit/rules.py (+AP-2/3/4/8)", "tests/test_audit.py (24→47 tests)"],
+          "rules_added": "AP-2 效能啟發式 / AP-3 繁體中文一致性 / AP-4 GAS端點標籤 / AP-8 SEO meta+OG tags",
+          "tests": "23 new"
+        },
+        {
+          "id": "B2",
+          "name": "notion_reconciler enforce mode",
+          "files": ["scripts/ap_notion_reconciler.py (+enforce subcommand, _patch_add_properties, _desired_spec_to_notion_body)", "tests/test_notion_reconciler.py (11→21 tests)"],
+          "safety": "additive only — never deletes/type-changes; requires --confirm; type_mismatch+option_diff flagged for human review",
+          "tests": "10 new"
+        },
+        {
+          "id": "B3",
+          "name": "catchup_protocol active replay + Gemini quota reconcile",
+          "files": ["scripts/ap_org_bot/handlers/catchup_protocol.py (+ReplayResult, DiscordFetcher, replay_feedback_channel, reconcile_gemini_quota)", "tests/test_catchup_protocol.py (20→31 tests)"],
+          "components": "ReplayResult / DiscordFetcher (injectable) / replay_feedback_channel() / reconcile_gemini_quota()",
+          "tests": "11 new"
+        },
+        {
+          "id": "B4",
+          "name": "Council 9-state daemon",
+          "files": ["scripts/ap_org_bot/council/daemon.py (new — 290 LoC)", "tests/test_council_daemon.py (new — 26 tests)"],
+          "components": "AgentInvoker (injectable) / parse_stance / _detect_divergence / CouncilDaemon.poll_and_advance / _run_phase1/2/3 / DaemonRun",
+          "tests": "26 new"
+        }
+      ],
+      "test_growth": "Sprint 2 183 → Sprint 3 253 (+70 tests, 3.60s)",
+      "follow_up": [
+        "Sprint 4: wire CouncilDaemon into main.py scheduler (11:00/20:00 poll)",
+        "Sprint 4: wire DiscordFetcher to real discord.py channel.history() in CatchupCoordinator",
+        "Sprint 4: ap_council_runner.py daemon-poll CLI subcommand",
+        "Sprint 4: migrations/ live (notion_reconciler enforce on boot)",
+        "Sprint 4: budget_governor full version",
+        "Sprint 5: GitHub branch protection + auto-merge 3-label gate"
+      ]
+    },
+    {
       "ts": "2026-04-30T22:00:00Z",
       "category": "feat",
       "scope": "sprint-2.batch",

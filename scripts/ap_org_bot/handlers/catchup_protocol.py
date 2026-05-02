@@ -169,20 +169,76 @@ class WatermarkStore:
         return False
 
 
+class ReplayResult:
+    """Result of a Discord channel replay pass."""
+
+    def __init__(
+        self,
+        source: SourceType,
+        messages_scanned: int,
+        messages_with_attachments: int,
+        new_watermark: Optional[str],
+        *,
+        skipped_reason: str = "",
+    ):
+        self.source = source
+        self.messages_scanned = messages_scanned
+        self.messages_with_attachments = messages_with_attachments
+        self.new_watermark = new_watermark
+        self.skipped_reason = skipped_reason
+
+    @property
+    def skipped(self) -> bool:
+        return bool(self.skipped_reason)
+
+    def to_dict(self) -> dict:
+        return {
+            "source": self.source.value,
+            "messages_scanned": self.messages_scanned,
+            "messages_with_attachments": self.messages_with_attachments,
+            "new_watermark": self.new_watermark,
+            "skipped_reason": self.skipped_reason,
+        }
+
+
+class DiscordFetcher:
+    """Protocol for fetching Discord message history.
+
+    The real implementation wraps discord.py's channel.history() coroutine.
+    Tests inject a fake to avoid live Discord calls.
+
+    fetch_after(channel_id, after_message_id, limit) → list[DiscordMessageLike]
+    Each message-like must have:
+      - id: str
+      - attachments: list (non-empty means has images)
+    """
+
+    async def fetch_after(
+        self,
+        channel_id: str,
+        after_message_id: Optional[str],
+        limit: int = 200,
+    ) -> list[dict]:
+        raise NotImplementedError
+
+
 class CatchupCoordinator:
     """Drives the on-startup audit. Call once after Discord login."""
 
-    def __init__(self, store: Optional[WatermarkStore] = None):
+    def __init__(
+        self,
+        store: Optional[WatermarkStore] = None,
+        fetcher: Optional[DiscordFetcher] = None,
+    ):
         self.store = store or WatermarkStore()
+        self.fetcher = fetcher  # None in prod until bot wires discord.py client
 
     def on_bot_startup(self) -> dict[str, Any]:
-        """Sprint 2 read-only audit: report watermark ages + active Council topics.
+        """Audit report: watermark ages + active Council topics.
 
         Returns a dict suitable for log emission + later telemetry.
-        Does NOT actually replay missed events (Sprint 3 will).
+        Sprint 3: also triggers replay if DISCORD_FEEDBACK watermark is stale.
         """
-        # Lazy import — Council depends on persistence which depends on infra.paths;
-        # importing at module level can create circular issues during test setup.
         from ap_org_bot.council.persistence import list_active_topics
 
         active_topics = list_active_topics()
@@ -223,6 +279,128 @@ class CatchupCoordinator:
 
         return report
 
+    async def replay_feedback_channel(
+        self,
+        channel_id: str,
+        *,
+        limit: int = 200,
+    ) -> ReplayResult:
+        """Re-scan #ap-feedback messages since last DISCORD_FEEDBACK watermark.
+
+        Fetches up to `limit` messages posted after the last known message_id.
+        Updates the watermark to the newest message_id found.
+
+        Returns a ReplayResult. Messages with attachments are logged as candidates
+        for re-processing (actual re-dispatch is handled by the caller / scheduler).
+
+        If no DiscordFetcher is wired (self.fetcher is None), returns a skipped result.
+        """
+        if self.fetcher is None:
+            log.info("[catchup] replay_feedback_channel: no fetcher wired — skipped")
+            return ReplayResult(
+                source=SourceType.DISCORD_FEEDBACK,
+                messages_scanned=0,
+                messages_with_attachments=0,
+                new_watermark=None,
+                skipped_reason="no DiscordFetcher configured",
+            )
+
+        last_wm = self.store.get(SourceType.DISCORD_FEEDBACK)
+        after_id = last_wm.value if last_wm else None
+
+        log.info("[catchup] replay #ap-feedback after=%s limit=%d",
+                 after_id or "beginning", limit)
+
+        try:
+            messages = await self.fetcher.fetch_after(channel_id, after_id, limit=limit)
+        except Exception as exc:
+            log.error("[catchup] Discord fetch failed: %s", exc)
+            return ReplayResult(
+                source=SourceType.DISCORD_FEEDBACK,
+                messages_scanned=0,
+                messages_with_attachments=0,
+                new_watermark=None,
+                skipped_reason=f"fetch error: {exc}",
+            )
+
+        if not messages:
+            log.info("[catchup] replay: no new messages since watermark")
+            return ReplayResult(
+                source=SourceType.DISCORD_FEEDBACK,
+                messages_scanned=0,
+                messages_with_attachments=0,
+                new_watermark=after_id,
+            )
+
+        with_attachments = [m for m in messages if m.get("attachments")]
+        newest_id = str(messages[-1]["id"])
+
+        if with_attachments:
+            log.info(
+                "[catchup] replay: %d messages scanned, %d with attachments "
+                "(candidates for re-dispatch)",
+                len(messages), len(with_attachments),
+            )
+            for msg in with_attachments:
+                log.debug("[catchup]   candidate message_id=%s", msg["id"])
+        else:
+            log.info("[catchup] replay: %d messages scanned, 0 with attachments",
+                     len(messages))
+
+        # Advance watermark to the newest message seen.
+        self.store.set(
+            SourceType.DISCORD_FEEDBACK,
+            newest_id,
+            extra={"channel_id": channel_id, "scanned": len(messages)},
+        )
+
+        return ReplayResult(
+            source=SourceType.DISCORD_FEEDBACK,
+            messages_scanned=len(messages),
+            messages_with_attachments=len(with_attachments),
+            new_watermark=newest_id,
+        )
+
+    def reconcile_gemini_quota(self) -> dict[str, Any]:
+        """Compare budget_gate ledger against GEMINI_CALLS watermark.
+
+        If the watermark is older than 1h and budget usage > 80% of cap,
+        emits a warning so the scheduler / SRE can throttle.
+
+        Returns a dict with reconciliation status.
+        """
+        from ap_org_bot.infra.budget_gate import usage_summary
+
+        summary = usage_summary()
+        gemini_entry = next(
+            (e for e in summary.get("providers", []) if e.get("provider") == "gemini"),
+            None,
+        )
+
+        wm = self.store.get(SourceType.GEMINI_CALLS)
+        wm_age = wm.age_hours() if wm else None
+
+        result: dict[str, Any] = {
+            "gemini_usage": gemini_entry,
+            "watermark_age_hours": wm_age,
+            "alert": False,
+        }
+
+        if gemini_entry:
+            current = gemini_entry.get("current", 0)
+            cap = gemini_entry.get("cap", 1)
+            pct = current / cap if cap else 0
+            if pct >= 0.8:
+                log.warning(
+                    "[catchup] Gemini quota at %.0f%% (%s/%s) — approaching cap",
+                    pct * 100, current, cap,
+                )
+                result["alert"] = True
+                result["alert_reason"] = f"Gemini quota {pct*100:.0f}% of cap"
+
+        log.info("[catchup] quota reconcile: alert=%s", result["alert"])
+        return result
+
     def heartbeat(self) -> Watermark:
-        """Convenience — bump BOT_HEARTBEAT watermark to now. Bot loop calls this periodically."""
+        """Convenience — bump BOT_HEARTBEAT watermark to now."""
         return self.store.set(SourceType.BOT_HEARTBEAT, _now_utc_iso())

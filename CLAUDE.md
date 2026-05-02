@@ -239,6 +239,19 @@ python3 -c "import sys; sys.path.insert(0, 'scripts'); \
             import json; print(json.dumps(usage_summary(), indent=2))"
 ```
 
+### Apply Auth Log DB schema migration (Sprint 2 follow-up — Craig action)
+
+Prereq: `NOTION_API_KEY` 已在 `.env.antique`（`ntn_26310350…`），`NOTION_AUTH_LOG_DB` = `d20ed582-…`。
+
+```bash
+cd "/mnt/c/Users/A50529/Desktop/Craig/Antique Digital Pavilion"
+source .env.antique       # 或 export $(grep -v '^#' .env.antique | xargs)
+python3 scripts/ap_authlog_schema_migrate.py apply
+```
+
+這一步把 `era` (select 9-enum) + `category` (select 6 options) + `isValid` (checkbox) 加到
+Notion Auth Log DB，讓 Curator `pull-pending` + `--apply` 可以 write-back 完整 verdict。
+
 ### Rollback the Sprint 0 refactor (emergency)
 
 If the refactored bot misbehaves within the first 14 days:
@@ -258,11 +271,11 @@ Detailed rollback rationale: `scripts/ap_org_bot/MIGRATION.md`.
 | Sprint | Status | Scope |
 |---|---|---|
 | **0** | ✅ done (2026-04-30) | Strangler-fig refactor 1288→42 modules + budget_gate + Council 3-state pilot + 51 tests + 4 optimisation lines (拆檔/budget/state-machine/migrations) |
-| **1** | 🚧 in progress | First real Council session + Curator agent + this CLAUDE.md + Discord reaction handler |
-| 2 | ⬜ pending | catchup_protocol.py + audit_runner.py + budget_governor full version |
-| 3 | ⬜ pending | Council 9-state extension + notion_reconciler drift mode |
-| 4 | ⬜ pending | notion_reconciler enforce + migrations/ live |
-| 5 | ⬜ pending | GitHub branch protection + auto-merge (3-label gate) |
+| **1** | ✅ done (2026-04-30) | First real Council session + Curator agent + CLAUDE.md + Discord reaction handler + 109 tests |
+| **2** | ✅ done (2026-04-30) | Curator --apply / Auth Log schema migration spec / catchup_protocol skeleton / audit_runner 4-rule MVP (AP-1/5/6/7) / Council 9-state extension / notion_reconciler drift mode — 183 tests, 6.87s |
+| **3** | ✅ done (2026-05-02) | Council 9-state daemon (`council/daemon.py`) + catchup active replay + Gemini quota reconcile + audit AP-2/3/4/8 (8-rule full set) + notion_reconciler enforce mode — 253 tests, 3.60s |
+| **4** | 🚧 pending | Wire daemon + DiscordFetcher into main.py scheduler + daemon-poll CLI + migrations/ live + budget_governor full version |
+| **5** | ⬜ pending | GitHub branch protection + auto-merge (3-label gate) |
 
 Authoritative source: `AP_Sustainability_Roadmap_v0.2.md`.
 

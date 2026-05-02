@@ -258,6 +258,281 @@ def rule_ap7_image_alt_text(text: str, *, target_path: str = "") -> RuleResult:
     )
 
 
+# ── AP-2: Heuristic performance check (Sprint 3) ───────────────────
+
+# Render-blocking script pattern: <script src=...> without async or defer.
+_SCRIPT_SRC_PATTERN = re.compile(
+    r"<script\s+[^>]*src\s*=\s*['\"][^'\"]+['\"][^>]*>",
+    re.IGNORECASE | re.DOTALL,
+)
+_HAS_ASYNC_OR_DEFER = re.compile(r"\b(async|defer)\b", re.IGNORECASE)
+
+_IMG_LOADING_PATTERN = re.compile(r"<img\s+[^>]*?>", re.IGNORECASE | re.DOTALL)
+_LOADING_LAZY = re.compile(r'\bloading\s*=\s*["\']lazy["\']', re.IGNORECASE)
+
+
+def rule_ap2_performance_heuristic(text: str, *, target_path: str = "") -> RuleResult:
+    """AP-2: heuristic Lighthouse-like check (no real browser required).
+
+    Checks:
+    - Render-blocking <script src=...> without async/defer
+    - <img> tags without loading="lazy"
+
+    Severity: P2 if render-blocking scripts exist; P3 otherwise.
+    """
+    if "<html" not in text.lower() and "<!doctype html" not in text.lower():
+        return RuleResult(
+            rule_id="AP-2",
+            rule_name="效能啟發式檢查",
+            dimension=Dimension.PERFORMANCE,
+            passed=True,
+            severity=Severity.P3,
+            violations=[],
+            target_path=target_path,
+            details={"trigger": "non-HTML — skipped"},
+        )
+
+    scripts = _SCRIPT_SRC_PATTERN.findall(text)
+    blocking = [s for s in scripts if not _HAS_ASYNC_OR_DEFER.search(s)]
+
+    imgs = _IMG_LOADING_PATTERN.findall(text)
+    no_lazy = [img for img in imgs if not _LOADING_LAZY.search(img)]
+
+    violations: list[str] = []
+    if blocking:
+        violations.append(
+            f"{len(blocking)} 個 <script src> 缺少 async/defer（render-blocking）"
+        )
+    if no_lazy and imgs:
+        pct = len(no_lazy) / len(imgs) * 100
+        if pct > 50:
+            violations.append(
+                f"{len(no_lazy)}/{len(imgs)} 張圖缺少 loading=\"lazy\""
+            )
+
+    passed = len(violations) == 0
+    return RuleResult(
+        rule_id="AP-2",
+        rule_name="效能啟發式檢查",
+        dimension=Dimension.PERFORMANCE,
+        passed=passed,
+        severity=Severity.P3 if passed else Severity.P2,
+        violations=violations,
+        target_path=target_path,
+        details={
+            "script_tags": len(scripts),
+            "render_blocking": len(blocking),
+            "imgs_total": len(imgs),
+            "imgs_no_lazy": len(no_lazy),
+        },
+    )
+
+
+# ── AP-3: Traditional Chinese language consistency (Sprint 3) ────────
+
+# Simplified-only characters that should never appear in Traditional Chinese UI.
+# These code points exist only in Simplified Chinese and are distinct from their
+# Traditional counterparts.
+_SIMPLIFIED_ONLY: frozenset[str] = frozenset(
+    "爱来说这们为时国对发现还没关问面动们经样发该员"
+)
+
+_HTML_LANG_PATTERN = re.compile(
+    r"<html[^>]*\blang\s*=\s*['\"]([^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+_TITLE_PATTERN = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+
+
+def rule_ap3_traditional_chinese(text: str, *, target_path: str = "") -> RuleResult:
+    """AP-3: Traditional Chinese brand consistency.
+
+    Checks:
+    - <html lang="zh-TW"> or lang="zh-Hant" (not zh-CN / zh)
+    - <title> tag free of simplified-only characters
+    """
+    if "<html" not in text.lower() and "<!doctype html" not in text.lower():
+        return RuleResult(
+            rule_id="AP-3",
+            rule_name="繁體中文語言一致性",
+            dimension=Dimension.BRAND_TONE,
+            passed=True,
+            severity=Severity.P3,
+            violations=[],
+            target_path=target_path,
+            details={"trigger": "non-HTML — skipped"},
+        )
+
+    violations: list[str] = []
+
+    # Check lang attribute
+    lang_match = _HTML_LANG_PATTERN.search(text)
+    lang_value = lang_match.group(1).lower() if lang_match else None
+
+    if lang_value is None:
+        violations.append("<html> 缺少 lang 屬性 — 請加 lang=\"zh-TW\"")
+    elif lang_value in ("zh-cn", "zh-hans"):
+        violations.append(
+            f"lang=\"{lang_match.group(1)}\" 為簡中標記 — 應使用 lang=\"zh-TW\" 或 zh-Hant"
+        )
+    elif lang_value not in ("zh-tw", "zh-hant", "zh-hant-tw"):
+        violations.append(
+            f"lang=\"{lang_match.group(1)}\" 未明確指定繁體 — 建議 lang=\"zh-TW\""
+        )
+
+    # Check title for simplified chars
+    title_match = _TITLE_PATTERN.search(text)
+    if title_match:
+        title_text = re.sub(r"<[^>]+>", "", title_match.group(1))
+        found_simplified = [c for c in title_text if c in _SIMPLIFIED_ONLY]
+        if found_simplified:
+            violations.append(
+                f"<title> 包含簡體字：{''.join(set(found_simplified))}"
+            )
+
+    passed = len(violations) == 0
+    severity = Severity.P3 if passed else (
+        Severity.P1 if lang_value in ("zh-cn", "zh-hans") else Severity.P2
+    )
+    return RuleResult(
+        rule_id="AP-3",
+        rule_name="繁體中文語言一致性",
+        dimension=Dimension.BRAND_TONE,
+        passed=passed,
+        severity=severity,
+        violations=violations,
+        target_path=target_path,
+        details={"lang": lang_value, "title_checked": title_match is not None},
+    )
+
+
+# ── AP-4: GAS endpoint reference (Sprint 3) ─────────────────────────
+
+# GAS Web App URLs contain this domain, and exec-URL paths follow the pattern
+# /macros/s/<key>/exec. A comment or JS variable referencing it is sufficient.
+_GAS_URL_PATTERN = re.compile(
+    r"script\.google\.com/macros/s/[A-Za-z0-9_-]+/exec",
+    re.IGNORECASE,
+)
+_GAS_COMMENT_PATTERN = re.compile(r"GAS[_\s:-]?(URL|doGet|endpoint)", re.IGNORECASE)
+
+
+def rule_ap4_gas_endpoint_label(text: str, *, target_path: str = "") -> RuleResult:
+    """AP-4: HTML must reference the GAS doGet endpoint URL.
+
+    Ensures the deployed file is wired to the correct GAS deployment so drift
+    (wrong URL after GAS re-deploy) is caught by the audit before it reaches prod.
+    Non-HTML files auto-pass.
+    """
+    if "<html" not in text.lower() and "<!doctype html" not in text.lower():
+        return RuleResult(
+            rule_id="AP-4",
+            rule_name="GAS 端點版本標籤",
+            dimension=Dimension.SCHEMA,
+            passed=True,
+            severity=Severity.P3,
+            violations=[],
+            target_path=target_path,
+            details={"trigger": "non-HTML — skipped"},
+        )
+
+    has_gas_url = bool(_GAS_URL_PATTERN.search(text))
+    has_gas_comment = bool(_GAS_COMMENT_PATTERN.search(text))
+
+    if has_gas_url or has_gas_comment:
+        return RuleResult(
+            rule_id="AP-4",
+            rule_name="GAS 端點版本標籤",
+            dimension=Dimension.SCHEMA,
+            passed=True,
+            severity=Severity.P3,
+            violations=[],
+            target_path=target_path,
+            details={"has_gas_url": has_gas_url, "has_gas_comment": has_gas_comment},
+        )
+
+    return RuleResult(
+        rule_id="AP-4",
+        rule_name="GAS 端點版本標籤",
+        dimension=Dimension.SCHEMA,
+        passed=False,
+        severity=Severity.P2,
+        violations=[
+            "HTML 未包含 GAS doGet 端點 URL（script.google.com/macros/s/.../exec）"
+            " — 部署後無法確認版本對齊"
+        ],
+        target_path=target_path,
+        details={"has_gas_url": False, "has_gas_comment": False},
+    )
+
+
+# ── AP-8: SEO meta tags (Sprint 3) ──────────────────────────────────
+
+_META_DESC_PATTERN = re.compile(
+    r'<meta\s+[^>]*name\s*=\s*["\']description["\']',
+    re.IGNORECASE,
+)
+_OG_TITLE_PATTERN = re.compile(
+    r'<meta\s+[^>]*property\s*=\s*["\']og:title["\']',
+    re.IGNORECASE,
+)
+_OG_IMAGE_PATTERN = re.compile(
+    r'<meta\s+[^>]*property\s*=\s*["\']og:image["\']',
+    re.IGNORECASE,
+)
+
+
+def rule_ap8_seo_meta_tags(text: str, *, target_path: str = "") -> RuleResult:
+    """AP-8: HTML must include meta description and Open Graph tags.
+
+    Required for gallery discoverability and social sharing preview.
+    Non-HTML files auto-pass.
+    """
+    if "<html" not in text.lower() and "<!doctype html" not in text.lower():
+        return RuleResult(
+            rule_id="AP-8",
+            rule_name="SEO meta / OG 標籤",
+            dimension=Dimension.SCHEMA,
+            passed=True,
+            severity=Severity.P3,
+            violations=[],
+            target_path=target_path,
+            details={"trigger": "non-HTML — skipped"},
+        )
+
+    missing: list[str] = []
+    if not _META_DESC_PATTERN.search(text):
+        missing.append("<meta name=\"description\">")
+    if not _OG_TITLE_PATTERN.search(text):
+        missing.append("<meta property=\"og:title\">")
+    if not _OG_IMAGE_PATTERN.search(text):
+        missing.append("<meta property=\"og:image\">")
+
+    if not missing:
+        return RuleResult(
+            rule_id="AP-8",
+            rule_name="SEO meta / OG 標籤",
+            dimension=Dimension.SCHEMA,
+            passed=True,
+            severity=Severity.P3,
+            violations=[],
+            target_path=target_path,
+            details={"all_present": True},
+        )
+
+    severity = Severity.P1 if len(missing) >= 2 else Severity.P2
+    return RuleResult(
+        rule_id="AP-8",
+        rule_name="SEO meta / OG 標籤",
+        dimension=Dimension.SCHEMA,
+        passed=False,
+        severity=severity,
+        violations=[f"缺少 {t}" for t in missing],
+        target_path=target_path,
+        details={"missing_tags": missing},
+    )
+
+
 # ── Registry ────────────────────────────────────────────────────────
 
 # Type alias for clarity
@@ -265,7 +540,11 @@ RuleFn = Callable[[str], RuleResult]
 
 ALL_RULES: dict[str, Callable] = {
     "AP-1": rule_ap1_forbidden_ad_tone,
+    "AP-2": rule_ap2_performance_heuristic,
+    "AP-3": rule_ap3_traditional_chinese,
+    "AP-4": rule_ap4_gas_endpoint_label,
     "AP-5": rule_ap5_compliance_disclaimer,
     "AP-6": rule_ap6_schema_org,
     "AP-7": rule_ap7_image_alt_text,
+    "AP-8": rule_ap8_seo_meta_tags,
 }

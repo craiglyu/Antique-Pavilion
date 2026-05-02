@@ -1,8 +1,10 @@
-"""catchup_protocol: WatermarkStore CRUD + CatchupCoordinator on_bot_startup audit."""
+"""catchup_protocol: WatermarkStore CRUD + CatchupCoordinator on_bot_startup audit + active replay."""
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import pytest
 
@@ -12,6 +14,8 @@ from ap_org_bot.handlers.catchup_protocol import (
     SCHEMA_VERSION,
     STALE_WATERMARK_AGE_HOURS,
     CatchupCoordinator,
+    DiscordFetcher,
+    ReplayResult,
     SourceType,
     Watermark,
     WatermarkStore,
@@ -205,3 +209,156 @@ def test_heartbeat_bumps_watermark(store):
     assert wm1.source == SourceType.BOT_HEARTBEAT
     # second heartbeat should be later (or equal in low-resolution clocks)
     assert wm2.updated_at >= wm1.updated_at
+
+
+# ── ReplayResult dataclass ──────────────────────────────────────────
+
+
+def test_replay_result_not_skipped_by_default():
+    r = ReplayResult(
+        source=SourceType.DISCORD_FEEDBACK,
+        messages_scanned=5,
+        messages_with_attachments=2,
+        new_watermark="msg-99",
+    )
+    assert not r.skipped
+    assert r.to_dict()["messages_scanned"] == 5
+
+
+def test_replay_result_skipped_when_reason_set():
+    r = ReplayResult(
+        source=SourceType.DISCORD_FEEDBACK,
+        messages_scanned=0,
+        messages_with_attachments=0,
+        new_watermark=None,
+        skipped_reason="no fetcher",
+    )
+    assert r.skipped
+    assert r.to_dict()["skipped_reason"] == "no fetcher"
+
+
+# ── replay_feedback_channel — fake fetcher ──────────────────────────
+
+
+class FakeDiscordFetcher(DiscordFetcher):
+    """Injected in tests to avoid live Discord calls."""
+
+    def __init__(self, messages: list[dict]):
+        self._messages = messages
+        self.calls: list[dict] = []
+
+    async def fetch_after(
+        self,
+        channel_id: str,
+        after_message_id: Optional[str],
+        limit: int = 200,
+    ) -> list[dict]:
+        self.calls.append({"channel_id": channel_id, "after": after_message_id})
+        return list(self._messages)
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+def test_replay_no_fetcher_returns_skipped(store):
+    coord = CatchupCoordinator(store=store, fetcher=None)
+    result = _run(coord.replay_feedback_channel("ch-001"))
+    assert result.skipped
+    assert "no DiscordFetcher" in result.skipped_reason
+
+
+def test_replay_no_new_messages(store):
+    fetcher = FakeDiscordFetcher(messages=[])
+    coord = CatchupCoordinator(store=store, fetcher=fetcher)
+    result = _run(coord.replay_feedback_channel("ch-001"))
+    assert result.messages_scanned == 0
+    assert result.new_watermark is None
+
+
+def test_replay_messages_without_attachments(store):
+    msgs = [
+        {"id": "100", "attachments": []},
+        {"id": "101", "attachments": []},
+    ]
+    fetcher = FakeDiscordFetcher(messages=msgs)
+    coord = CatchupCoordinator(store=store, fetcher=fetcher)
+    result = _run(coord.replay_feedback_channel("ch-001"))
+    assert result.messages_scanned == 2
+    assert result.messages_with_attachments == 0
+    assert result.new_watermark == "101"
+
+
+def test_replay_messages_with_attachments(store):
+    msgs = [
+        {"id": "200", "attachments": [{"url": "img.jpg"}]},
+        {"id": "201", "attachments": []},
+        {"id": "202", "attachments": [{"url": "img2.jpg"}]},
+    ]
+    fetcher = FakeDiscordFetcher(messages=msgs)
+    coord = CatchupCoordinator(store=store, fetcher=fetcher)
+    result = _run(coord.replay_feedback_channel("ch-feedback"))
+    assert result.messages_scanned == 3
+    assert result.messages_with_attachments == 2
+    assert result.new_watermark == "202"
+
+
+def test_replay_advances_watermark(store):
+    msgs = [{"id": "300", "attachments": []}]
+    fetcher = FakeDiscordFetcher(messages=msgs)
+    coord = CatchupCoordinator(store=store, fetcher=fetcher)
+    _run(coord.replay_feedback_channel("ch-001"))
+    wm = store.get(SourceType.DISCORD_FEEDBACK)
+    assert wm is not None
+    assert wm.value == "300"
+
+
+def test_replay_uses_existing_watermark_as_after(store):
+    store.set(SourceType.DISCORD_FEEDBACK, "prev-999")
+    msgs = [{"id": "1000", "attachments": []}]
+    fetcher = FakeDiscordFetcher(messages=msgs)
+    coord = CatchupCoordinator(store=store, fetcher=fetcher)
+    _run(coord.replay_feedback_channel("ch-001"))
+    assert fetcher.calls[0]["after"] == "prev-999"
+
+
+def test_replay_fetch_error_returns_skipped(store):
+    class ErrorFetcher(DiscordFetcher):
+        async def fetch_after(self, channel_id, after_message_id, limit=200):
+            raise ConnectionError("Discord down")
+
+    coord = CatchupCoordinator(store=store, fetcher=ErrorFetcher())
+    result = _run(coord.replay_feedback_channel("ch-001"))
+    assert result.skipped
+    assert "fetch error" in result.skipped_reason
+
+
+# ── reconcile_gemini_quota ──────────────────────────────────────────
+
+
+def test_reconcile_gemini_quota_returns_dict(store, monkeypatch):
+    def fake_usage_summary():
+        return {"providers": [{"provider": "gemini", "current": 5, "cap": 30}]}
+
+    monkeypatch.setattr(
+        "ap_org_bot.infra.budget_gate.usage_summary",
+        fake_usage_summary,
+    )
+    coord = CatchupCoordinator(store=store)
+    result = coord.reconcile_gemini_quota()
+    assert "gemini_usage" in result
+    assert result["alert"] is False  # 5/30 = 16% — below 80%
+
+
+def test_reconcile_gemini_quota_alerts_at_80pct(store, monkeypatch):
+    def fake_usage_summary():
+        return {"providers": [{"provider": "gemini", "current": 25, "cap": 30}]}
+
+    monkeypatch.setattr(
+        "ap_org_bot.infra.budget_gate.usage_summary",
+        fake_usage_summary,
+    )
+    coord = CatchupCoordinator(store=store)
+    result = coord.reconcile_gemini_quota()
+    assert result["alert"] is True
+    assert "80%" in result.get("alert_reason", "") or "83%" in result.get("alert_reason", "")

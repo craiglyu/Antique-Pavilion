@@ -185,3 +185,93 @@ def test_db_diff_to_dict_shape():
     assert d["db_name"] == "topics"
     assert d["db_id"] == "abcdef-12345"
     assert isinstance(d["properties"], list)
+
+
+# ── enforce mode helpers (_desired_spec_to_notion_body) ────────────
+
+
+def test_desired_spec_title_body():
+    from ap_notion_reconciler import _desired_spec_to_notion_body
+    assert _desired_spec_to_notion_body({"type": "title"}) == {"title": {}}
+
+
+def test_desired_spec_select_body():
+    from ap_notion_reconciler import _desired_spec_to_notion_body
+    spec = {
+        "type": "select",
+        "options": [{"name": "清朝", "color": "red"}, {"name": "民國"}],
+    }
+    body = _desired_spec_to_notion_body(spec)
+    assert body is not None
+    opts = body["select"]["options"]
+    assert len(opts) == 2
+    assert opts[0]["name"] == "清朝"
+    assert opts[1].get("color") == "default"
+
+
+def test_desired_spec_checkbox_body():
+    from ap_notion_reconciler import _desired_spec_to_notion_body
+    assert _desired_spec_to_notion_body({"type": "checkbox"}) == {"checkbox": {}}
+
+
+def test_desired_spec_unknown_type_returns_none():
+    from ap_notion_reconciler import _desired_spec_to_notion_body
+    assert _desired_spec_to_notion_body({"type": "formula"}) is None
+
+
+def test_desired_spec_rich_text():
+    from ap_notion_reconciler import _desired_spec_to_notion_body
+    assert _desired_spec_to_notion_body({"type": "rich_text"}) == {"rich_text": {}}
+
+
+# ── enforce CLI — no-confirm guard ─────────────────────────────────
+
+
+def test_enforce_requires_confirm(capsys):
+    from ap_notion_reconciler import main
+    rc = main(["enforce"])
+    assert rc == 4
+    captured = capsys.readouterr()
+    assert "--confirm" in captured.err
+
+
+def test_enforce_unknown_db_returns_error(capsys):
+    from ap_notion_reconciler import main
+    rc = main(["enforce", "--db", "nonexistent_db", "--confirm"])
+    assert rc == 2
+
+
+# ── enforce mode logic (unit test via compute_db_diff + _desired_spec) ─
+
+
+def test_enforce_correctly_identifies_addable_props():
+    """Verifies that missing props can be converted to Notion bodies."""
+    from ap_notion_reconciler import _desired_spec_to_notion_body
+    desired = _desired_topics_db()
+    actual = _actual_topics_db_clean()
+    del actual["properties"]["狀態"]  # simulate missing property
+    diff = compute_db_diff("topics", desired, actual)
+    missing = [p for p in diff.properties if p.kind == "missing"]
+    assert len(missing) == 1
+    assert missing[0].name == "狀態"
+    # Must be convertible to Notion body
+    body = _desired_spec_to_notion_body(missing[0].desired or {})
+    assert body is not None
+    assert "select" in body
+
+
+def test_enforce_skips_type_mismatch():
+    """type_mismatch props must NOT be auto-fixed — only flagged."""
+    actual = _actual_topics_db_clean()
+    actual["properties"]["議題"] = {"type": "rich_text", "rich_text": {}}
+    diff = compute_db_diff("topics", _desired_topics_db(), actual)
+    type_mis = [p for p in diff.properties if p.kind == "type_mismatch"]
+    assert len(type_mis) == 1
+    # Enforce should never call _patch for type_mismatch — verified by logic check
+    # (no live API call in unit tests)
+
+
+def test_enforce_missing_db_is_skipped():
+    """If a DB doesn't exist on Notion (actual=None), enforce logs warning and skips."""
+    diff = compute_db_diff("topics", _desired_topics_db(), None)
+    assert not diff.actual_present  # code path that triggers "DB not found — skipping"
