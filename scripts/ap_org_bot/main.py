@@ -48,6 +48,8 @@ from ap_org_bot.handlers.feedback_poll import (  # noqa: E402
     check_expired_proposals,
     run_feedback_poll,
 )
+from ap_org_bot.handlers.catchup_protocol import CatchupCoordinator  # noqa: E402
+from ap_org_bot.handlers.discord_fetcher_real import RealDiscordFetcher  # noqa: E402
 from ap_org_bot.handlers.message import MessageDispatcher  # noqa: E402
 from ap_org_bot.handlers.proposal_actions import ProposalActionHandler  # noqa: E402
 from ap_org_bot.handlers.reaction import CouncilReactionHandler  # noqa: E402
@@ -199,6 +201,17 @@ def main() -> None:
             dev_channel=dev_channel,
             auto_dev=auto_dev,
             gas_dev=gas_dev,
+        )
+
+        # Sprint 4: CatchupCoordinator + RealDiscordFetcher — active replay wiring.
+        coord = CatchupCoordinator(fetcher=RealDiscordFetcher(bot))
+        startup_report = coord.on_bot_startup()
+        log.info(
+            "[catchup] startup audit: active=%d fresh=%d stale=%d missing=%d",
+            startup_report["active_topic_count"],
+            len(startup_report["fresh_watermarks"]),
+            len(startup_report["stale_watermarks"]),
+            len(startup_report["missing_watermarks"]),
         )
 
         async def _poll_once():
