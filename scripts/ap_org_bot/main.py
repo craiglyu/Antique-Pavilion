@@ -51,6 +51,8 @@ from ap_org_bot.handlers.feedback_poll import (  # noqa: E402
 from ap_org_bot.handlers.message import MessageDispatcher  # noqa: E402
 from ap_org_bot.handlers.proposal_actions import ProposalActionHandler  # noqa: E402
 from ap_org_bot.handlers.reaction import CouncilReactionHandler  # noqa: E402
+from ap_org_bot.council.agent_invoker_real import RealAgentInvoker  # noqa: E402
+from ap_org_bot.council.daemon import CouncilDaemon  # noqa: E402
 from ap_org_bot.handlers.scheduler import build_scheduler  # noqa: E402
 from ap_org_bot.handlers.slash import register_slash_commands  # noqa: E402
 from ap_org_bot.infra.claude_cli import HeadlessClient  # noqa: E402
@@ -107,6 +109,9 @@ def main() -> None:
 
     # ── Headless client + agents ──────────────────────────────────────
     claude = HeadlessClient()
+
+    # CouncilDaemon — wired into scheduler below; ticks at 11:00 / 20:00.
+    council_daemon = CouncilDaemon(invoker=RealAgentInvoker(claude))
 
     feedback_pm = FeedbackPMAgent(claude)
 
@@ -208,6 +213,7 @@ def main() -> None:
             sched = build_scheduler(
                 poll_coroutine=_poll_once,
                 expiry_coroutine=check_expired_proposals,
+                daemon_tick=council_daemon.poll_and_advance,
             )
             sched.start()
             on_ready._scheduler_started = True  # type: ignore[attr-defined]
