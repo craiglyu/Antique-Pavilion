@@ -5,6 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>吉寶軒 Jibao Xuan — 傳承・鑑光・典藏</title>
+    <!-- SEO / Open Graph -->
+    <meta name="description" content="吉寶軒 Jibao Xuan — 傳承精緻中式古董珍藏，誠邀藏家蒞臨典藏閣鑑賞。">
+    <meta property="og:title" content="吉寶軒 Jibao Xuan — 傳承・鑑光・典藏">
+    <meta property="og:description" content="傳承精緻中式古董珍藏，誠邀藏家蒞臨典藏閣鑑賞。">
+    <meta property="og:type" content="website">
+    <!-- og:image TODO: 請 Craig 指定封面圖 URL 後替換下方 placeholder -->
+    <meta property="og:image" content="https://example.com/og-cover.jpg">
+    <meta name="twitter:card" content="summary_large_image">
     <!-- Three-tier Chinese type system + Latin auction face -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -160,17 +168,29 @@
             padding: 80px 20px 20px;
             box-sizing: border-box;
             background: transparent;
-            transition: padding 0.6s ease, background 0.6s ease, backdrop-filter 0.6s ease,
-                        border-bottom 0.6s ease, box-shadow 0.6s ease;
+            transition: box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
-
-        header.header-compact {
+        /* Background fade handled by ::before — avoids painting background on every scroll frame */
+        header::before {
+            content: '';
+            position: absolute;
+            inset: 0;
             background: rgba(247, 244, 237, 0.92);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(196, 154, 69, 0.3);
+            opacity: 0;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        header.header-compact {
             padding: 16px 20px 12px;
             box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
+        }
+        header.header-compact::before {
+            opacity: 1;
         }
 
         /* Brand mark — font strategy:
@@ -911,10 +931,12 @@
             overflow: hidden;
         }
         #scroll-progress-bar {
-            width: 100%; height: 0%;
+            width: 100%; height: 100%;
             background: linear-gradient(to bottom, var(--gold), var(--seal-red));
             border-radius: 1px;
-            transition: height 0.1s linear;
+            transform: scaleY(0);
+            transform-origin: top center;
+            transition: transform 0.1s linear;
         }
 
         /* =========================================================
@@ -1308,22 +1330,21 @@
             width: 32px;
             height: 32px;
             opacity: 0.7;
-            transition: opacity 0.3s ease, transform 0.3s ease;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .footer-seal:hover {
             opacity: 1;
             transform: rotate(-3deg) scale(1.05);
         }
 
-        /* Category rail wrap + fade */
+        /* Category rail wrap + fade — 90% opaque paper bg is sufficient; no backdrop-filter needed */
         .category-rail-wrap {
             position: sticky;
             top: 72px;
             z-index: 90;
             margin-top: 400px;
             background: rgba(247, 244, 237, 0.90);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
         }
         .category-rail-wrap::after {
             content: '';
@@ -1390,10 +1411,10 @@
             to   { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* Skeleton loading */
-        @keyframes shimmer {
-            0%   { background-position: -400px 0; }
-            100% { background-position: 400px 0; }
+        /* Skeleton loading — shimmer uses transform: translateX (compositor-only, no layout) */
+        @keyframes shimmerSlide {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
         .skeleton-card {
             width: 100%;
@@ -1408,10 +1429,18 @@
         .skeleton-img {
             width: 50%; height: 420px;
             flex-shrink: 0;
+            background: var(--paper-500);
+            position: relative;
+            overflow: hidden;
+        }
+        .skeleton-img::after {
+            content: '';
+            position: absolute;
+            inset: 0;
             background: linear-gradient(90deg,
-                var(--paper-500) 0%, var(--paper-400) 50%, var(--paper-500) 100%);
-            background-size: 800px 100%;
-            animation: shimmer 1.6s ease-in-out infinite;
+                transparent 0%, var(--paper-400) 50%, transparent 100%);
+            transform: translateX(-100%);
+            animation: shimmerSlide 1.6s ease-in-out infinite;
         }
         .skeleton-info {
             width: 50%;
@@ -1425,17 +1454,31 @@
         .skeleton-line {
             height: 10px;
             border-radius: 5px;
-            background: linear-gradient(90deg,
-                var(--paper-500) 0%, var(--paper-400) 50%, var(--paper-500) 100%);
-            background-size: 800px 100%;
-            animation: shimmer 1.6s ease-in-out infinite;
+            background: var(--paper-500);
+            position: relative;
+            overflow: hidden;
         }
-        .skeleton-line:nth-child(1) { width: 30%; animation-delay: 0s; }
-        .skeleton-line:nth-child(2) { width: 60%; height: 24px; animation-delay: 0.1s; }
-        .skeleton-line:nth-child(3) { width: 45%; animation-delay: 0.2s; }
-        .skeleton-line:nth-child(4) { width: 90%; animation-delay: 0.1s; margin-top: 8px; }
-        .skeleton-line:nth-child(5) { width: 85%; animation-delay: 0.15s; }
-        .skeleton-line:nth-child(6) { width: 80%; animation-delay: 0.2s; }
+        .skeleton-line::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg,
+                transparent 0%, var(--paper-400) 50%, transparent 100%);
+            transform: translateX(-100%);
+            animation: shimmerSlide 1.6s ease-in-out infinite;
+        }
+        .skeleton-line:nth-child(1) { width: 30%; }
+        .skeleton-line:nth-child(1)::after { animation-delay: 0s; }
+        .skeleton-line:nth-child(2) { width: 60%; height: 24px; }
+        .skeleton-line:nth-child(2)::after { animation-delay: 0.1s; }
+        .skeleton-line:nth-child(3) { width: 45%; }
+        .skeleton-line:nth-child(3)::after { animation-delay: 0.2s; }
+        .skeleton-line:nth-child(4) { width: 90%; margin-top: 8px; }
+        .skeleton-line:nth-child(4)::after { animation-delay: 0.1s; }
+        .skeleton-line:nth-child(5) { width: 85%; }
+        .skeleton-line:nth-child(5)::after { animation-delay: 0.15s; }
+        .skeleton-line:nth-child(6) { width: 80%; }
+        .skeleton-line:nth-child(6)::after { animation-delay: 0.2s; }
 
         /* Tweaks panel */
         #tweaks-panel {
@@ -1595,6 +1638,29 @@
 
         } /* end @media (max-width: 768px) — BUGFIX: was missing closing brace */
 
+        /* clip-path fallback for browsers without inset() support (e.g. older iOS Safari) */
+        @supports not (clip-path: inset(0)) {
+            .modal-content {
+                clip-path: none;
+                transform: scaleY(0);
+                transform-origin: center center;
+                transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1),
+                            opacity 0.3s ease;
+            }
+            .modal-overlay.active .modal-content {
+                clip-path: none;
+                transform: scaleY(1);
+                opacity: 1;
+            }
+            .modal-overlay.closing .modal-content {
+                clip-path: none;
+                transform: scaleY(0);
+                opacity: 0;
+                transition: transform 0.24s cubic-bezier(0.4, 0, 1, 1),
+                            opacity 0.2s cubic-bezier(0.4, 0, 1, 1);
+            }
+        }
+
         /* CHANGE P0-01: Accessibility — honor user's motion preference (complete) */
         @media (prefers-reduced-motion: reduce) {
             *,
@@ -1610,9 +1676,15 @@
                 opacity: 1 !important;
                 transform: none !important;
             }
+            /* Snap modal open instantly — collapse clip-path and skip transform fallback */
             .modal-overlay.active .modal-content {
+                clip-path: inset(0 0 0 0 round 8px) !important;
                 transform: none !important;
                 opacity: 1 !important;
+            }
+            .modal-overlay.closing .modal-content {
+                clip-path: inset(50% 0 50% 0 round 8px) !important;
+                transform: none !important;
             }
         }
     </style>
@@ -1880,8 +1952,10 @@
                     對館藏器物有興趣，歡迎透過 LINE 私訊掌櫃，<br>
                     我們將於 24 小時內回覆您的詢問。
                 </p>
+                <!-- LINE_ID_PLACEHOLDER: replace href with https://line.me/ti/p/[YOUR_LINE_ID] and remove onclick when ready -->
                 <a class="contact-line-btn"
-                   href="https://line.me/ti/p/[YOUR_LINE_ID]"
+                   href="#"
+                   onclick="alert('LINE ID 待設定'); return false;"
                    target="_blank" rel="noopener noreferrer">
                     <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                         <path fill="currentColor"
@@ -2046,9 +2120,8 @@
                         const scrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
                         const maxScroll = Math.round(scrollHeight - window.innerHeight);
                         if (maxScroll > 0) {
-                            let progress = Math.floor((window.scrollY / maxScroll) * 100);
-                            progress = Math.min(Math.max(progress, 0), 100);
-                            progressBar.style.height = `${progress}%`;
+                            let progress = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
+                            progressBar.style.transform = `scaleY(${progress})`;
                         }
                         if (window.scrollY > 0 && window.scrollY >= maxScroll - 50) {
                             header.classList.add('header-compact');
@@ -2393,19 +2466,34 @@
             window.addEventListener('resize', resize); resize();
 
             let startTime = performance.now();
+            let pausedAt = 0;
+            let totalPaused = 0;
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
+            let rafId = null;
+
             function render(time) {
-                const dt = (time - startTime) * 0.001;
+                const dt = (time - startTime - totalPaused) * 0.001;
                 gl.uniform1f(timeLoc, dt);
                 gl.uniform2f(mouseLoc, mouseX, mouseY);
                 gl.clearColor(0, 0, 0, 0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
-                requestAnimationFrame(render);
+                rafId = requestAnimationFrame(render);
             }
-            requestAnimationFrame(render);
+            rafId = requestAnimationFrame(render);
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                    pausedAt = performance.now();
+                } else if (!rafId) {
+                    totalPaused += performance.now() - pausedAt;
+                    rafId = requestAnimationFrame(render);
+                }
+            });
         }
 
         /* ============ Artifacts fetch + render ============ */
@@ -2471,6 +2559,15 @@
                         card.style.cursor = 'pointer';
                         card.dataset.category = item.category || '';
                         card.setAttribute('onclick', `openModal(${index})`);
+                        card.setAttribute('tabindex', '0');
+                        card.setAttribute('role', 'button');
+                        card.setAttribute('aria-label', item.itemName || '典藏');
+                        card.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                openModal(index);
+                            }
+                        });
 
                         if (index < 6) card.classList.add('is-visible');
 
