@@ -68,3 +68,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ── 視覺回歸基線 / 效能基線 ──────────────────────────
+reports/_chrome_profile/
