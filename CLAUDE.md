@@ -274,7 +274,7 @@ Detailed rollback rationale: `scripts/ap_org_bot/MIGRATION.md`.
 | **1** | ✅ done (2026-04-30) | First real Council session + Curator agent + CLAUDE.md + Discord reaction handler + 109 tests |
 | **2** | ✅ done (2026-04-30) | Curator --apply / Auth Log schema migration spec / catchup_protocol skeleton / audit_runner 4-rule MVP (AP-1/5/6/7) / Council 9-state extension / notion_reconciler drift mode — 183 tests, 6.87s |
 | **3** | ✅ done (2026-05-02) | Council 9-state daemon (`council/daemon.py`) + catchup active replay + Gemini quota reconcile + audit AP-2/3/4/8 (8-rule full set) + notion_reconciler enforce mode — 253 tests, 3.60s |
-| **4** | 🚧 pending | Wire daemon + DiscordFetcher into main.py scheduler + daemon-poll CLI + migrations/ live + budget_governor full version |
+| **4** | 🟡 partial (2026-05-03) | ✅ Wire CouncilDaemon into 11:00/20:00 scheduler (`agent_invoker_real.py` + `scheduler.py daemon_tick`) / ✅ daemon-poll CLI / ✅ RealDiscordFetcher production wrapper / ✅ Emil UI audit P1+P2+P3 (10 items) / ✅ visual regression baseline (10 screenshots @ 5 viewports + perf metrics) — 266 passed + 2 skipped (apscheduler-only). Still pending: migrations/ live on bot startup + budget_governor full version |
 | **5** | ⬜ pending | GitHub branch protection + auto-merge (3-label gate) |
 
 Authoritative source: `AP_Sustainability_Roadmap_v0.2.md`.

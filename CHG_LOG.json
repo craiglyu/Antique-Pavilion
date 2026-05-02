@@ -3,6 +3,61 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-05-03T03:00:00Z",
+      "category": "feat",
+      "scope": "sprint-4.integration",
+      "version_from": "v0.4.0-rc1",
+      "version_to": "v0.5.0-rc1",
+      "summary": "Sprint 4 平行 sessions 整合 — 5 個 worktree (Sessions A/B/C/D/E) 收合到 main, 253→266 tests (+13), 2 skipped (apscheduler 只在 prod bot 機).",
+      "rationale": "Craig 晚上不在, 開 5 個 auto-pilot session 平行推進. 早上整合時發現所有 session 都branch off main, 沒看到 Sprint 3 (尚未 merge), 導致 Session B/D 各自重新發明 daemon.py, Session C 重新定義 DiscordFetcher Protocol. 整合策略: 先把 Sprint 3 ff-merge 到 main, 然後拆解後 sessions 只取 additive 部分.",
+      "breaking": false,
+      "rollback": "git revert <merge commits + cherry-pick commits>",
+      "blocks": [
+        {
+          "id": "S-A",
+          "name": "Emil UI audit P1+P2+P3 (10 items)",
+          "files": ["Publish/index.html (10 changes)", "reports/emil_audit_after/verification_report.md", "CHG_LOG.json"],
+          "merge_strategy": "no-ff merge, 手動 reconcile CHG_LOG.json (兩個 ts=05-02 entry 共存)"
+        },
+        {
+          "id": "S-E",
+          "name": "Visual regression baseline + perf metrics",
+          "files": ["tests/visual/baseline/*.png (10 screenshots)", "reports/perf_baseline_2026-05-02.json", "reports/console_baseline_2026-05-02.json", "scripts/take_baseline.py", ".gitignore"],
+          "merge_strategy": "no-ff merge, .claude/launch.json.local-bak 備份 Craig 本地版"
+        },
+        {
+          "id": "S-D",
+          "name": "daemon-poll CLI subcommand",
+          "files": ["scripts/ap_council_runner.py (+37)", "tests/test_ap_council_runner_daemon.py (+94, 3 tests)"],
+          "merge_strategy": "cherry-pick CLI + test only, 拋棄 Session D 的 daemon.py 重寫 (Sprint 3 已有 290 LoC 完整版)",
+          "note": "Session D CLI 是 duck-typed against to_dict(), 無痛接 Sprint 3 daemon"
+        },
+        {
+          "id": "S-C",
+          "name": "RealDiscordFetcher production wrapper",
+          "files": ["scripts/ap_org_bot/handlers/discord_fetcher_real.py (+109)", "tests/test_discord_fetcher_real.py (+184, 7 tests)"],
+          "merge_strategy": "重寫對齊 Sprint 3 的 DiscordFetcher base class (str channel_id + Optional[str] after_message_id + limit=200), 而非 Session C 自己定義的 Protocol (int + int + limit=100)"
+        },
+        {
+          "id": "S-B",
+          "name": "CouncilDaemon → 11:00/20:00 scheduler wiring",
+          "files": ["scripts/ap_org_bot/council/agent_invoker_real.py (+50)", "scripts/ap_org_bot/handlers/scheduler.py (+13)", "scripts/ap_org_bot/main.py (+5)", "tests/test_council_daemon_integration.py (+105, 3 pass + 2 skip)"],
+          "merge_strategy": "拋棄 Session B 的 daemon.py 重寫 (57 LoC stub) + apscheduler 直接 import (測試環境沒裝); 改用 importlib.util.find_spec 偵測 + skipif 保護, agent_invoker_real 顯式 inherit AgentInvoker base class"
+        }
+      ],
+      "test_growth": "Sprint 3 253 → Sprint 4 partial 266 (+13 tests, +2 skipped)",
+      "lessons_learned": [
+        "開平行 session 前要先 sync main: 5 個 session 都 branch off 過時 main, 不知道 Sprint 3 daemon.py 已存在",
+        "Prompt 寫「不要動 X」不夠: Session B/D 沒「動」既有檔案 (因為 main 上不存在), 而是建了新的; 應改成「先 git log 確認看到 Sprint 3 commit」",
+        "新依賴需明確禁止: Session B 的測試 import scheduler.py 而 scheduler 本就用 apscheduler — 但 prod 機有, dev 機沒有; importlib.util.find_spec + skipif 是正確 pattern"
+      ],
+      "still_pending_for_sprint_4_full": [
+        "migrations/ live on bot startup (notion_reconciler enforce)",
+        "budget_governor full version (per-call USD ledger, weekly/daily caps)"
+      ],
+      "files": ["multi-file integration commit"]
+    },
+    {
       "ts": "2026-05-03T02:00:00Z",
       "category": "fix",
       "scope": "ui.emil_audit",
