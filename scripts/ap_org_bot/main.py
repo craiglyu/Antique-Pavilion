@@ -51,6 +51,7 @@ from ap_org_bot.handlers.feedback_poll import (  # noqa: E402
 from ap_org_bot.handlers.catchup_protocol import CatchupCoordinator  # noqa: E402
 from ap_org_bot.handlers.discord_fetcher_real import RealDiscordFetcher  # noqa: E402
 from ap_org_bot.handlers.message import MessageDispatcher  # noqa: E402
+from ap_org_bot.handlers.migrations_runner import MigrationsRunner  # noqa: E402
 from ap_org_bot.handlers.proposal_actions import ProposalActionHandler  # noqa: E402
 from ap_org_bot.handlers.reaction import CouncilReactionHandler  # noqa: E402
 from ap_org_bot.council.agent_invoker_real import RealAgentInvoker  # noqa: E402
@@ -212,6 +213,19 @@ def main() -> None:
             len(startup_report["fresh_watermarks"]),
             len(startup_report["stale_watermarks"]),
             len(startup_report["missing_watermarks"]),
+        )
+
+        # Sprint 4: MigrationsRunner — Notion schema drift audit at startup.
+        # Set AP_MIGRATIONS_AUTO_APPLY=1 to enable additive auto-patch.
+        runner = MigrationsRunner(
+            auto_apply=env("AP_MIGRATIONS_AUTO_APPLY") == "1",
+            dry_run=env("AP_MIGRATIONS_AUTO_APPLY") != "1",
+        )
+        mig_report = runner.run_at_startup()
+        log.info(
+            "[migrations] startup audit: drift=%d applied=%d errors=%d (auto_apply=%s)",
+            mig_report["drift_found"], mig_report["applied"], len(mig_report["errors"]),
+            runner.auto_apply,
         )
 
         async def _poll_once():
