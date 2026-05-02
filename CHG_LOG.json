@@ -3,6 +3,46 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-05-03T22:00:00Z",
+      "category": "feat",
+      "scope": "sprint-4.completion",
+      "version_from": "v0.5.0-rc1",
+      "version_to": "v0.5.0",
+      "summary": "Sprint 4 完成 — 補上 MigrationsRunner (F) + BudgetGovernor (G) 兩件 pending. 266→284 tests (+18, F:6 + G:12).",
+      "rationale": "昨晚整合報告留下 Sprint 4 partial 狀態, Craig 開兩個 auto-pilot session F+G overnight 補完. Prompt 加強 (強制 git log 驗證 + 列既有契約 + 禁止新依賴) 後, 兩個 session 都 branch off 最新 main, 整合零衝突.",
+      "breaking": false,
+      "rollback": "git revert <merge commits>",
+      "blocks": [
+        {
+          "id": "S-F",
+          "name": "MigrationsRunner — startup Notion schema audit",
+          "files": ["scripts/ap_org_bot/handlers/migrations_runner.py (+231)", "scripts/ap_org_bot/main.py (+14 wiring)", "tests/test_migrations_runner.py (+145, 6 tests)"],
+          "design": "Safe-by-default dry-run audit; AP_MIGRATIONS_AUTO_APPLY=1 才會真的 PATCH Notion. 重用 ap_notion_reconciler 的 _patch_add_properties / _compare_schema, 不 subprocess CLI",
+          "merge_strategy": "no-ff merge — main.py wiring 純 additive, 跟 Session B/C 既有 wiring 不衝突"
+        },
+        {
+          "id": "S-G",
+          "name": "BudgetGovernor — full USD ledger + multi-window caps + attribution",
+          "files": ["scripts/ap_org_bot/infra/budget_governor.py (+228)", "tests/test_infra_budget_governor.py (+185, 12 tests)"],
+          "design": "EXTEND budget_gate (不 REPLACE): record_call() 內部仍 bump record_call_attempt() 維持 backward compat. 新 SQLite table budget_calls_v2 與 budget_gate 共用 DB. 三層 caps (daily/weekly/monthly USD)",
+          "callsite_migration": "本 session 故意不改 RealAgentInvoker / catchup_protocol callsites — 留給 Sprint 5",
+          "merge_strategy": "no-ff merge — 純新檔, 零衝突"
+        }
+      ],
+      "test_growth": "Sprint 4 partial 266 → Sprint 4 done 284 (+18 tests, +0 skipped diff)",
+      "lessons_validated": [
+        "強制 git log -12 開頭驗證 → 兩個 session 都從最新 main (f8dbb73) 分支, 沒人重發明 daemon.py",
+        "明確列「已存在、不要動的契約」+ API 簽名 → BudgetGovernor 正確 EXTEND budget_gate 而非 REPLACE",
+        "明確「不要新增 Python dependency」+ 「不要 wire 進 callsites」→ 兩 session 都嚴守邊界, 整合零衝突"
+      ],
+      "sprint_4_full_done": true,
+      "still_pending_for_sprint_5": [
+        "GitHub branch protection + 3-label auto-merge gate",
+        "把 RealAgentInvoker / catchup_protocol callsites 改成 BudgetGovernor.record_call() (而非 budget_gate.record_call_attempt())",
+        "topic_id 屬性 wire 進 RealAgentInvoker (供 BudgetGovernor.attribution_by_topic 用)"
+      ]
+    },
+    {
       "ts": "2026-05-03T03:00:00Z",
       "category": "feat",
       "scope": "sprint-4.integration",
