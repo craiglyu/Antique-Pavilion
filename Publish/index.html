@@ -192,7 +192,8 @@
             font-weight: normal;
             color: var(--ink);
             margin: 0;
-            letter-spacing: 0.2rem;
+            /* CHANGE A1: letter-spacing 直接設為最終值 1.5rem，不參與動畫（避免 layout reflow） */
+            letter-spacing: 1.5rem;
             filter: blur(10px);
             opacity: 0;
             transform: scale(0.95);
@@ -204,10 +205,11 @@
             will-change: filter, transform, opacity;
         }
 
+        /* CHANGE A1: remove letter-spacing from keyframes — non-compositor.
+           只 animate opacity / transform / filter，全部走 GPU compositor，無 layout reflow */
         @keyframes titleReveal {
             100% {
                 opacity: 1;
-                letter-spacing: 1.5rem;
                 filter: blur(0px) drop-shadow(4px 4px 0px rgba(196, 154, 69, 0.2));
                 transform: scale(1);
             }
@@ -401,7 +403,8 @@
             color: var(--paper-100);
             font-family: var(--font-latin);
             font-size: 0.65rem;
-            font-weight: 500;
+            /* CHANGE A4: font-weight 500 → 400，符合品牌「400 only」原則 */
+            font-weight: 400;
             line-height: 18px;
             text-align: center;
             border-radius: 9px;
@@ -750,7 +753,8 @@
         }
         .lot-num-val {
             color: var(--gold-700);
-            font-weight: 500;
+            /* CHANGE A4: font-weight 500 → 400，符合品牌「400 only」原則 */
+            font-weight: 400;
         }
 
         /* Item typography */
@@ -1483,7 +1487,8 @@
             letter-spacing: 0.3em;
             color: var(--gold-700);
             text-transform: none;
-            font-weight: 500;
+            /* CHANGE A4: font-weight 500 → 400，符合品牌「400 only」原則 */
+            font-weight: 400;
         }
         #tweaks-panel label {
             display: block;
@@ -1616,8 +1621,11 @@
             .skeleton-card { flex-direction: column !important; }
             .skeleton-img { width: 100% !important; height: 240px !important; }
             .skeleton-info { width: 100%; padding: 24px 20px; }
+        }
 
-        /* CHANGE C5-b: 品牌金色 focus-visible ring，符合 WCAG 鍵盤導航要求 */
+        /* CHANGE A2: move focus-visible to global scope — WCAG 2.4.7
+           原本被困在 @media (max-width: 768px) 內，桌面鍵盤使用者看不到 focus ring。
+           移出 media query → 所有斷點都有金色 2px focus ring */
         .cat-btn:focus-visible,
         .modal-close:focus-visible,
         .modal-nav:focus-visible,
@@ -1815,7 +1823,8 @@
         <!-- CHANGE C5-d: 加入 aria-hidden="true" — 純裝飾性 SVG -->
         <svg id="scroll-seal" viewBox="0 0 20 20" aria-hidden="true"><!-- CHANGE C6: currentColor inherits from #scroll-seal { color: var(--seal-red) } -->
             <rect x="2" y="2" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
-            <text x="10" y="14" text-anchor="middle" font-family="Noto Serif TC, serif" font-size="9" fill="currentColor" font-weight="600">軒</text>
+            <!-- CHANGE A4: font-weight 600 → 400，符合品牌「400 only」原則 -->
+            <text x="10" y="14" text-anchor="middle" font-family="Noto Serif TC, serif" font-size="9" fill="currentColor" font-weight="400">軒</text>
         </svg>
         <div id="scroll-progress-track">
             <div id="scroll-progress-bar"></div>
@@ -2546,16 +2555,24 @@
             }
         }
 
-        /* CHANGE C1: 卡片 3D tilt 視差效果初始化 */
+        /* CHANGE A3: cache getBoundingClientRect on mouseenter, not mousemove
+           原本每次 mousemove 都呼叫 getBoundingClientRect() 觸發 layout recalculation，
+           造成中階手機 ≤30fps jank。改為 mouseenter 時快取，mousemove 直接使用 cachedRect。 */
         function initCardTilt() {
             const cards = document.querySelectorAll('.card');
             cards.forEach(card => {
+                let cachedRect = null;
+
+                card.addEventListener('mouseenter', () => {
+                    cachedRect = card.getBoundingClientRect();
+                });
+
                 card.addEventListener('mousemove', (e) => {
-                    const rect = card.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const centerX = rect.width / 2;
-                    const centerY = rect.height / 2;
+                    if (!cachedRect) cachedRect = card.getBoundingClientRect();
+                    const x = e.clientX - cachedRect.left;
+                    const y = e.clientY - cachedRect.top;
+                    const centerX = cachedRect.width / 2;
+                    const centerY = cachedRect.height / 2;
                     
                     // 計算滑鼠相對於卡片中心的偏移（-1 到 1）
                     const percentX = (x - centerX) / centerX;
@@ -2570,6 +2587,7 @@
                 });
                 
                 card.addEventListener('mouseleave', () => {
+                    cachedRect = null;
                     card.classList.remove('tilt-active');
                     card.style.transform = '';
                 });
