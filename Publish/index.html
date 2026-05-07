@@ -1664,6 +1664,21 @@
             .brand-title { opacity: 1 !important; filter: none !important; transform: none !important; }
         }
 
+        /* CHANGE C3: contact section scroll-reveal entrance animation */
+        .contact-reveal {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.7s cubic-bezier(0.25, 1, 0.5, 1),
+                        transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .contact-reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .contact-reveal { opacity: 1 !important; transform: none !important; }
+        }
+
         /* CHANGE C8: SVG <text> presentation attrs can't resolve CSS vars.
            Apply font via a class so CSS (which CAN resolve vars) handles it. */
         .svg-display-text {
@@ -1778,7 +1793,7 @@
     </div>
 
     <!-- Contact Section -->
-    <section id="contact" class="contact-section">
+    <section id="contact" class="contact-section contact-reveal">
         <div class="contact-inner">
             <div class="contact-brand">
                 <div class="contact-seal" aria-hidden="true">
@@ -1959,6 +1974,21 @@
             initWebGLFog();
             initTweaks();
             initCategoryFilter();
+
+            /* CHANGE C3: contact section scroll-reveal — 使用 .is-visible class 重用 revealObserver
+               或直接用獨立 observer 切換 .visible class */
+            const contactSection = document.getElementById('contact');
+            if (contactSection) {
+                const contactObserver = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            observer.unobserve(entry.target);
+                        }
+                    });
+                }, { threshold: 0.2 });
+                contactObserver.observe(contactSection);
+            }
 
             /* CHANGE C3: strip will-change from brand-title once titleReveal completes
                (keeping will-change alive after animation wastes a compositor layer) */
@@ -2468,6 +2498,8 @@
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
+            /* CHANGE C2: WebGL loop 加上 Page Visibility Gate — 分頁背景時暗長 */
+            let rafId = null;
             function render(time) {
                 const dt = (time - startTime) * 0.001;
                 gl.uniform1f(timeLoc, dt);
@@ -2475,9 +2507,22 @@
                 gl.clearColor(0, 0, 0, 0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
-                requestAnimationFrame(render);
+                rafId = requestAnimationFrame(render);
             }
-            requestAnimationFrame(render);
+            rafId = requestAnimationFrame(render);
+
+            /* CHANGE C2: 分頁隱藏時取消 raf，重新可見時重啟（調整 startTime 防時間跳躍）*/
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    if (rafId !== null) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
+                } else if (rafId === null) {
+                    startTime = performance.now();
+                    rafId = requestAnimationFrame(render);
+                }
+            });
         }
 
         /* ============ Artifacts fetch + render ============ */
@@ -2543,6 +2588,16 @@
                         card.style.cursor = 'pointer';
                         card.dataset.category = item.category || '';
                         card.setAttribute('onclick', `openModal(${index})`);
+                        /* CHANGE C1: card keyboard accessibility — tabindex, role=button, keydown Enter/Space */
+                        card.setAttribute('tabindex', '0');
+                        card.setAttribute('role', 'button');
+                        card.setAttribute('aria-label', `${item.itemName || '典藏'}, ${item.era || '年代不詳'}`);
+                        card.addEventListener('keydown', (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                openModal(index);
+                            }
+                        });
 
                         if (index < 6) card.classList.add('is-visible');
 
