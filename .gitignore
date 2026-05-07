@@ -71,3 +71,7 @@ desktop.ini
 
 # ── 視覺回歸基線 / 效能基線 ──────────────────────────
 reports/_chrome_profile/
+
+# Claude Design Loop (auto-generated)
+DESIGN_BRIEF_NEXT.md
+memory/design_review_log.md
