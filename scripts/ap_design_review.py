@@ -120,10 +120,11 @@ def analyze(html: str, diff: str) -> dict:
     violations, warnings, passes = [], [], []
 
     for pattern, desc, category in VIOLATIONS:
-        # diff 中新增行（+ 開頭）才算
+        # diff 中新增行（+ 開頭）才算；跳過 CSS custom property 定義行（--var-name: ...）
         new_lines = "\n".join(
             line[1:] for line in diff.splitlines()
             if line.startswith("+") and not line.startswith("+++")
+            and not line.lstrip("+").lstrip().startswith("--")  # skip CSS var defs
         )
         if re.search(pattern, new_lines, re.IGNORECASE):
             violations.append(f"[{category.upper()}] {desc}")
@@ -165,11 +166,10 @@ def score(analysis: dict) -> dict:
 # ── Brief 生成 ────────────────────────────────────────────────────────────────
 
 NEXT_TASKS = [
-    "C1: 卡片 3D tilt 視差效果（±3° rotateXY，mousemove 驅動）",
-    "C2: 捲軸印章隨滾動進度旋轉（rotate(progress × 15 - 7.5 deg)）",
-    "C4: 分類篩選按鈕加上藏品數量 badge",
-    "C5: 8px grid 間距微調（item-era / material-badges → 16px；ruyi-divider margin → 32px）",
-    "B4: 聯絡區塊補入實際地址、電話、營業時間（Craig 提供資料後）",
+    # C1/C2/C4 done in Round 4. C5 is next micro-polish.
+    "C5: 8px grid 間距微調（item-era / material-badges gap→16px；ruyi-divider margin→32px；card padding 24→32px）",
+    "E1: 漸進式圖片載入 — 對 Drive thumbnail 加 IntersectionObserver lazy-load + blur-in reveal（替換 eager-load）",
+    "E2: 骨架卡片 — gallery 尚未載入時顯示 3 張 skeleton card（pulse 動畫，純 CSS）",
 ]
 
 def generate_brief(round_n: int, commit_hash: str, commit_msg: str,
