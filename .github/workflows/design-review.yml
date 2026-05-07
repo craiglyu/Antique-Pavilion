@@ -1,8 +1,11 @@
 name: 🎨 吉寶軒 Design Review Loop
 
-# 觸發條件：任何 branch 只要 Publish/index.html 被改動
+# 觸發條件：push 或 PR 只要包含 Publish/index.html
 on:
   push:
+    paths:
+      - 'Publish/index.html'
+  pull_request:
     paths:
       - 'Publish/index.html'
 
@@ -12,7 +15,9 @@ jobs:
     runs-on: ubuntu-latest
 
     # 防止 bot commit 觸發無限迴圈
-    if: "!contains(github.event.head_commit.message, '[design-bot]')"
+    if: |
+      !contains(github.event.head_commit.message, '[design-bot]') &&
+      !contains(github.event.pull_request.title, '[design-bot]')
 
     permissions:
       contents: write   # 允許 commit 回 repo
