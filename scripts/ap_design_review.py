@@ -238,6 +238,13 @@ def generate_brief(round_n: int, commit_hash: str, commit_msg: str,
 - 在修改處加上 `/* CHANGE [任務代號]: 說明 */` 註解
 - 確保所有現有功能（modal、WebGL fog、category filter、scroll-seal）保持運作
 
+**完成後 Craig 的 git 指令（直接推 main，不用開 PR branch）**：
+```bash
+git add Publish/index.html
+git commit -m "design: Round {round_n + 1} — [本輪任務摘要]"
+git push origin main
+```
+
 ---
 """
 
