@@ -213,6 +213,8 @@
                have time to load before title becomes visible → no per-char font swap FOUT */
             animation: titleReveal 2s 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
             transition: all 0.5s ease;
+            /* CHANGE C3: promote to compositor thread for blur → opacity → scale animation */
+            will-change: filter, transform, opacity;
         }
 
         @keyframes titleReveal {
@@ -438,6 +440,13 @@
             position: relative;
             overflow: hidden;
             min-height: 100dvh;
+            /* CHANGE D3: opening fade-in — wrapper appears with a 0.3s delay after
+               the body paints so the ink-wash bg is already visible beneath it */
+            animation: pageWrapperReveal 1.2s 0.3s cubic-bezier(0.25, 1, 0.5, 1) both;
+        }
+        @keyframes pageWrapperReveal {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
         .gallery-container {
@@ -472,8 +481,10 @@
         .card.from-left  { transform: translateY(20px) translateX(-60px); }
         .card.from-right { transform: translateY(20px) translateX(60px); }
         .card.is-visible { opacity: 1; transform: translateY(0) translateX(0); }
+        /* CHANGE C9: is-visible 後加回 opacity transition，避免 filter-hiding 閃爍 */
         .card.is-visible {
-            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+            transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
                         box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .card:hover {
@@ -562,12 +573,16 @@
             top: -50%; left: -50%;
             background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='c'><feTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 0.95  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23c)'/></svg>");
             opacity: 0.4;
+            /* CHANGE B5: 預設暫停，僅在 card 進入中心視窗時啟動 — 節省非聚焦卡片的 GPU */
             animation: drift 60s linear infinite;
+            animation-play-state: paused;
             pointer-events: none;
             z-index: 3;
             transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .card:hover .moving-cloud { opacity: 0; }
+        /* CHANGE B5: 中心卡片才播放雲動畫 */
+        .card.in-center .moving-cloud { animation-play-state: running; }
         @keyframes drift { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .focus-border {
@@ -754,6 +769,7 @@
             color: var(--fg-muted);
             margin: 0 0 16px;
             text-transform: uppercase;
+            font-variant-numeric: tabular-nums; /* CHANGE D6: tabular alignment for lot numbers */
         }
         .lot-num-val {
             color: var(--gold-700);
@@ -880,6 +896,33 @@
             overflow: hidden;
         }
 
+        /* CHANGE B1: 金句 highlight blockquote — card variant (compact) */
+        .highlight-quote {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            line-height: 1.75;
+            color: var(--gold-700);
+            border-left: 2px solid var(--gold-300);
+            padding: 6px 12px;
+            margin: 0 0 14px;
+            background: linear-gradient(90deg, rgba(196,154,69,0.06) 0%, transparent 100%);
+            letter-spacing: 0.06em;
+            font-style: normal;
+        }
+        /* Modal variant — slightly larger */
+        .modal-highlight-quote {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            line-height: 1.85;
+            color: var(--gold-700);
+            border-left: 2px solid var(--gold-500);
+            padding: 10px 16px;
+            margin: 0 0 20px;
+            background: linear-gradient(90deg, rgba(196,154,69,0.07) 0%, transparent 100%);
+            letter-spacing: 0.06em;
+            font-style: normal;
+        }
+
         .tags { font-size: 0.9rem; }
         .tag {
             color: var(--fg-muted);
@@ -922,7 +965,8 @@
             z-index: 200;
             pointer-events: none;
         }
-        #scroll-seal { width: 24px; height: 24px; margin-bottom: 6px; }
+        /* CHANGE C6: use CSS var so Tweaks panel seal-red override propagates to scroll-seal */
+        #scroll-seal { width: 24px; height: 24px; margin-bottom: 6px; color: var(--seal-red); }
         #scroll-progress-track {
             width: 2px; height: 50dvh;
             background: rgba(196, 154, 69, 0.25);
@@ -994,10 +1038,12 @@
             opacity: 1;
         }
 
+        /* CHANGE TIER A2: modal-close 改為 <button>，尺寸升至 44×44px 符合 WCAG 觸控目標 */
         .modal-close {
             position: absolute;
             top: 20px; right: 20px;
-            width: 40px; height: 40px;
+            width: 44px; height: 44px;
+            border: none;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.10);
             display: flex;
@@ -1009,8 +1055,34 @@
             color: var(--paper-300);
             font-size: 1.5rem;
             line-height: 1;
+            padding: 0;
         }
         .modal-close:hover { background: rgba(255, 255, 255, 0.20); color: var(--paper-100); }
+
+        /* CHANGE B2: modal prev/next navigation arrows */
+        .modal-nav {
+            position: absolute;
+            top: 50%; transform: translateY(-50%);
+            width: 44px; height: 44px;
+            background: rgba(255, 255, 255, 0.10);
+            color: var(--paper-300);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 2px;
+            font-size: 1.5rem; line-height: 1;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.18s, color 0.18s;
+            z-index: 10;
+        }
+        .modal-nav:hover { background: rgba(255, 255, 255, 0.22); color: var(--paper-100); }
+        .modal-nav.prev { left: 8px; }
+        .modal-nav.next { right: 8px; }
+        .modal-nav:disabled { opacity: 0; pointer-events: none; }
+        @media (max-width: 768px) {
+            .modal-nav { top: auto; bottom: 46px; transform: none; }
+            .modal-nav.prev { left: 16px; }
+            .modal-nav.next { right: 16px; }
+        }
 
         .modal-left {
             width: 52%;
@@ -1025,6 +1097,15 @@
             max-width: 100%; max-height: 100%;
             object-fit: contain;
             filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45));
+            /* CHANGE B3: click-to-zoom */
+            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            cursor: zoom-in;
+            transform-origin: center center;
+        }
+        .modal-img.zoomed {
+            transform: scale(1.85);
+            cursor: zoom-out;
+            filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.6));
         }
 
         .modal-right {
@@ -1171,23 +1252,6 @@
             box-shadow: none;
         }
 
-        /* Tweaks panel */
-        #tweaks-panel {
-            position: fixed;
-            right: 20px; bottom: 20px;
-            width: 260px;
-            background: rgba(247, 244, 237, 0.97);
-            border: 1px solid rgba(196, 154, 69, 0.4);
-            border-radius: 6px;
-            padding: 16px 18px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            font-family: var(--font-display);
-            font-size: 0.85rem;
-            color: var(--fg-1);
-            z-index: 500;
-            display: none;
-        }
-
         /* =========================================================
            Contact Section — 洽詢典藏
            ========================================================= */
@@ -1263,6 +1327,17 @@
             margin: 0;
             letter-spacing: 0.05em;
         }
+        /* CHANGE TIER A1: LINE 按鈕為「即將開放」狀態，禁用互動 */
+        .contact-line-btn[aria-disabled="true"] {
+            cursor: not-allowed;
+            opacity: 0.85;
+        }
+        .contact-line-btn[aria-disabled="true"]:hover {
+            background: transparent;
+            color: var(--line-green);
+            transform: none;
+            box-shadow: none;
+        }
         .contact-line-btn {
             display: inline-flex;
             align-items: center;
@@ -1325,6 +1400,12 @@
             padding: 0 20px;
             opacity: 0.85;
         }
+        /* CHANGE C8: SVG <text> presentation attrs can't resolve CSS vars.
+           Apply font via a class so CSS (which CAN resolve vars) handles it. */
+        .svg-display-text {
+            font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
+        }
+
         /* CHANGE P2-08: footer brand seal */
         .footer-seal {
             width: 32px;
@@ -1676,6 +1757,14 @@
                 opacity: 1 !important;
                 transform: none !important;
             }
+            /* CHANGE D3: page wrapper is opacity:0 by default via animation 'both' fill */
+            .page-wrapper { opacity: 1 !important; transform: none !important; }
+            /* CHANGE D5: .ruyi-center starts opacity:0 and fades in via animation;
+               without motion the animation is killed → dot stays invisible.
+               Force it visible so the gold anchor dot still shows. */
+            .ruyi-center { opacity: 1 !important; }
+            /* Also ensure brand-title is visible without the blur-reveal animation */
+            .brand-title { opacity: 1 !important; filter: none !important; transform: none !important; }
             /* Snap modal open instantly — collapse clip-path and skip transform fallback */
             .modal-overlay.active .modal-content {
                 clip-path: inset(0 0 0 0 round 8px) !important;
@@ -1914,7 +2003,7 @@
         <!-- Category filter — 懸絲標籤 rail (built dynamically from sheet data) -->
         <div class="category-rail-wrap">
             <div class="category-rail" id="categoryFilter"
-                 role="tablist" aria-label="器物分類篩選">
+                 role="tablist" aria-label="典藏分類篩選">
             <button class="cat-btn active" data-cat="all"
                     role="tab" aria-selected="true" aria-controls="gallery">
                 <span class="cat-glyph">全</span>
@@ -1937,10 +2026,11 @@
                     <svg viewBox="0 0 50 50" width="56" height="56">
                         <rect x="5" y="5" width="40" height="40" rx="4"
                               fill="var(--paper)" stroke="var(--seal-red)" stroke-width="2.5"/>
-                        <text x="50%" y="35%" dominant-baseline="middle" text-anchor="middle"
-                              font-family="var(--font-display)" font-size="13" fill="var(--seal-red)">吉</text>
-                        <text x="50%" y="68%" dominant-baseline="middle" text-anchor="middle"
-                              font-family="var(--font-display)" font-size="13" fill="var(--seal-red)">寶</text>
+                        <!-- CHANGE C8: use class not presentation attr for font-family -->
+                        <text class="svg-display-text" x="50%" y="35%" dominant-baseline="middle" text-anchor="middle"
+                              font-size="13" fill="var(--seal-red)">吉</text>
+                        <text class="svg-display-text" x="50%" y="68%" dominant-baseline="middle" text-anchor="middle"
+                              font-size="13" fill="var(--seal-red)">寶</text>
                     </svg>
                 </div>
                 <h2 class="contact-title">洽詢典藏</h2>
@@ -1952,10 +2042,12 @@
                     對館藏器物有興趣，歡迎透過 LINE 私訊掌櫃，<br>
                     我們將於 24 小時內回覆您的詢問。
                 </p>
-                <!-- LINE_ID_PLACEHOLDER: replace href with https://line.me/ti/p/[YOUR_LINE_ID] and remove onclick when ready -->
+                <!-- LINE_ID_PLACEHOLDER: replace href with https://line.me/ti/p/[YOUR_LINE_ID] and remove aria-disabled when ready -->
                 <a class="contact-line-btn"
                    href="#"
-                   onclick="alert('LINE ID 待設定'); return false;"
+                   aria-disabled="true"
+                   title="LINE 洽詢即將開放，敬請期待"
+                   onclick="event.preventDefault(); return false;"
                    target="_blank" rel="noopener noreferrer">
                     <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                         <path fill="currentColor"
@@ -1975,12 +2067,13 @@
         <svg class="footer-seal" viewBox="0 0 32 48" aria-hidden="true" style="width:32px;height:48px;">
             <rect x="2" y="2" width="28" height="44" rx="2"
                   fill="var(--paper-400)" stroke="var(--seal-red)" stroke-width="1.8"/>
-            <text x="50%" y="26%" dominant-baseline="middle" text-anchor="middle"
-                  font-family="var(--font-display)" font-size="11" fill="var(--seal-red)">吉</text>
-            <text x="50%" y="52%" dominant-baseline="middle" text-anchor="middle"
-                  font-family="var(--font-display)" font-size="11" fill="var(--seal-red)">寶</text>
-            <text x="50%" y="78%" dominant-baseline="middle" text-anchor="middle"
-                  font-family="var(--font-display)" font-size="11" fill="var(--seal-red)">軒</text>
+            <!-- CHANGE C8: class resolves vars; presentation attr cannot -->
+            <text class="svg-display-text" x="50%" y="26%" dominant-baseline="middle" text-anchor="middle"
+                  font-size="11" fill="var(--seal-red)">吉</text>
+            <text class="svg-display-text" x="50%" y="52%" dominant-baseline="middle" text-anchor="middle"
+                  font-size="11" fill="var(--seal-red)">寶</text>
+            <text class="svg-display-text" x="50%" y="78%" dominant-baseline="middle" text-anchor="middle"
+                  font-size="11" fill="var(--seal-red)">軒</text>
         </svg>
         <div>© 2026 吉寶軒 Jibao Xuan &nbsp;·&nbsp; 典藏器物圖片及資料受著作權保護</div>
         <p class="footer-disclaimer">
@@ -1990,9 +2083,9 @@
 
     <!-- Scroll progress -->
     <div id="scroll-progress-wrap">
-        <svg id="scroll-seal" viewBox="0 0 20 20">
-            <rect x="2" y="2" width="16" height="16" rx="2" fill="none" stroke="#8a2a2a" stroke-width="1.5" />
-            <text x="10" y="14" text-anchor="middle" font-family="Noto Serif TC, serif" font-size="9" fill="#8a2a2a" font-weight="600">軒</text>
+        <svg id="scroll-seal" viewBox="0 0 20 20"><!-- CHANGE C6: currentColor inherits from #scroll-seal { color: var(--seal-red) } -->
+            <rect x="2" y="2" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
+            <text x="10" y="14" text-anchor="middle" font-family="Noto Serif TC, serif" font-size="9" fill="currentColor" font-weight="600">軒</text>
         </svg>
         <div id="scroll-progress-track">
             <div id="scroll-progress-bar"></div>
@@ -2002,9 +2095,12 @@
     <!-- Modal -->
     <div class="modal-overlay" id="artifactModal">
         <div class="modal-content">
-            <div class="modal-close" onclick="closeModal()">✕</div>
+            <button class="modal-close" aria-label="關閉典藏詳情" onclick="closeModal()">✕</button>
+            <!-- CHANGE B2: 上下藏品導覽 -->
+            <button class="modal-nav prev" id="modalPrev" aria-label="上一件典藏" onclick="navigateModal(-1)">‹</button>
+            <button class="modal-nav next" id="modalNext" aria-label="下一件典藏" onclick="navigateModal(1)">›</button>
             <div class="modal-left">
-                <img src="" alt="藏品詳情圖" class="modal-img" id="modalImg">
+                <img src="" alt="典藏詳情圖" class="modal-img" id="modalImg">
             </div>
             <div class="modal-right">
                 <h2 class="modal-title" id="modalTitle"></h2>
@@ -2020,10 +2116,13 @@
                     <div class="appraisal-note" id="modalDisplayRec"></div>
                 </div>
                 <div class="modal-story" id="modalStory"></div>
+                <!-- CHANGE B1: highlightQuote 金句 blockquote -->
+                <blockquote class="modal-highlight-quote" id="modalHighlightQuote" style="display:none;"></blockquote>
                 <div class="modal-tags" id="modalTags"></div>
+                <!-- CHANGE TIER A4: 術語統一「典藏」 -->
                 <button class="modal-action"
                         onclick="closeModal(); setTimeout(() => document.getElementById('contact').scrollIntoView({behavior:'smooth'}), 280);">
-                    洽詢收藏
+                    洽詢典藏
                 </button>
             </div>
         </div>
@@ -2096,8 +2195,26 @@
             initTweaks();
             initCategoryFilter();
 
+            /* CHANGE C3: strip will-change from brand-title once titleReveal completes
+               (keeping will-change alive after animation wastes a compositor layer) */
+            const brandTitle = document.querySelector('.brand-title');
+            if (brandTitle) {
+                brandTitle.addEventListener('animationend', () => {
+                    brandTitle.style.willChange = 'auto';
+                }, { once: true });
+            }
+
             document.getElementById('artifactModal').addEventListener('click', function (e) {
                 if (e.target === this) closeModal();
+            });
+
+            /* CHANGE TIER A3 + B2: ESC closes, ← → navigates modal */
+            document.addEventListener('keydown', e => {
+                const isOpen = document.getElementById('artifactModal').classList.contains('active');
+                if (e.key === 'Escape') { closeModal(); return; }
+                if (!isOpen) return;
+                if (e.key === 'ArrowLeft')  { e.preventDefault(); navigateModal(-1); }
+                if (e.key === 'ArrowRight') { e.preventDefault(); navigateModal(1); }
             });
 
             const header = document.getElementById('main-header');
@@ -2288,9 +2405,31 @@
         }
 
         /* ============ Modal ============ */
+        /* CHANGE B2: track index for prev/next nav */
+        let currentModalIndex = -1;
+
+        function navigateModal(direction) {
+            const target = currentModalIndex + direction;
+            if (!artifactsData || target < 0 || target >= artifactsData.length) return;
+            /* quick clip-path exit → re-open new item */
+            const overlay = document.getElementById('artifactModal');
+            overlay.classList.add('closing');
+            setTimeout(() => {
+                overlay.classList.remove('closing');
+                openModal(target);
+            }, 160);
+        }
+
         function openModal(index) {
             const item = artifactsData[index];
             if (!item) return;
+
+            /* CHANGE B2: persist index + update nav button states */
+            currentModalIndex = index;
+            const prevBtn = document.getElementById('modalPrev');
+            const nextBtn = document.getElementById('modalNext');
+            if (prevBtn) prevBtn.disabled = index <= 0;
+            if (nextBtn) nextBtn.disabled = index >= (artifactsData.length - 1);
 
             let highResUrl = item.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='80' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='18' fill='%238a6f2f' letter-spacing='6' opacity='0.6'>暫無圖片</text></svg>";
             if (item.imageUrl) {
@@ -2310,6 +2449,17 @@
 
             document.getElementById('modalStory').textContent = item.story || '暫無故事描述。';
 
+            /* CHANGE B1: highlightQuote 金句 */
+            const quoteEl = document.getElementById('modalHighlightQuote');
+            if (quoteEl) {
+                if (item.highlightQuote) {
+                    quoteEl.textContent = item.highlightQuote;
+                    quoteEl.style.display = '';
+                } else {
+                    quoteEl.style.display = 'none';
+                }
+            }
+
             const tagsHtml = item.tags
                 ? item.tags.split(/[\s，,、]+/).filter(Boolean)
                     .map(t => { const c = t.replace(/^[#＃]/, '').replace(/[，,、]$/, '').trim(); return c ? `<span class="tag">#${c}</span>` : ''; })
@@ -2328,12 +2478,20 @@
             }
 
             document.body.style.overflow = 'hidden';
+
+            /* CHANGE B3: click-to-zoom — reset zoom state each time modal opens */
+            const modalImgEl = document.getElementById('modalImg');
+            modalImgEl.classList.remove('zoomed');
+            modalImgEl.onclick = () => modalImgEl.classList.toggle('zoomed');
+
             document.getElementById('artifactModal').classList.add('active');
         }
 
         function closeModal() {
             const overlay = document.getElementById('artifactModal');
             overlay.classList.add('closing');
+            /* CHANGE B3: always reset zoom on close */
+            document.getElementById('modalImg').classList.remove('zoomed');
             setTimeout(() => {
                 overlay.classList.remove('active', 'closing');
                 document.body.style.overflow = '';
@@ -2342,6 +2500,16 @@
 
         /* ============ WebGL fog (preserved) ============ */
         function initWebGLFog() {
+            /* CHANGE B6: skip shader on low-core / low-memory devices to avoid jank */
+            const cores = navigator.hardwareConcurrency || 4;
+            const memGB = navigator.deviceMemory || 4;
+            if (cores <= 4 || memGB < 4) {
+                console.info('[JBX] WebGL fog disabled — low-core device (cores=%d, mem=%dGB)', cores, memGB);
+                const canvas = document.getElementById('glCanvas');
+                if (canvas) canvas.style.display = 'none';
+                return;
+            }
+
             const canvas = document.getElementById('glCanvas');
             const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
             if (!gl) { console.warn("WebGL not supported"); return; }
@@ -2599,6 +2767,7 @@
                                     <p class="item-story">${item.story || '暫無故事描述。'}</p>
                                     <span class="read-more-hint" aria-hidden="true">展開詳情 ›</span>
                                 </div>
+                                ${item.highlightQuote ? `<blockquote class="highlight-quote">${item.highlightQuote}</blockquote>` : ''}
                                 <div class="tags">${tagsHtml}</div>
                             </div>
                         `;
