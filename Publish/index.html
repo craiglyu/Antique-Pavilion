@@ -5,14 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>吉寶軒 Jibao Xuan — 傳承・鑑光・典藏</title>
-    <!-- SEO / Open Graph -->
-    <meta name="description" content="吉寶軒 Jibao Xuan — 傳承精緻中式古董珍藏，誠邀藏家蒞臨典藏閣鑑賞。">
-    <meta property="og:title" content="吉寶軒 Jibao Xuan — 傳承・鑑光・典藏">
-    <meta property="og:description" content="傳承精緻中式古董珍藏，誠邀藏家蒞臨典藏閣鑑賞。">
-    <meta property="og:type" content="website">
-    <!-- og:image TODO: 請 Craig 指定封面圖 URL 後替換下方 placeholder -->
-    <meta property="og:image" content="https://example.com/og-cover.jpg">
-    <meta name="twitter:card" content="summary_large_image">
     <!-- Three-tier Chinese type system + Latin auction face -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,9 +38,6 @@
             --ink-400:    #999999;
             --ink-300:    #bdbdbd;
 
-            /* CHANGE P0-02: LINE brand color as CSS variable */
-            --line-green: #06C755;
-
             /* Paper / neutrals */
             --paper-100:  #ffffff;
             --paper-200:  #fbf9f3;
@@ -65,7 +54,7 @@
             --fg-1: var(--ink-800);
             --fg-2: var(--ink-600);
             --fg-3: var(--ink-500);
-            --fg-muted: #6b6b6b;        /* CHANGE P0-03: contrast boost to WCAG AA 4.5:1 */
+            --fg-muted: var(--ink-400);
 
             /* Lines */
             --rule-hair: 1px solid rgba(44, 44, 44, 0.12);
@@ -168,29 +157,17 @@
             padding: 80px 20px 20px;
             box-sizing: border-box;
             background: transparent;
-            transition: box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: padding 0.6s ease, background 0.6s ease, backdrop-filter 0.6s ease,
+                        border-bottom 0.6s ease, box-shadow 0.6s ease;
         }
-        /* Background fade handled by ::before — avoids painting background on every scroll frame */
-        header::before {
-            content: '';
-            position: absolute;
-            inset: 0;
+
+        header.header-compact {
             background: rgba(247, 244, 237, 0.92);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(196, 154, 69, 0.3);
-            opacity: 0;
-            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        header.header-compact {
             padding: 16px 20px 12px;
             box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
-        }
-        header.header-compact::before {
-            opacity: 1;
         }
 
         /* Brand mark — font strategy:
@@ -378,7 +355,7 @@
             justify-content: center;
             gap: 0;
             padding: 0 40px 32px;
-            max-width: 820px;
+            max-width: 1100px;
             margin: 0 auto;
             border-bottom: var(--rule-hair);
         }
@@ -396,13 +373,41 @@
             transition: background 0.3s ease;
             position: relative;
         }
+        /* CHANGE C4: 藏品數量 badge */
+        .cat-count {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            background: var(--gold-500);
+            color: var(--paper-100);
+            font-family: var(--font-latin);
+            font-size: 0.65rem;
+            font-weight: 500;
+            line-height: 18px;
+            text-align: center;
+            border-radius: 9px;
+            box-shadow: 0 2px 6px rgba(196, 154, 69, 0.35);
+            opacity: 0.92;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .cat-btn:hover .cat-count {
+            opacity: 1;
+            transform: scale(1.08);
+        }
+        .cat-btn.active .cat-count {
+            background: var(--seal-red);
+            opacity: 1;
+        }
         .cat-btn:first-child { border-left: var(--rule-hair); }
         .cat-glyph {
             font-family: var(--font-plaque);
             font-size: 1.4rem;
             color: var(--fg-3);
             line-height: 1;
-            transition: color 0.3s ease, transform 0.3s cubic-bezier(0.25, 1, 0.5, 1); /* CHANGE P1-06: smooth scale */
+            transition: color 0.3s ease;
         }
         .cat-label {
             font-family: var(--font-display);
@@ -424,10 +429,7 @@
         }
         .cat-btn:hover .cat-glyph { color: var(--fg-1); }
         .cat-btn:hover .cat-label { color: var(--fg-2); }
-        .cat-btn.active .cat-glyph {
-            color: var(--gold);
-            transform: scale(1.1); /* CHANGE P1-06: active state emphasis */
-        }
+        .cat-btn.active .cat-glyph { color: var(--gold); }
         .cat-btn.active .cat-label { color: var(--gold-700); }
         .cat-btn.active::after { transform: scaleX(1); }
 
@@ -441,13 +443,13 @@
         }
 
         .gallery-container {
-            max-width: 820px;
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 200px 40px 80px;
+            padding: 360px 40px 100px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 60px;
+            gap: 80px;
         }
 
         /* Cards */
@@ -482,6 +484,19 @@
             z-index: 10;
         }
 
+        /* CHANGE C1: 3D tilt 視差效果 — mousemove 驅動 ±3° rotateXY */
+        .card {
+            perspective: 1000px;
+            transform-style: preserve-3d;
+        }
+        .card.is-visible:not(:hover) {
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                        box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card.tilt-active {
+            transition: none;
+        }
+
         /* FIX-05 — 中式裱裱四角裝飾 L 型角飾 */
         .card::before, .card::after {
             content: '';
@@ -501,33 +516,13 @@
             bottom: 8px; right: 8px;
             border-width: 0 1px 1px 0;
         }
-        .card:hover::before,
-        .card:hover::after { opacity: 1; }
 
-        /* 四角 L 框完整版 — 右上角 (img-box::before) + 左下角 (info-box::after) */
-        .img-box::before {
-            content: '';
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            border-color: rgba(196, 154, 69, 0.35);
-            border-style: solid;
-            border-width: 1px 1px 0 0;
-            top: 8px;
-            right: 8px;
-            z-index: 5;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.6s ease;
-        }
-        .card:hover .img-box::before { opacity: 1; }
         .img-box {
             width: 50%;
-            aspect-ratio: 4/3;
-            height: auto;
+            height: 450px;
             position: relative;
             overflow: hidden;
-            background: var(--paper-500);
+            background: var(--paper-500);  /* warm tone during image load */
             flex-shrink: 0;
         }
         .antique-img {
@@ -601,30 +596,8 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            transition: background-color 0.4s ease; /* CHANGE P2-07: hover lightening prep */
             /* gold dividing line via ::before only — no static border-left */
         }
-        /* R3-02: info-box hover lightening — completes the transition prep above */
-        .card:hover .info-box { background-color: var(--paper-300); }
-
-        /* CHANGE R2-01: bottom-left corner via info-box::after */
-        .info-box::after {
-            content: '';
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            border-color: rgba(196, 154, 69, 0.35);
-            border-style: solid;
-            border-width: 0 0 1px 1px;
-            bottom: 8px;
-            left: 8px;
-            z-index: 5;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.6s ease;
-        }
-        .card:hover .info-box::after { opacity: 1; }
-
         .info-box::before {
             content: '';
             position: absolute;
@@ -647,29 +620,12 @@
             right: 0;
         }
 
-        /* 朝代水印 — 年代首字浮於 info-box 右下，3% 透明度，器物自述時代 */
-        .era-watermark {
-            position: absolute;
-            bottom: -16px;
-            right: 12px;
-            font-family: var(--font-plaque);
-            font-size: 7rem;
-            font-weight: 400;
-            color: var(--ink);
-            opacity: 0.035;
-            line-height: 1;
-            pointer-events: none;
-            user-select: none;
-            z-index: 0;
-            letter-spacing: 0;
-        }
-
-        /* DP-002: card proportion variants — R3-03: aspect-ratio replaces fixed heights */
-        .card--portrait .img-box  { width: 42%; aspect-ratio: 3/4; height: auto; }
+        /* DP-002: card proportion variants */
+        .card--portrait .img-box  { width: 42%; height: 540px; }
         .card--portrait .info-box { width: 58%; }
-        .card--landscape .img-box  { width: 58%; aspect-ratio: 4/3; height: auto; }
+        .card--landscape .img-box  { width: 58%; height: 380px; }
         .card--landscape .info-box { width: 42%; }
-        .card--feature .img-box  { width: 62%; aspect-ratio: 16/10; height: auto; }
+        .card--feature .img-box  { width: 62%; height: 520px; }
         /* Feature info-box: flush-top so seal + lot-number form header row */
         .card--feature .info-box { width: 38%; padding: 16px 40px 50px; justify-content: flex-start; }
 
@@ -683,14 +639,10 @@
         }
         .seal-svg {
             width: 100%; height: 100%;
-            transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: transform 0.4s ease;
             overflow: visible;
         }
         .seal-wrapper:hover .seal-svg { transform: scale(1.1) rotate(-5deg); }
-        .seal-wrapper:active .seal-svg {
-            transform: scale(0.88) rotate(-8deg);
-            transition: transform 0.08s cubic-bezier(0.4, 0, 1, 1);
-        }
         .seal-bg {
             fill: var(--paper);
             stroke: var(--seal-red);
@@ -765,7 +717,7 @@
             font-family: var(--font-display);
             font-weight: 400;
             font-size: 1.75rem;
-            margin: 0 0 16px; /* CHANGE P2-09: breathing space after title */
+            margin: 0 0 10px;
             color: var(--fg-1);
             line-height: 1.35;
             letter-spacing: 0.04em;
@@ -781,24 +733,10 @@
             letter-spacing: 0.18em;
             color: var(--gold-700);
             text-transform: uppercase;
+            border-bottom: var(--rule-dash);
             padding-bottom: 14px;
             margin-bottom: 18px;
-            position: relative;
         }
-        /* C — 筆觸金線：從左向右畫出，卡片進入 viewport 時觸發 */
-        .item-era::after {
-            content: '';
-            position: absolute;
-            bottom: 0; left: 0;
-            width: 100%; height: 1px;
-            background: var(--rule-dash);
-            background-image: none;
-            border-bottom: var(--rule-dash);
-            transform: scaleX(0);
-            transform-origin: left center;
-            transition: transform 0.9s 0.25s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-        .card.is-visible .item-era::after { transform: scaleX(1); }
         .item-era::before {
             content: '';
             display: inline-block;
@@ -815,19 +753,8 @@
             gap: 4px;
             margin: 8px 0 12px;
             padding-bottom: 14px;
-            position: relative;
-        }
-        .material-badges::after {
-            content: '';
-            position: absolute;
-            bottom: 0; left: 0;
-            width: 100%; height: 1px;
             border-bottom: var(--rule-dash);
-            transform: scaleX(0);
-            transform-origin: left center;
-            transition: transform 0.9s 0.45s cubic-bezier(0.25, 1, 0.5, 1);
         }
-        .card.is-visible .material-badges::after { transform: scaleX(1); }
         .badge {
             font-family: var(--font-display);
             font-size: 0.72rem;
@@ -922,7 +849,14 @@
             z-index: 200;
             pointer-events: none;
         }
-        #scroll-seal { width: 24px; height: 24px; margin-bottom: 6px; }
+        /* CHANGE C2: 印章隨滾動進度旋轉 — rotate(progress × 15 - 7.5 deg) */
+        #scroll-seal {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 6px;
+            transition: transform 0.1s linear;
+            will-change: transform;
+        }
         #scroll-progress-track {
             width: 2px; height: 50dvh;
             background: rgba(196, 154, 69, 0.25);
@@ -931,12 +865,10 @@
             overflow: hidden;
         }
         #scroll-progress-bar {
-            width: 100%; height: 100%;
+            width: 100%; height: 0%;
             background: linear-gradient(to bottom, var(--gold), var(--seal-red));
             border-radius: 1px;
-            transform: scaleY(0);
-            transform-origin: top center;
-            transition: transform 0.1s linear;
+            transition: height 0.1s linear;
         }
 
         /* =========================================================
@@ -963,12 +895,11 @@
             transition: opacity 0.24s cubic-bezier(0.4, 0, 1, 1),
                         visibility 0.24s;
         }
-        /* E — 捲軸收起：從中心向上下收縮，2× 快於展開 */
         .modal-overlay.closing .modal-content {
-            clip-path: inset(50% 0 50% 0 round 8px);
+            transform: scale(0.97) translateY(8px);
             opacity: 0;
-            transition: clip-path 0.24s cubic-bezier(0.4, 0, 1, 1),
-                        opacity 0.2s cubic-bezier(0.4, 0, 1, 1);
+            transition: transform 0.24s cubic-bezier(0.4, 0, 1, 1),
+                        opacity 0.24s cubic-bezier(0.4, 0, 1, 1);
         }
 
         .modal-content {
@@ -982,15 +913,13 @@
             flex-direction: row;
             overflow: hidden;
             position: relative;
-            /* E — 捲軸展開：從中心向上下展開，如手卷被攤開 */
-            clip-path: inset(50% 0 50% 0 round 8px);
+            transform: scale(0.95) translateY(20px);
             opacity: 0;
-            transition: clip-path 0.55s cubic-bezier(0.25, 1, 0.5, 1),
-                        opacity 0.3s ease;
+            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
             border: 1px solid rgba(196, 154, 69, 0.3);
         }
         .modal-overlay.active .modal-content {
-            clip-path: inset(0 0 0 0 round 8px);
+            transform: scale(1) translateY(0);
             opacity: 1;
         }
 
@@ -1015,7 +944,7 @@
         .modal-left {
             width: 52%;
             background: linear-gradient(160deg, var(--ink-800) 0%, var(--ink-900) 100%);
-            box-shadow: inset 0 0 160px rgba(0, 0, 0, 0.65), inset 0 0 60px rgba(0, 0, 0, 0.35); /* R3-01: double-vignette — edges to black, object stays lit */
+            box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.4);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1268,8 +1197,8 @@
             align-items: center;
             gap: 10px;
             padding: 14px 36px;
-            border: 1px solid var(--line-green); /* CHANGE P0-02: use CSS variable */
-            color: var(--line-green);
+            border: 1px solid #06C755;
+            color: #06C755;
             font-family: var(--font-display);
             font-size: 0.95rem;
             letter-spacing: 0.15em;
@@ -1282,7 +1211,7 @@
                         box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .contact-line-btn:hover {
-            background: var(--line-green); /* CHANGE P0-02: use CSS variable */
+            background: #06C755;
             color: #ffffff;
             transform: translateY(-3px);
             box-shadow: 0 12px 30px rgba(6, 199, 85, 0.25);
@@ -1302,49 +1231,17 @@
             background: var(--ink-900);
             color: var(--fg-muted);
             text-align: center;
-            padding: 32px 20px 24px; /* CHANGE P2-08: top padding for seal */
+            padding: 24px 20px;
             font-family: var(--font-latin);
             font-size: 0.78rem;
             letter-spacing: 0.12em;
             border-top: 1px solid rgba(196, 154, 69, 0.2);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-        }
-        /* AP-5 compliance disclaimer — required by audit_runner Tier 1 policy
-           (CLAUDE.md §5; 對外宣稱不可宣稱絕對鑑定權威性) */
-        .footer-disclaimer {
-            font-family: var(--font-display);
-            font-size: 0.68rem;
-            color: var(--fg-muted);
-            letter-spacing: 0.06em;
-            line-height: 1.8;
-            max-width: 560px;
-            margin: -4px auto 0;
-            padding: 0 20px;
-            opacity: 0.85;
-        }
-        /* CHANGE P2-08: footer brand seal */
-        .footer-seal {
-            width: 32px;
-            height: 32px;
-            opacity: 0.7;
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .footer-seal:hover {
-            opacity: 1;
-            transform: rotate(-3deg) scale(1.05);
         }
 
-        /* Category rail wrap + fade — 90% opaque paper bg is sufficient; no backdrop-filter needed */
+        /* Category rail wrap + fade */
         .category-rail-wrap {
-            position: sticky;
-            top: 72px;
-            z-index: 90;
-            margin-top: 400px;
-            background: rgba(247, 244, 237, 0.90);
+            position: relative;
+            margin-top: 300px;
         }
         .category-rail-wrap::after {
             content: '';
@@ -1375,26 +1272,6 @@
             pointer-events: none;
         }
 
-        /* R3-04: 展開詳情 hover invite — floats above the fade mask */
-        .read-more-hint {
-            position: absolute;
-            bottom: 4px;
-            right: 0;
-            font-family: var(--font-display);
-            font-size: 0.72rem;
-            letter-spacing: 0.2em;
-            color: var(--gold-500);
-            opacity: 0;
-            transform: translateY(4px);
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            pointer-events: none;
-            z-index: 2;
-        }
-        .card:hover .read-more-hint {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
         /* Filter transition */
         .card.filter-hiding {
             opacity: 0;
@@ -1411,10 +1288,10 @@
             to   { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* Skeleton loading — shimmer uses transform: translateX (compositor-only, no layout) */
-        @keyframes shimmerSlide {
-            0%   { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
+        /* Skeleton loading */
+        @keyframes shimmer {
+            0%   { background-position: -400px 0; }
+            100% { background-position: 400px 0; }
         }
         .skeleton-card {
             width: 100%;
@@ -1429,18 +1306,10 @@
         .skeleton-img {
             width: 50%; height: 420px;
             flex-shrink: 0;
-            background: var(--paper-500);
-            position: relative;
-            overflow: hidden;
-        }
-        .skeleton-img::after {
-            content: '';
-            position: absolute;
-            inset: 0;
             background: linear-gradient(90deg,
-                transparent 0%, var(--paper-400) 50%, transparent 100%);
-            transform: translateX(-100%);
-            animation: shimmerSlide 1.6s ease-in-out infinite;
+                var(--paper-500) 0%, var(--paper-400) 50%, var(--paper-500) 100%);
+            background-size: 800px 100%;
+            animation: shimmer 1.6s ease-in-out infinite;
         }
         .skeleton-info {
             width: 50%;
@@ -1454,31 +1323,17 @@
         .skeleton-line {
             height: 10px;
             border-radius: 5px;
-            background: var(--paper-500);
-            position: relative;
-            overflow: hidden;
-        }
-        .skeleton-line::after {
-            content: '';
-            position: absolute;
-            inset: 0;
             background: linear-gradient(90deg,
-                transparent 0%, var(--paper-400) 50%, transparent 100%);
-            transform: translateX(-100%);
-            animation: shimmerSlide 1.6s ease-in-out infinite;
+                var(--paper-500) 0%, var(--paper-400) 50%, var(--paper-500) 100%);
+            background-size: 800px 100%;
+            animation: shimmer 1.6s ease-in-out infinite;
         }
-        .skeleton-line:nth-child(1) { width: 30%; }
-        .skeleton-line:nth-child(1)::after { animation-delay: 0s; }
-        .skeleton-line:nth-child(2) { width: 60%; height: 24px; }
-        .skeleton-line:nth-child(2)::after { animation-delay: 0.1s; }
-        .skeleton-line:nth-child(3) { width: 45%; }
-        .skeleton-line:nth-child(3)::after { animation-delay: 0.2s; }
-        .skeleton-line:nth-child(4) { width: 90%; margin-top: 8px; }
-        .skeleton-line:nth-child(4)::after { animation-delay: 0.1s; }
-        .skeleton-line:nth-child(5) { width: 85%; }
-        .skeleton-line:nth-child(5)::after { animation-delay: 0.15s; }
-        .skeleton-line:nth-child(6) { width: 80%; }
-        .skeleton-line:nth-child(6)::after { animation-delay: 0.2s; }
+        .skeleton-line:nth-child(1) { width: 30%; animation-delay: 0s; }
+        .skeleton-line:nth-child(2) { width: 60%; height: 24px; animation-delay: 0.1s; }
+        .skeleton-line:nth-child(3) { width: 45%; animation-delay: 0.2s; }
+        .skeleton-line:nth-child(4) { width: 90%; animation-delay: 0.1s; margin-top: 8px; }
+        .skeleton-line:nth-child(5) { width: 85%; animation-delay: 0.15s; }
+        .skeleton-line:nth-child(6) { width: 80%; animation-delay: 0.2s; }
 
         /* Tweaks panel */
         #tweaks-panel {
@@ -1609,7 +1464,7 @@
 
             /* ── Category rail ── */
             .category-rail-wrap {
-                margin-top: 280px;
+                margin-top: 0;
             }
             .category-rail-wrap::after { display: block; }
             .category-rail {
@@ -1636,55 +1491,13 @@
             .skeleton-img { width: 100% !important; height: 240px !important; }
             .skeleton-info { width: 100%; padding: 24px 20px; }
 
-        } /* end @media (max-width: 768px) — BUGFIX: was missing closing brace */
-
-        /* clip-path fallback for browsers without inset() support (e.g. older iOS Safari) */
-        @supports not (clip-path: inset(0)) {
-            .modal-content {
-                clip-path: none;
-                transform: scaleY(0);
-                transform-origin: center center;
-                transition: transform 0.55s cubic-bezier(0.25, 1, 0.5, 1),
-                            opacity 0.3s ease;
-            }
-            .modal-overlay.active .modal-content {
-                clip-path: none;
-                transform: scaleY(1);
-                opacity: 1;
-            }
-            .modal-overlay.closing .modal-content {
-                clip-path: none;
-                transform: scaleY(0);
-                opacity: 0;
-                transition: transform 0.24s cubic-bezier(0.4, 0, 1, 1),
-                            opacity 0.2s cubic-bezier(0.4, 0, 1, 1);
-            }
-        }
-
-        /* CHANGE P0-01: Accessibility — honor user's motion preference (complete) */
+        /* Accessibility — honor user's motion preference */
         @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
+            *, *::before, *::after {
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;
                 transition-duration: 0.01ms !important;
-                transition-delay: 0ms !important;
                 scroll-behavior: auto !important;
-            }
-            .card.is-visible {
-                opacity: 1 !important;
-                transform: none !important;
-            }
-            /* Snap modal open instantly — collapse clip-path and skip transform fallback */
-            .modal-overlay.active .modal-content {
-                clip-path: inset(0 0 0 0 round 8px) !important;
-                transform: none !important;
-                opacity: 1 !important;
-            }
-            .modal-overlay.closing .modal-content {
-                clip-path: inset(50% 0 50% 0 round 8px) !important;
-                transform: none !important;
             }
         }
     </style>
@@ -1698,183 +1511,49 @@
                 <path d="M0.05,0.05 Q0.1,0 0.5,0.02 T0.95,0.05 Q1,0.1 0.98,0.5 T0.95,0.95 Q0.9,1 0.5,0.98 T0.05,0.95 Q0,0.9 0.02,0.5 T0.05,0.05 Z" />
             </clipPath>
 
-            <!-- CHANGE R2-03: Ruyi cloud redesign based on jade dragon pendant reference
-                 Structure: 3 ruyi-head lobes + S-curve spine + spiral tail
-                 Direction: x=280 (centre end) → x=0 (tail end) for scaleX(-1) mirror
-                 Jade reference: 如意頭 = mushroom-cap crown + inward-curl sides + open bottom
-            -->
-            <!-- CHANGE R2-03 v2: Ruyi cloud redrawn from white-jade pendant reference (Opus rebuild)
-                 Anatomy of authentic 如意雲紋 (per pendant photo):
-                   - Each head = symmetric DOUBLE-SCROLL: V-notched crown + paired inward curls
-                   - Two small "scroll-ears" 捲耳 on each side, NOT a smooth dome
-                   - Heads linked by tight wave-ridge, not loose S
-                   - Tail terminates in a multi-loop tight spiral (蝸牛殼)
-                   - Jade-carving feel: outer outline + inner shadow groove (雙線陰刻)
-                 Direction: x=280 (centre, big head) → x=0 (tail tip spiral)
-                 Mirror: parent uses scaleX(-1) for opposite side.
+            <!-- ============ 祥雲 — 捲雲紋 auspicious cloud half-unit ============
+                 Design ref: 祥雲1.jpg / 祥雲2.jpg (Design folder)
+                 Structure: overlapping circle lobes (雲朵) + curling tail (捲雲尾)
+                            + white highlight arcs (筆觸感光澤) + gold spiral accent (捲雲渦)
+                 This half is reflected (scaleX -1) for the right side.
+                 Lobe layout (right=near centre, left=tail):
+                   A cx=265 cy=37 r=15  — leading lobe (nearest centre)
+                   B cx=243 cy=24 r=18  — upper main lobe
+                   C cx=212 cy=38 r=21  — anchor lobe (largest)
+                   D cx=229 cy=12 r=10  — small summit lobe
+                   E cx=182 cy=44 r=15  — trailing lobe
+                 Tail: S-curve from E, fading to the outer edge.
             -->
             <symbol id="ruyi-chain" viewBox="0 0 300 70" overflow="visible">
-                <!--
-                  重繪：卷草連雲 (juǎn cǎo lián yún) — 參考玉雕龍形佩的捲雲紋
-                  形制：三個 C 弧捲草單元，每個單元由主弧 + 上下雙捲尾組成
-                        以流動脊線串連，尾端收成蝸牛殼螺旋
-                  方向：x=300（接中心金點）→ x=0（尾端）
-                  每個捲草單元（卷草頭）的結構：
-                    ① 主弧：C 形開口向右（接脊線），弧頂升至 y≈10-18
-                    ② 上捲尾：弧頂捲回，形成一個緊密的 C 形小圈
-                    ③ 下捲尾：弧底捲入，與脊線過渡
-                -->
+                <!-- Trailing tail — graceful S-curve, fades outward -->
+                <path d="M 167 48 C 148 57 118 55 92 48 C 68 41 44 40 22 46 C 12 49 5 47 0 51"
+                      fill="none" stroke="rgba(196,154,69,0.28)" stroke-width="1.8" stroke-linecap="round"/>
 
-                <!-- ══════════════════════════════════
-                     脊線（貫穿全圖的流動骨架）
-                     ══════════════════════════════════ -->
-                <path d="M 292 36
-                         C 278 32 262 30 248 34
-                         C 234 38 218 40 204 36
-                         C 190 32 174 30 160 34
-                         C 146 38 130 42 116 40
-                         C 102 38 86 40 70 46
-                         C 54 52 36 54 18 52"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.28)"
-                      stroke-width="0.9"
-                      stroke-linecap="round"/>
+                <!-- Cloud lobes, painted back → front for layering -->
+                <circle cx="182" cy="44" r="15"
+                        fill="rgba(240,234,218,0.20)" stroke="rgba(196,154,69,0.34)" stroke-width="1.1"/>
+                <circle cx="229" cy="12" r="10"
+                        fill="rgba(240,234,218,0.20)" stroke="rgba(196,154,69,0.32)" stroke-width="0.9"/>
+                <circle cx="212" cy="38" r="21"
+                        fill="rgba(240,234,218,0.24)" stroke="rgba(196,154,69,0.40)" stroke-width="1.2"/>
+                <circle cx="243" cy="24" r="18"
+                        fill="rgba(240,234,218,0.24)" stroke="rgba(196,154,69,0.40)" stroke-width="1.1"/>
+                <circle cx="265" cy="37" r="15"
+                        fill="rgba(240,234,218,0.20)" stroke="rgba(196,154,69,0.34)" stroke-width="1.0"/>
 
-                <!-- ══════════════════════════════════
-                     捲草 1 — 大（中心端，x≈248-292）
-                     ══════════════════════════════════ -->
-                <!-- 主弧：從脊線 x=292 起，向左上畫大 C 弧，到 x=248 回脊線 -->
-                <path d="M 292 36
-                         C 290 26 284 14 274 10
-                         C 264 6 254 10 250 20
-                         C 247 28 250 36 256 38"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.65)"
-                      stroke-width="2.0"
-                      stroke-linecap="round"/>
-                <!-- 上捲尾：弧頂 (x≈274,y≈10) 向右捲入小圈 -->
-                <path d="M 274 10
-                         C 280 8 286 12 284 18
-                         C 282 24 276 25 273 20
-                         C 270 16 273 12 277 13"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.58)"
-                      stroke-width="1.6"
-                      stroke-linecap="round"/>
-                <!-- 下捲尾：弧底 (x≈256,y≈38) 向下捲入，接脊線過渡 -->
-                <path d="M 256 38
-                         C 252 44 250 52 254 58
-                         C 258 63 265 62 266 56
-                         C 267 51 263 47 258 48
-                         C 254 49 254 54 258 55"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.50)"
-                      stroke-width="1.5"
-                      stroke-linecap="round"/>
-                <!-- 玉雕高光：主弧外緣（模擬玉面受光） -->
-                <path d="M 287 16 C 282 10 275 8 269 11"
-                      fill="none"
-                      stroke="rgba(255,255,255,0.52)"
-                      stroke-width="1.1"
-                      stroke-linecap="round"/>
+                <!-- White highlight arcs — 筆觸光澤 depth illusion -->
+                <path d="M 194 20 A 21 21 0 0 1 231 36"
+                      fill="none" stroke="rgba(255,255,255,0.52)" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M 228 13 A 18 18 0 0 1 259 24"
+                      fill="none" stroke="rgba(255,255,255,0.46)" stroke-width="1.3" stroke-linecap="round"/>
+                <path d="M 250 22 A 15 15 0 0 1 278 37"
+                      fill="none" stroke="rgba(255,255,255,0.38)" stroke-width="1.0" stroke-linecap="round"/>
+                <path d="M 170 31 A 15 15 0 0 1 196 44"
+                      fill="none" stroke="rgba(255,255,255,0.32)" stroke-width="0.9" stroke-linecap="round"/>
 
-                <!-- ══════════════════════════════════
-                     捲草 2 — 中（x≈160-204）
-                     ══════════════════════════════════ -->
-                <path d="M 204 36
-                         C 202 27 196 16 187 12
-                         C 178 8 169 12 166 21
-                         C 163 29 166 36 172 38"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.60)"
-                      stroke-width="1.8"
-                      stroke-linecap="round"/>
-                <!-- 上捲尾 -->
-                <path d="M 187 12
-                         C 193 10 198 14 197 20
-                         C 196 25 190 27 187 22
-                         C 184 18 187 14 191 15"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.52)"
-                      stroke-width="1.4"
-                      stroke-linecap="round"/>
-                <!-- 下捲尾 -->
-                <path d="M 172 38
-                         C 168 44 167 52 171 57
-                         C 175 62 181 61 182 55
-                         C 183 50 179 46 175 47
-                         C 171 48 171 53 175 54"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.44)"
-                      stroke-width="1.4"
-                      stroke-linecap="round"/>
-                <!-- 玉雕高光 -->
-                <path d="M 200 18 C 195 12 188 10 182 13"
-                      fill="none"
-                      stroke="rgba(255,255,255,0.46)"
-                      stroke-width="1.0"
-                      stroke-linecap="round"/>
-
-                <!-- ══════════════════════════════════
-                     捲草 3 — 小（x≈80-130）
-                     ══════════════════════════════════ -->
-                <path d="M 130 40
-                         C 128 32 123 22 115 18
-                         C 107 14 99 18 97 26
-                         C 95 33 98 40 104 41"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.54)"
-                      stroke-width="1.6"
-                      stroke-linecap="round"/>
-                <!-- 上捲尾 -->
-                <path d="M 115 18
-                         C 121 16 126 20 125 26
-                         C 124 31 118 33 115 28
-                         C 112 24 115 20 119 21"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.46)"
-                      stroke-width="1.3"
-                      stroke-linecap="round"/>
-                <!-- 下捲尾 -->
-                <path d="M 104 41
-                         C 100 47 99 55 103 60
-                         C 107 64 113 63 114 57
-                         C 115 52 111 48 107 49
-                         C 103 50 103 55 107 56"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.38)"
-                      stroke-width="1.3"
-                      stroke-linecap="round"/>
-                <!-- 玉雕高光 -->
-                <path d="M 126 24 C 122 18 116 16 111 19"
-                      fill="none"
-                      stroke="rgba(255,255,255,0.38)"
-                      stroke-width="0.9"
-                      stroke-linecap="round"/>
-
-                <!-- ══════════════════════════════════
-                     尾端流線 + 蝸牛殼螺旋（捲尾終點）
-                     ══════════════════════════════════ -->
-                <!-- 流線：捲草 3 下捲尾 → 外邊緣 -->
-                <path d="M 68 46
-                         C 54 50 40 52 26 54"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.32)"
-                      stroke-width="1.1"
-                      stroke-linecap="round"/>
-                <!-- 蝸牛殼螺旋（尾端終點）：外圈 → 中心 -->
-                <path d="M 26 54
-                         C 20 54 14 58 14 64
-                         C 14 70 20 73 25 70
-                         C 30 67 31 61 27 57
-                         C 23 53 17 55 16 60
-                         C 15 65 19 68 23 66"
-                      fill="none"
-                      stroke="rgba(196,154,69,0.48)"
-                      stroke-width="1.4"
-                      stroke-linecap="round"/>
-                <!-- 螺旋中心點 -->
-                <circle cx="22" cy="64" r="1.2" fill="rgba(196,154,69,0.60)"/>
+                <!-- Gold spiral accent — 捲雲渦 scroll curl in main body -->
+                <path d="M 220 35 C 215 27 221 22 228 27 C 235 32 232 41 223 42"
+                      fill="none" stroke="rgba(196,154,69,0.58)" stroke-width="1.4" stroke-linecap="round"/>
             </symbol>
         </defs>
     </svg>
@@ -1924,7 +1603,7 @@
             </div>
         </div>
 
-        <div id="gallery" class="gallery-container">
+        <div id="gallery" class="gallery-container" style="padding-top: 40px;">
             <div class="loading">載入典藏中<span class="loading-dots"><span>·</span><span>·</span><span>·</span></span></div>
         </div>
     </div>
@@ -1952,10 +1631,8 @@
                     對館藏器物有興趣，歡迎透過 LINE 私訊掌櫃，<br>
                     我們將於 24 小時內回覆您的詢問。
                 </p>
-                <!-- LINE_ID_PLACEHOLDER: replace href with https://line.me/ti/p/[YOUR_LINE_ID] and remove onclick when ready -->
                 <a class="contact-line-btn"
-                   href="#"
-                   onclick="alert('LINE ID 待設定'); return false;"
+                   href="https://line.me/ti/p/[YOUR_LINE_ID]"
                    target="_blank" rel="noopener noreferrer">
                     <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                         <path fill="currentColor"
@@ -1971,21 +1648,7 @@
     </section>
 
     <footer class="site-footer">
-        <!-- CHANGE P2-08: footer brand seal -->
-        <svg class="footer-seal" viewBox="0 0 32 48" aria-hidden="true" style="width:32px;height:48px;">
-            <rect x="2" y="2" width="28" height="44" rx="2"
-                  fill="var(--paper-400)" stroke="var(--seal-red)" stroke-width="1.8"/>
-            <text x="50%" y="26%" dominant-baseline="middle" text-anchor="middle"
-                  font-family="var(--font-display)" font-size="11" fill="var(--seal-red)">吉</text>
-            <text x="50%" y="52%" dominant-baseline="middle" text-anchor="middle"
-                  font-family="var(--font-display)" font-size="11" fill="var(--seal-red)">寶</text>
-            <text x="50%" y="78%" dominant-baseline="middle" text-anchor="middle"
-                  font-family="var(--font-display)" font-size="11" fill="var(--seal-red)">軒</text>
-        </svg>
-        <div>© 2026 吉寶軒 Jibao Xuan &nbsp;·&nbsp; 典藏器物圖片及資料受著作權保護</div>
-        <p class="footer-disclaimer">
-            本平台所載鑑定意見僅供參考、非鑑定書，藏品價值以實物鑑定為準。
-        </p>
+        © 2026 吉寶軒 Jibao Xuan &nbsp;·&nbsp; 典藏器物圖片及資料受著作權保護
     </footer>
 
     <!-- Scroll progress -->
@@ -2004,7 +1667,7 @@
         <div class="modal-content">
             <div class="modal-close" onclick="closeModal()">✕</div>
             <div class="modal-left">
-                <img src="" alt="藏品詳情圖" class="modal-img" id="modalImg">
+                <img src="" alt="" class="modal-img" id="modalImg">
             </div>
             <div class="modal-right">
                 <h2 class="modal-title" id="modalTitle"></h2>
@@ -2103,6 +1766,8 @@
             const header = document.getElementById('main-header');
             const sentinel = document.getElementById('header-sentinel');
             const progressBar = document.getElementById('scroll-progress-bar');
+            /* CHANGE C2: 印章旋轉元素 */
+            const scrollSeal = document.getElementById('scroll-seal');
 
             const headerObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
@@ -2120,8 +1785,16 @@
                         const scrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
                         const maxScroll = Math.round(scrollHeight - window.innerHeight);
                         if (maxScroll > 0) {
-                            let progress = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
-                            progressBar.style.transform = `scaleY(${progress})`;
+                            let progress = Math.floor((window.scrollY / maxScroll) * 100);
+                            progress = Math.min(Math.max(progress, 0), 100);
+                            progressBar.style.height = `${progress}%`;
+
+                            /* CHANGE C2: 印章隨滾動進度旋轉 — rotate(progress × 15 - 7.5 deg)
+                               progress 0→100 對應 rotation -7.5°→+7.5° (總轉 15°) */
+                            if (scrollSeal) {
+                                const rotation = (progress / 100) * 15 - 7.5;
+                                scrollSeal.style.transform = `rotate(${rotation}deg)`;
+                            }
                         }
                         if (window.scrollY > 0 && window.scrollY >= maxScroll - 50) {
                             header.classList.add('header-compact');
@@ -2131,6 +1804,9 @@
                     ticking = true;
                 }
             }, { passive: true });
+
+            /* CHANGE C1: 卡片 3D tilt 視差效果 — mousemove 驅動 ±3° rotateXY */
+            initCardTilt();
         });
 
         /* ============ Category filter (懸絲標籤 rail — dynamic) ============ */
@@ -2164,7 +1840,19 @@
                 return a[0].localeCompare(b[0], 'zh-Hant');
             });
 
-            sorted.forEach(([cat]) => {
+            /* CHANGE C4: 更新「全部典藏」按鈕數量 badge */
+            const allBtn = bar.querySelector('.cat-btn[data-cat="all"]');
+            if (allBtn) {
+                const existingBadge = allBtn.querySelector('.cat-count');
+                if (existingBadge) existingBadge.remove();
+                const totalCount = artifactsData.length;
+                const badge = document.createElement('span');
+                badge.className = 'cat-count';
+                badge.textContent = totalCount;
+                allBtn.appendChild(badge);
+            }
+
+            sorted.forEach(([cat, count]) => {
                 const btn = document.createElement('button');
                 btn.className = 'cat-btn';
                 btn.dataset.cat = cat;
@@ -2174,9 +1862,11 @@
                 btn.setAttribute('aria-controls', 'gallery');
                 // Glyph = first character of category name, label = full name
                 const glyph = cat.charAt(0);
+                /* CHANGE C4: 加入藏品數量 badge */
                 btn.innerHTML =
                     `<span class="cat-glyph">${glyph}</span>` +
-                    `<span class="cat-label">${cat}</span>`;
+                    `<span class="cat-label">${cat}</span>` +
+                    `<span class="cat-count">${count}</span>`;
                 bar.appendChild(btn);
             });
 
@@ -2299,9 +1989,7 @@
             }
 
             document.getElementById('modalImg').src = highResUrl;
-            // DP-001: alt 改為「朝代・品類・名稱」三段式（博物館圖說規範）
-            document.getElementById('modalImg').alt =
-                [item.era, item.category, item.itemName].filter(Boolean).join('・') || '藏品詳情圖';
+            document.getElementById('modalImg').alt = item.itemName || '';
             document.getElementById('modalTitle').textContent = item.itemName || '';
             document.getElementById('modalEra').textContent = item.era || '年代待考';
 
@@ -2466,34 +2154,19 @@
             window.addEventListener('resize', resize); resize();
 
             let startTime = performance.now();
-            let pausedAt = 0;
-            let totalPaused = 0;
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-            let rafId = null;
-
             function render(time) {
-                const dt = (time - startTime - totalPaused) * 0.001;
+                const dt = (time - startTime) * 0.001;
                 gl.uniform1f(timeLoc, dt);
                 gl.uniform2f(mouseLoc, mouseX, mouseY);
                 gl.clearColor(0, 0, 0, 0);
                 gl.clear(gl.COLOR_BUFFER_BIT);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
-                rafId = requestAnimationFrame(render);
+                requestAnimationFrame(render);
             }
-            rafId = requestAnimationFrame(render);
-
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    cancelAnimationFrame(rafId);
-                    rafId = null;
-                    pausedAt = performance.now();
-                } else if (!rafId) {
-                    totalPaused += performance.now() - pausedAt;
-                    rafId = requestAnimationFrame(render);
-                }
-            });
+            requestAnimationFrame(render);
         }
 
         /* ============ Artifacts fetch + render ============ */
@@ -2559,15 +2232,6 @@
                         card.style.cursor = 'pointer';
                         card.dataset.category = item.category || '';
                         card.setAttribute('onclick', `openModal(${index})`);
-                        card.setAttribute('tabindex', '0');
-                        card.setAttribute('role', 'button');
-                        card.setAttribute('aria-label', item.itemName || '典藏');
-                        card.addEventListener('keydown', (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                openModal(index);
-                            }
-                        });
 
                         if (index < 6) card.classList.add('is-visible');
 
@@ -2582,7 +2246,6 @@
                                 <div class="focus-border"></div>
                             </div>
                             <div class="info-box">
-                                <span class="era-watermark" aria-hidden="true">${(item.era || '').charAt(0)}</span>
                                 <div class="seal-wrapper">
                                     <div class="seal-halo"></div>
                                     <svg class="seal-svg" viewBox="0 0 50 50">
@@ -2597,7 +2260,6 @@
                                 <div class="material-badges">${badgesHtml}</div>
                                 <div class="item-story-wrap">
                                     <p class="item-story">${item.story || '暫無故事描述。'}</p>
-                                    <span class="read-more-hint" aria-hidden="true">展開詳情 ›</span>
                                 </div>
                                 <div class="tags">${tagsHtml}</div>
                             </div>
@@ -2621,6 +2283,36 @@
                 console.error(e);
                 gallery.innerHTML = `<div class="loading" style="color:${getComputedStyle(document.documentElement).getPropertyValue('--seal-red')};">連線失敗：請檢查 GAS 部署網址。<br><small style="font-family:var(--font-latin); font-style:italic;">${e.message}</small></div>`;
             }
+        }
+
+        /* CHANGE C1: 卡片 3D tilt 視差效果初始化 */
+        function initCardTilt() {
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
+                    // 計算滑鼠相對於卡片中心的偏移（-1 到 1）
+                    const percentX = (x - centerX) / centerX;
+                    const percentY = (y - centerY) / centerY;
+                    
+                    // ±3° 旋轉範圍
+                    const rotateY = percentX * 3;
+                    const rotateX = -percentY * 3;
+                    
+                    card.classList.add('tilt-active');
+                    card.style.transform = `translateY(-5px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                });
+                
+                card.addEventListener('mouseleave', () => {
+                    card.classList.remove('tilt-active');
+                    card.style.transform = '';
+                });
+            });
         }
 
         /* ============ Tweaks ============ */
