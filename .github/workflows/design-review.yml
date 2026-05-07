@@ -1,0 +1,65 @@
+name: 🎨 吉寶軒 Design Review Loop
+
+# 觸發條件：任何 branch 只要 Publish/index.html 被改動
+on:
+  push:
+    paths:
+      - 'Publish/index.html'
+
+jobs:
+  review:
+    name: Review & Generate Next Brief
+    runs-on: ubuntu-latest
+
+    # 防止 bot commit 觸發無限迴圈
+    if: "!contains(github.event.head_commit.message, '[design-bot]')"
+
+    permissions:
+      contents: write   # 允許 commit 回 repo
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2        # 需要 HEAD~1 做 diff
+          ref: ${{ github.ref }}
+
+      # ── 2. Python 環境 ───────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── 3. 執行 Design Review ────────────────────────────────────────────
+      - name: Run ap_design_review.py
+        run: python3 scripts/ap_design_review.py
+
+      # ── 4. 顯示生成的 Brief（Actions log 可直接讀） ──────────────────────
+      - name: Show generated brief
+        run: |
+          echo "========================================"
+          echo "📋 DESIGN_BRIEF_NEXT.md"
+          echo "========================================"
+          cat DESIGN_BRIEF_NEXT.md
+
+      # ── 5. Commit brief 回同一 branch ────────────────────────────────────
+      - name: Commit brief back to repo
+        run: |
+          git config user.name  "AP Design Bot"
+          git config user.email "ap-design-bot@jibao-xuan.local"
+
+          # 只在有改動時才 commit（避免空 commit）
+          if git diff --quiet DESIGN_BRIEF_NEXT.md 2>/dev/null && \
+             git ls-files --error-unmatch DESIGN_BRIEF_NEXT.md 2>/dev/null; then
+            echo "ℹ️  DESIGN_BRIEF_NEXT.md 無變化，跳過 commit"
+          else
+            git add DESIGN_BRIEF_NEXT.md
+            # review log 可能不存在，用 -f
+            git add -f memory/design_review_log.md 2>/dev/null || true
+
+            ROUND=$(grep -o 'Round [0-9]*' DESIGN_BRIEF_NEXT.md | tail -1 | grep -o '[0-9]*' || echo "?")
+            git commit -m "[design-bot] Round ${ROUND} brief generated"
+            git push
+            echo "✅ Brief committed → Round ${ROUND}"
+          fi
