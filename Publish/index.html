@@ -231,19 +231,21 @@
             margin-top: 22px;
             letter-spacing: 0.5rem;
             opacity: 1;
-            max-height: 50px;
             overflow: hidden;
-            transition: all 0.5s ease;
+            /* CHANGE F1: remove max-height — non-compositor; use scaleY for collapse */
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            transform-origin: top center;
         }
         .brand-slogan .sep { opacity: 0.5; margin: 0 0.3em; }
 
         header.header-compact .brand-slogan {
             opacity: 0;
-            max-height: 0;
-            margin-top: 0;
+            /* CHANGE F1: pure compositor solution — scaleY(0) + visibility, no max-height/margin-top */
+            transform: scaleY(0);
+            visibility: hidden;
             transition: opacity 0.3s cubic-bezier(0.4, 0, 1, 1),
-                        max-height 0.3s cubic-bezier(0.4, 0, 1, 1),
-                        margin-top 0.3s cubic-bezier(0.4, 0, 1, 1);
+                        transform 0.3s cubic-bezier(0.4, 0, 1, 1),
+                        visibility 0.3s;
         }
 
         /* Staggered entrance — 三詞依序浮現 */
@@ -677,7 +679,8 @@
             fill: var(--seal-red);
             font-size: 14px;
             font-family: var(--font-display);
-            font-weight: 600;
+            /* CHANGE F2: font-weight 600 → 400 符合品牌「font-weight: 400 only」原則 */
+            font-weight: 400;
             transition: fill 0.4s ease;
         }
         .seal-wrapper:hover .seal-bg { fill: var(--seal-red); }
@@ -760,7 +763,8 @@
             text-transform: uppercase;
             border-bottom: var(--rule-dash);
             padding-bottom: 14px;
-            margin-bottom: 18px;
+            /* CHANGE C5-a: 18px → 16px，8px grid 對齊 */
+            margin-bottom: 16px;
         }
         .item-era::before {
             content: '';
@@ -777,7 +781,8 @@
             flex-wrap: wrap;
             gap: 4px;
             margin: 8px 0 12px;
-            padding-bottom: 14px;
+            /* CHANGE C5-a: 14px → 16px，8px grid 對齊 */
+            padding-bottom: 16px;
             border-bottom: var(--rule-dash);
         }
         .badge {
@@ -840,7 +845,8 @@
             color: var(--gold-700);
             border-left: 2px solid var(--gold-300);
             padding: 6px 12px;
-            margin: 0 0 14px;
+            /* CHANGE C5-a: 14px → 16px，8px grid 對齊 */
+            margin: 0 0 16px;
             background: linear-gradient(90deg, rgba(196,154,69,0.06) 0%, transparent 100%);
             letter-spacing: 0.06em;
             font-style: normal;
@@ -1480,7 +1486,8 @@
             font-family: var(--font-display);
             font-size: 0.85rem;
             border: 1px solid var(--paper-500);
-            background: white;
+            /* CHANGE C5-c: background: white → var(--paper-100) 使用 CSS 變數 */
+            background: var(--paper-100);
             border-radius: 2px;
         }
 
@@ -1595,6 +1602,20 @@
             .skeleton-card { flex-direction: column !important; }
             .skeleton-img { width: 100% !important; height: 240px !important; }
             .skeleton-info { width: 100%; padding: 24px 20px; }
+
+        /* CHANGE C5-b: 品牌金色 focus-visible ring，符合 WCAG 鍵盤導航要求 */
+        .cat-btn:focus-visible,
+        .modal-close:focus-visible,
+        .modal-nav:focus-visible,
+        .contact-line-btn:focus-visible,
+        .modal-action:focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 2px;
+        }
+        .card:focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 4px;
+        }
 
         /* Accessibility — honor user's motion preference */
         @media (prefers-reduced-motion: reduce) {
@@ -1777,7 +1798,8 @@
 
     <!-- Scroll progress -->
     <div id="scroll-progress-wrap">
-        <svg id="scroll-seal" viewBox="0 0 20 20"><!-- CHANGE C6: currentColor inherits from #scroll-seal { color: var(--seal-red) } -->
+        <!-- CHANGE C5-d: 加入 aria-hidden="true" — 純裝飾性 SVG -->
+        <svg id="scroll-seal" viewBox="0 0 20 20" aria-hidden="true"><!-- CHANGE C6: currentColor inherits from #scroll-seal { color: var(--seal-red) } -->
             <rect x="2" y="2" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
             <text x="10" y="14" text-anchor="middle" font-family="Noto Serif TC, serif" font-size="9" fill="currentColor" font-weight="600">軒</text>
         </svg>
