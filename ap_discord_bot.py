@@ -38,6 +38,20 @@ def _load_env(env_file: Path) -> dict:
     return env
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
+
+# ── Phase A: Notion writer (opt-in via NOTION_API_KEY) ──
+try:
+    import sys as _sys_n
+    _sys_n.path.insert(0, str(_PROJECT_ROOT / "scripts"))
+    from notion_writer import (
+        is_enabled as notion_enabled,
+        create_authentication_log,
+    )
+except Exception as _e:
+    import logging as _lg
+    _lg.getLogger("ap_discord_bot").warning("[notion] notion_writer not loaded: %s", _e)
+    def notion_enabled(): return False
+    def create_authentication_log(*a, **k): return None
 _ENV = _load_env(_PROJECT_ROOT / ".env.antique")
 
 # ================================================================
@@ -69,6 +83,7 @@ GAS_DOPOST_URL = (
 )
 
 ANTIQUE_CHANNEL_ID = 1495279823009087551   # #antique-analysis
+PROCESSING_REACTION = "🏺"               # reaction 標記：已收到，catch-up 補跑依此判斷
 
 # 白名單：可上傳圖片的 Discord User ID
 ALLOWED_USER_IDS = {
@@ -105,6 +120,38 @@ async def on_ready():
         log.info("Slash commands 同步：%d 個", len(synced))
     except Exception as e:
         log.error("Slash command 同步失敗: %s", e)
+    # 補跑離線期間未處理訊息
+    await catch_up_missed_messages()
+
+
+async def catch_up_missed_messages():
+    """掃描 #antique-analysis 最近 100 則，補跑沒有 🏺 reaction 的白名單圖片訊息"""
+    channel = bot.get_channel(ANTIQUE_CHANNEL_ID)
+    if not channel:
+        log.warning("[CatchUp] 找不到頻道 %s", ANTIQUE_CHANNEL_ID)
+        return
+    log.info("[CatchUp] 掃描離線期間未處理訊息（最近 100 則）...")
+    caught = 0
+    async for message in channel.history(limit=100):
+        if message.author.bot:
+            continue
+        if str(message.author.id) not in ALLOWED_USER_IDS:
+            continue
+        images = [
+            a for a in message.attachments
+            if a.content_type and a.content_type.startswith("image/")
+        ]
+        if not images:
+            continue
+        # 已有 🏺 reaction（bot 自己加的）→ 已處理，略過
+        already = any(str(r.emoji) == PROCESSING_REACTION and r.me for r in message.reactions)
+        if already:
+            continue
+        log.info("[CatchUp] 補跑 msgId=%s author=%s", message.id, message.author.display_name)
+        await handle_antique_message(message)
+        caught += 1
+        await asyncio.sleep(2)   # rate-limit buffer：避免短時間大量呼叫 GAS
+    log.info("[CatchUp] 完成，共補跑 %d 則", caught)
 
 
 @bot.event
@@ -141,6 +188,12 @@ async def handle_antique_message(message: discord.Message):
         if message.content.strip().lower() == "ping":
             await message.reply("通訊正常，系統待命中。🏺")
         return
+
+    # 先加 🏺 reaction 標記「已收到」，catch-up 補跑邏輯依此判斷是否處理過
+    try:
+        await message.add_reaction(PROCESSING_REACTION)
+    except discord.HTTPException as e:
+        log.warning("[Antique] 無法加 reaction: %s", e)
 
     await message.reply("已收到您的雅器圖片，掌櫃正在調閱典籍鑑定中，請稍候...")
     asyncio.create_task(_process_antique_image(message, images[0]))
@@ -189,16 +242,42 @@ async def _process_antique_image(message: discord.Message, attachment: discord.A
         file_url  = result.get("fileUrl", "")
 
         if not result.get("success"):
+            err_msg = result.get('error', '未知錯誤')
             await message.reply(
-                f"**鑑定失敗**\n錯誤：{result.get('error', '未知錯誤')}"
+                f"**鑑定失敗**\n錯誤：{err_msg}"
             )
+            # ── Phase A: 寫到 Authentication Log (opt-in) ──
+            if notion_enabled():
+                try:
+                    create_authentication_log(
+                        title=f"[失敗] msgId={message.id}",
+                        user=message.author.display_name,
+                        gemini_judgment=f"鑑定失敗：{err_msg}",
+                        curator_status="退回",
+                        notes=f"錯誤：{str(err_msg)[:500]}",
+                    )
+                except Exception as _e:
+                    log.warning("[notion] auth log failed: %s", _e)
 
         elif not analysis.get("isValid"):
+            reject_reason = analysis.get('rejectionReason', '圖片不符合鑑定條件')
             await message.reply(
                 f"**鑑定退回**\n\n"
-                f"{analysis.get('rejectionReason', '圖片不符合鑑定條件')}"
+                f"{reject_reason}"
                 f"\n\n圖片已存檔：{file_url}"
             )
+            # ── Phase A: 寫到 Authentication Log (opt-in) ──
+            if notion_enabled():
+                try:
+                    create_authentication_log(
+                        title=f"[退回] msgId={message.id}",
+                        user=message.author.display_name,
+                        gemini_judgment=f"退回：{reject_reason}",
+                        curator_status="退回",
+                        notes=f"圖片：{file_url}",
+                    )
+                except Exception as _e:
+                    log.warning("[notion] auth log failed: %s", _e)
 
         else:
             embed = discord.Embed(
@@ -235,6 +314,29 @@ async def _process_antique_image(message: discord.Message, attachment: discord.A
             )
             await message.reply(embed=embed)
             log.info("[Antique] ✅ 鑑定完成：%s", analysis.get("itemName", "未知"))
+
+            # ── Phase A: 寫到 Authentication Log (opt-in) ──
+            if notion_enabled():
+                try:
+                    create_authentication_log(
+                        title=analysis.get("itemName", "未命名器物"),
+                        user=message.author.display_name,
+                        gemini_judgment=(
+                            f"分類：{analysis.get('category', '不詳')} | "
+                            f"斷代：{analysis.get('era', '不詳')}\n"
+                            f"特徵：{analysis.get('features', '不詳')[:800]}\n"
+                            f"故事：{analysis.get('story', '不詳')[:800]}"
+                        ),
+                        curator_status="未審",
+                        notes=(
+                            f"拍賣參考：{analysis.get('refItem', '不詳')} "
+                            f"(約 {analysis.get('refPrice', '不詳')})\n"
+                            f"圖片：{file_url}\n"
+                            f"msgId={message.id}"
+                        ),
+                    )
+                except Exception as _e:
+                    log.warning("[notion] auth log failed: %s", _e)
 
     except Exception as err:
         await message.reply(f"**鑑定失敗**\n{str(err)[:300]}")

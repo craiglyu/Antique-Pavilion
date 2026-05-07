@@ -200,7 +200,14 @@
             /* 1s delay → Google Fonts CJK subsets (吉/寶/軒 in separate woff2 files)
                have time to load before title becomes visible → no per-char font swap FOUT */
             animation: titleReveal 2s 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-            transition: all 0.5s ease;
+            /* CHANGE B1: restrict brand-title transition to compositor-only — no letter-spacing
+               原本 transition: all 在 header-compact 切換時 letter-spacing 1.5rem→0.8rem 觸發 layout reflow。
+               改為僅含 compositor 友善屬性 + font-size（仍會 reflow，但已是必要 size 切換），
+               letter-spacing 不在 transition 列表內 → 瞬間切換，無動畫，無捲動 jank。 */
+            transition: font-size 0.5s ease,
+                        opacity 0.5s ease,
+                        filter 0.5s ease,
+                        transform 0.5s ease;
             /* CHANGE C3: promote to compositor thread for blur → opacity → scale animation */
             will-change: filter, transform, opacity;
         }
@@ -2018,8 +2025,7 @@
                 }
             }, { passive: true });
 
-            /* CHANGE C1: 卡片 3D tilt 視差效果 — mousemove 驅動 ±3° rotateXY */
-            initCardTilt();
+            /* CHANGE B2: initCardTilt() 已移至 fetchArtifacts 渲染卡片後呼叫，此處不再呼叫 */
         });
 
         /* ============ Category filter (懸絲標籤 rail — dynamic) ============ */
@@ -2193,6 +2199,9 @@
         /* ============ Modal ============ */
         /* CHANGE B2: track index for prev/next nav */
         let currentModalIndex = -1;
+        /* CHANGE B3: modal focus trap state — track trigger element + bound handler */
+        let modalTriggerElement = null;
+        let modalFocusTrapHandler = null;
 
         function navigateModal(direction) {
             const target = currentModalIndex + direction;
@@ -2209,6 +2218,9 @@
         function openModal(index) {
             const item = artifactsData[index];
             if (!item) return;
+
+            /* CHANGE B3: modal focus trap — record trigger element so we can restore focus on close */
+            modalTriggerElement = document.activeElement;
 
             /* CHANGE B2: persist index + update nav button states */
             currentModalIndex = index;
@@ -2269,6 +2281,32 @@
             modalImgEl.onclick = () => modalImgEl.classList.toggle('zoomed');
 
             document.getElementById('artifactModal').classList.add('active');
+
+            /* CHANGE B3: modal focus trap — WCAG 2.1 SC 2.1.2
+               收集 modal 內所有可聚焦元素，覆寫 Tab/Shift+Tab 讓焦點循環在 modal 內。
+               焦點先移至第一個可聚焦元素（modal-close 或 nav button）。 */
+            const overlay = document.getElementById('artifactModal');
+            const focusableSelector = 'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+            const focusables = overlay.querySelectorAll(focusableSelector);
+            if (focusables.length > 0) {
+                // 延後一個 frame 等 modal transition 開始後再聚焦
+                requestAnimationFrame(() => focusables[0].focus());
+            }
+            modalFocusTrapHandler = (e) => {
+                if (e.key !== 'Tab') return;
+                const list = overlay.querySelectorAll(focusableSelector);
+                if (list.length === 0) return;
+                const first = list[0];
+                const last = list[list.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            };
+            document.addEventListener('keydown', modalFocusTrapHandler);
         }
 
         function closeModal() {
@@ -2276,6 +2314,15 @@
             overlay.classList.add('closing');
             /* CHANGE B3: always reset zoom on close */
             document.getElementById('modalImg').classList.remove('zoomed');
+            /* CHANGE B3: remove focus trap + restore focus to triggering card */
+            if (modalFocusTrapHandler) {
+                document.removeEventListener('keydown', modalFocusTrapHandler);
+                modalFocusTrapHandler = null;
+            }
+            if (modalTriggerElement && typeof modalTriggerElement.focus === 'function') {
+                modalTriggerElement.focus();
+            }
+            modalTriggerElement = null;
             setTimeout(() => {
                 overlay.classList.remove('active', 'closing');
                 document.body.style.overflow = '';
@@ -2546,6 +2593,12 @@
 
                     // Build rail from actual category data
                     buildCategoryFilter();
+
+                    /* CHANGE B2: move initCardTilt() call to after fetchArtifacts renders cards
+                       原本在 DOMContentLoaded 呼叫，但 fetchArtifacts 是 async，
+                       卡片 DOM 尚未存在 → querySelectorAll('.card') 回傳空 NodeList，tilt 完全失效。
+                       移至此處：卡片已渲染完畢，正確掛上 mousemove listener。 */
+                    initCardTilt();
                 } else {
                     gallery.innerHTML = '<div class="loading">庫房目前空置，或無法取得資料。</div>';
                 }
