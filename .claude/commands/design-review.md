@@ -3,157 +3,165 @@ id: skill_design_review
 type: skill
 layer: domain/ap
 loaded_by: [Designer, PM]
-version: v1.0
+version: v2.0
 schema_version: 1
 last_updated: 2026-05-07
-change_notes: "初版 — Claude Design 多輪優化 Loop 的 review + brief 生成器"
+change_notes: "v2: 明確串接 /taste-skill + /audit + /emil-skill，輸出 Claude Design task prompt"
 ---
 
 # /design-review — Claude Design Loop Review
 
-**Purpose**: 讀取最新一次 git commit 中 Claude Design 對 `Publish/index.html` 的改動，
-用吉寶軒設計系統規則進行審查，並輸出下一輪可直接貼入 Claude Design 的設計 brief。
+**用途**：作為 Claude Design 多輪優化 Loop 的「大腦」。
+讀取 Git 上最新的 `Publish/index.html`，透過 AP 專案的三個設計 skills 進行深度 review，
+輸出一份可直接貼入 Claude Design text window 的 task prompt。
+
+> 這是 Loop 的 STEP 1。Craig 執行後，複製輸出的 prompt 貼入 Claude Design。
 
 ---
 
-## 執行步驟
+## 執行流程
 
-### Step 1 — 取得上一輪 diff
+### Phase A — 讀取最新狀態
 
 ```bash
-git log --oneline -5                                      # 確認最新幾筆 commit
-git show HEAD --stat                                      # 確認哪些檔案被改動
-git diff HEAD~1 HEAD -- Publish/index.html                # 取得完整 diff
+# 取得 Git 上最新版本的 index.html
+git log --oneline -3 -- Publish/index.html
+
+# 如果 Claude Design 有開 PR，讀取 PR branch 的最新版
+git fetch origin
+git log --oneline -3 origin/design/round-$(git branch -r | grep design | wc -l)
 ```
 
-如果 `Publish/index.html` 不在最新 commit 裡，往前找到最近一次包含它的 commit：
-
-```bash
-git log --oneline -- Publish/index.html | head -3
-git show <commit-hash> -- Publish/index.html | head -200
-```
-
-### Step 2 — 審查 diff（吉寶軒設計系統規範）
-
-逐一核查以下規則，標注 ✅ 通過 / ⚠️ 待改 / ❌ 違規：
-
-**品牌 & 色彩**
-- [ ] 只使用 `--gold / --ink / --paper / --seal-red` 及其 scale 變數；無硬編碼 hex（除 fallback 之外）
-- [ ] 無 blue / green / purple / teal / aurora gradient 出現
-- [ ] seal-red 僅用於 CTA、印章、進度條；不作大面積 fill
-
-**字型**
-- [ ] 所有中文字用 `--font-plaque / --font-display / --font-body` 三層之一
-- [ ] Latin 數字（Lot #、年份）用 `--font-latin`（Cormorant Garamond）
-- [ ] 無 `font-weight: bold` 套在 brush/kai 字型上
-- [ ] SVG `<text>` 不用 `font-family="var(--font-display)"` presentation attr（用 CSS class）
-
-**動畫**
-- [ ] 只 animate `transform / opacity / filter`；禁 `width / height / top / left / margin`
-- [ ] Exit 動畫速度 ≥ 2× 快於 Enter
-- [ ] `@media (prefers-reduced-motion: reduce)` 覆蓋所有動畫
-- [ ] `will-change` 在動畫結束後清除（animationend listener）
-
-**佈局**
-- [ ] 卡片維持單欄交錯排列（奇左偶右）；無 3-column grid
-- [ ] 間距符合 8px grid
-- [ ] 觸控目標 ≥ 44×44px
-
-**文案語境**
-- [ ] 繁體中文為主；無簡體字混入
-- [ ] 無「商品 / 查看 / 日期 / 倉庫」等俗字（用設計系統詞彙替換）
-- [ ] Empty state 用 `庫房目前空置` 不用 "No items found"
-
-**結構**
-- [ ] 無新增 npm / framework / build step 依賴
-- [ ] Sheets 欄位對應不變（UUID, itemName, category, era, story...）
-
-### Step 3 — 輸出 Review 報告
-
-格式：
-
-```
-## 吉寶軒 Design Review — Round [N]
-**Commit**: [hash] [message]
-**審查時間**: [timestamp]
-
-### ✅ 通過項目
-...
-
-### ⚠️ 建議改善（不阻擋上線）
-...
-
-### ❌ 違規項目（必須修正）
-...
-
-### 評分
-| 維度 | 分數 |
-|---|---|
-| 品牌一致性 | /4 |
-| 動畫品質 | /4 |
-| 排版正確性 | /4 |
-| 可及性 | /4 |
-| 程式碼品質 | /4 |
-| **總分** | **/20** |
-```
-
-### Step 4 — 生成下一輪 Claude Design Brief
-
-根據 Review 結果，輸出一份可直接貼入 Claude Design 的 prompt：
-
-```
-## 📋 Round [N+1] — Claude Design Brief
-（複製以下全文貼入 Claude Design）
+讀取 `Publish/index.html` 全文，確認目前版本狀態。
 
 ---
 
-你是吉寶軒（Jibao Xuan）的首席設計師，正在優化一個高奢中式古董展覽網站。
-品牌定位等同 Sotheby's Asia、Christie's Hong Kong。
+### Phase B — 三層 AP Skills 深度 Review
 
-**設計系統規範**（必須嚴格遵守）：
-- 色彩：sumi ink (#2c2c2c) / rice paper (#f7f4ed) / aged brass (#c49a45) / cinnabar seal (#8a2a2a)
-- 字型三層：--font-plaque（Ma Shan Zheng）/ --font-display（標楷體）/ --font-body（LXGW WenKai TC）
-- 動畫：只用 transform/opacity/filter；exit 2× 快於 enter
-- 佈局：單欄交錯卡片，8px grid，無 3-column grid
+依序執行以下三個 skill 的核心審查邏輯（不需用戶另外輸入指令）：
 
-**上一輪完成的工作**：
-[從 Review 報告摘要]
+#### B1. /taste-skill 審查（高奢品牌品味）
 
-**本輪任務**（優先序由高到低）：
-1. [修正 ❌ 違規項目]
-2. [改善 ⚠️ 建議項目]
-3. [下一個功能目標]
+參照 `.claude/commands/taste-skill.md` 的規則，審查：
+- 是否達到 Sotheby's Asia / Christie's Hong Kong 的視覺水準？
+- 動畫是否有「撥雲見寶」的質感，而非 AI generic 效果？
+- 字型三層系統是否正確運用？
+- 有無任何「AI slop」特徵（過度圓角、過飽和漸層、多餘陰影）？
 
-**技術約束**：
-- 純 HTML/CSS/vanilla JS，無 npm / framework
-- 全部改動在 Publish/index.html 這一個檔案內完成
-- Google Apps Script API 端點不可動
+#### B2. /audit 審查（5 維度設計評分）
 
-請直接輸出完整的 index.html。
+參照 `.claude/commands/audit.md` 的 5 維度，每項 0–4 分：
+
+| 維度 | 評分 | 主要發現 |
+|---|---|---|
+| 可及性 | /4 | WCAG AA、觸控目標、motion preference |
+| 視覺層次 | /4 | 字型大小節奏、留白、對齊 |
+| 品牌一致性 | /4 | 色彩、字型、詞彙 |
+| 動畫品質 | /4 | Emil 原則、exit 速度、compositor |
+| 程式碼品質 | /4 | 無 framework、無硬編碼 hex、SVG 正確 |
+
+**總分：/20**
+
+#### B3. /emil-skill 審查（動畫細節）
+
+參照 `.claude/commands/emil-skill.md`，具體檢查：
+- Exit 動畫是否比 Enter 快 2× ？
+- 有無在 `width/height/top/left` 上做動畫？
+- `will-change` 是否在動畫結束後清除？
+- hover 互動是否有 `cubic-bezier(0.34, 1.56, 0.64, 1)` spring 感？
+
 ---
-```
 
-### Step 5 — 儲存輸出
+### Phase C — 生成 Claude Design Task Prompt
 
-將 brief 寫入 `DESIGN_BRIEF_NEXT.md`（git-ignored，工作暫存）：
+根據 Phase B 的發現，生成以下格式的 prompt。
+**這份 prompt 就是 Craig 要貼進 Claude Design text window 的內容。**
 
-```bash
-# Claude Code 會自動將 Step 4 的內容寫入這個檔案
-```
-
-並在終端顯示：
+---
 
 ```
-✅ Review 完成 → DESIGN_BRIEF_NEXT.md 已更新
-   複製其中內容貼入 Claude Design 開始 Round [N+1]
+═══════════════════════════════════════════════════════════════
+📋 CLAUDE DESIGN TASK PROMPT — Round [N]
+（複製以下全文，貼入 Claude Design text window）
+═══════════════════════════════════════════════════════════════
+
+你是吉寶軒（Jibao Xuan）的首席設計師。
+吉寶軒是一個高奢中式古董展覽網站，品牌定位等同
+Sotheby's Asia、Christie's Hong Kong、中國嘉德。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【設計系統】（必須嚴格遵守，違反則整輪作廢）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+色彩（僅此四色 + scale）：
+  --ink   #2c2c2c  墨  | --paper  #f7f4ed  宣紙
+  --gold  #c49a45  黃銅 | --seal-red #8a2a2a 朱砂
+  → 無任何 blue / teal / purple / aurora gradient
+
+四層字型：
+  Plaque ：Ma Shan Zheng → 標楷體（品牌大字）
+  Display：標楷體 → DFKai-SB（標題、印章）
+  Body   ：LXGW WenKai TC → 標楷體（故事文字）
+  Latin  ：Cormorant Garamond（批號、年份，僅 Latin 字元）
+  → font-weight: 400 only，絕對不用 bold
+
+動畫原則（Emil Kowalski）：
+  → 只 animate transform / opacity / filter
+  → exit 速度 2× enter
+  → will-change 在 animationend 後清除
+  → prefers-reduced-motion 必須覆蓋所有動畫
+
+佈局：
+  → 單欄交錯卡片（奇右偶左），絕不用 3-column grid
+  → 8px grid，觸控目標 ≥ 44×44px
+
+技術：
+  → 純 HTML/CSS/vanilla JS
+  → 所有改動在 Publish/index.html 一個檔案內完成
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【上一輪 Review 發現】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Phase B 的評分與主要發現]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【本輪任務】（優先序）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[根據 audit 結果填入，最多 3 項，每項有明確驗收標準]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【輸出要求】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 請先從 GitHub repo craiglyu/Antique-Pavilion，
+   branch [當前 branch 名稱] 讀取 Publish/index.html
+
+2. 完成優化後，開 Pull Request：
+   - base: main
+   - head: design/round-[N]
+   - title: design: Round [N] — [本輪任務摘要]
+   - 只修改 Publish/index.html
+
+3. 每個改動處加上 /* CHANGE [代號]: 說明 */ 註解
+
+═══════════════════════════════════════════════════════════════
 ```
 
 ---
 
-## 快速觸發
+### Phase D — 儲存與顯示
+
+1. 將完整 prompt 寫入 `DESIGN_BRIEF_NEXT.md`
+2. 在終端顯示評分摘要與 prompt
+3. 提示 Craig 複製 prompt 貼入 Claude Design
+
+---
+
+## 觸發時機
+
+每次 GitHub Actions 完成後（收到通知或看到 Actions 綠勾），
+在 Claude Code CLI 輸入：
 
 ```
 /design-review
 ```
 
-不需要任何參數。Claude 會自動讀取 git 狀態決定 diff 範圍。
+Claude 會自動完成 Phase A → B → C → D，輸出下一輪 prompt。
