@@ -1,0 +1,49 @@
+name: 🚀 Deploy to Public Site
+
+# 當 Publish/index.html 有更動時自動部署
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Publish/index.html'
+  workflow_dispatch:   # 允許手動觸發
+
+jobs:
+  deploy:
+    name: Deploy to jibao-xuan-site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+
+      - name: Deploy to public repo
+        env:
+          PAT: ${{ secrets.DEPLOY_PAT }}
+        run: |
+          git config --global user.email "ap-design-bot@jibao-xuan.local"
+          git config --global user.name "AP Design Bot"
+
+          # Clone 公開 repo
+          git clone https://x-access-token:${PAT}@github.com/craiglyu/jibao-xuan-site.git public-site
+
+          # 複製網站檔案
+          cp Publish/index.html public-site/index.html
+
+          # 複製背景圖（HTML 用相對路徑 ./seedream-*.webp 引用）
+          WEBP=$(ls seedream-*.webp 2>/dev/null | head -1)
+          if [ -n "$WEBP" ]; then
+            cp "$WEBP" "public-site/$WEBP"
+          fi
+
+          # 有改動才 commit
+          cd public-site
+          git add .
+          if git diff --staged --quiet; then
+            echo "ℹ️ 無改動，跳過 deploy"
+          else
+            ROUND=$(grep -o 'Round [0-9]*' ../Publish/index.html | head -1 || echo "")
+            git commit -m "deploy: ${ROUND} — $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+            echo "✅ 部署完成"
+          fi
