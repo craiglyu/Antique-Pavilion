@@ -63,7 +63,8 @@
             --fg-1: var(--ink-800);
             --fg-2: var(--ink-600);
             --fg-3: var(--ink-500);
-            --fg-muted: var(--ink-400);
+            /* CHANGE A1 (Round 22): bump muted from ink-400 (#999, 2.49:1) to ink-500 (#6b6b6b, 5.09:1) for WCAG AA */
+            --fg-muted: var(--ink-500);
 
             /* Lines */
             --rule-hair: 1px solid rgba(44, 44, 44, 0.12);
@@ -1393,10 +1394,11 @@
             position: absolute;
             bottom: 0; left: 0; right: 0;
             height: 2.8em;
+            /* CHANGE A2 (Round 22): match .info-box bg (paper-400 #ede8dc) — paper-200 left a white halo */
             background: linear-gradient(
                 to bottom,
                 transparent,
-                var(--paper-200)
+                var(--paper-400)
             );
             pointer-events: none;
         }
@@ -1878,7 +1880,8 @@
         <svg id="scroll-seal" viewBox="0 0 20 20" aria-hidden="true"><!-- CHANGE C6: currentColor inherits from #scroll-seal { color: var(--seal-red) } -->
             <rect x="2" y="2" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
             <!-- CHANGE A4: font-weight 600 → 400，符合品牌「400 only」原則 -->
-            <text x="10" y="14" text-anchor="middle" font-family="Noto Serif TC, serif" font-size="9" fill="currentColor" font-weight="400">軒</text>
+            <!-- CHANGE A3 (Round 22): drop font-family presentation attr, use .svg-display-text class (CSS vars resolve in class, not attrs) -->
+            <text class="svg-display-text" x="10" y="14" text-anchor="middle" font-size="9" fill="currentColor" font-weight="400">軒</text>
         </svg>
         <div id="scroll-progress-track">
             <div id="scroll-progress-bar"></div>
