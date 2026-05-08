@@ -1664,7 +1664,7 @@
             .brand-title { opacity: 1 !important; filter: none !important; transform: none !important; }
         }
 
-        /* CHANGE C3: contact section scroll-reveal entrance animation */
+        /* CHANGE C3: contact section scroll-reveal entrance animation (legacy — kept for back-compat, no longer used on section) */
         .contact-reveal {
             opacity: 0;
             transform: translateY(24px);
@@ -1677,6 +1677,21 @@
         }
         @media (prefers-reduced-motion: reduce) {
             .contact-reveal { opacity: 1 !important; transform: none !important; }
+        }
+
+        /* CHANGE D3: contact stagger — individual children fade-in with 100ms stagger */
+        .contact-child-reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.7s cubic-bezier(0.25, 1, 0.5, 1),
+                        transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .contact-child-reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .contact-child-reveal { opacity: 1 !important; transform: none !important; }
         }
 
         /* CHANGE C8: SVG <text> presentation attrs can't resolve CSS vars.
@@ -1793,7 +1808,8 @@
     </div>
 
     <!-- Contact Section -->
-    <section id="contact" class="contact-section contact-reveal">
+    <!-- CHANGE D3: contact stagger — removed .contact-reveal from section, individual children animate with stagger -->
+    <section id="contact" class="contact-section">
         <div class="contact-inner">
             <div class="contact-brand">
                 <div class="contact-seal" aria-hidden="true">
@@ -1975,18 +1991,22 @@
             initTweaks();
             initCategoryFilter();
 
-            /* CHANGE C3: contact section scroll-reveal — 使用 .is-visible class 重用 revealObserver
-               或直接用獨立 observer 切換 .visible class */
+            /* CHANGE D3: contact stagger — observe section, then stagger 100ms across .contact-inner > * children
+               threshold 0.15 so reveal triggers slightly earlier; each child gets .contact-child-reveal then .visible */
             const contactSection = document.getElementById('contact');
             if (contactSection) {
+                const children = contactSection.querySelectorAll('.contact-inner > *');
+                children.forEach(child => child.classList.add('contact-child-reveal'));
                 const contactObserver = new IntersectionObserver((entries, observer) => {
                     entries.forEach(entry => {
                         if (entry.isIntersecting) {
-                            entry.target.classList.add('visible');
+                            children.forEach((child, i) => {
+                                setTimeout(() => child.classList.add('visible'), i * 100);
+                            });
                             observer.unobserve(entry.target);
                         }
                     });
-                }, { threshold: 0.2 });
+                }, { threshold: 0.15 });
                 contactObserver.observe(contactSection);
             }
 
@@ -2125,17 +2145,67 @@
         function initCategoryFilter() {
             const btns = document.querySelectorAll('.cat-btn');
             const gallery = document.getElementById('gallery');
+            const rail = document.getElementById('categoryFilter');
             let emptyEl = null;
+
+            /* CHANGE D2: tablist arrow-key navigation — WCAG APG Tabs pattern
+               Step 1: roving tabindex — only active tab is Tab-able (tabindex=0); others = -1 */
+            btns.forEach(btn => {
+                btn.setAttribute('tabindex', btn.classList.contains('active') ? '0' : '-1');
+            });
+
+            /* CHANGE D2: tablist arrow-key navigation — sync roving tabindex + aria-selected on activation */
+            function activateTab(targetBtn, focusAfter) {
+                btns.forEach(b => {
+                    b.classList.remove('active');
+                    b.setAttribute('aria-selected', 'false');
+                    b.setAttribute('tabindex', '-1');
+                });
+                targetBtn.classList.add('active');
+                targetBtn.setAttribute('aria-selected', 'true');
+                targetBtn.setAttribute('tabindex', '0');
+                if (focusAfter) targetBtn.focus();
+                targetBtn.click();
+            }
+
+            /* CHANGE D2: tablist arrow-key navigation — Arrow/Home/End navigate within rail */
+            if (rail && !rail.dataset.keyboundD2) {
+                rail.dataset.keyboundD2 = '1';
+                rail.addEventListener('keydown', (e) => {
+                    const list = Array.from(rail.querySelectorAll('.cat-btn'));
+                    if (!list.length) return;
+                    const currentIndex = list.indexOf(document.activeElement);
+                    if (currentIndex === -1) return;
+                    let nextIndex = -1;
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                        nextIndex = (currentIndex + 1) % list.length;
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                        nextIndex = (currentIndex - 1 + list.length) % list.length;
+                    } else if (e.key === 'Home') {
+                        nextIndex = 0;
+                    } else if (e.key === 'End') {
+                        nextIndex = list.length - 1;
+                    } else {
+                        return;
+                    }
+                    e.preventDefault();
+                    activateTab(list[nextIndex], true);
+                });
+            }
+
             btns.forEach(btn => {
                 if (btn.dataset.bound) return;
                 btn.dataset.bound = '1';
                 btn.addEventListener('click', () => {
+                    /* CHANGE D2: tablist arrow-key navigation — sync roving tabindex on click too */
                     btns.forEach(b => {
                         b.classList.remove('active');
                         b.setAttribute('aria-selected', 'false');
+                        b.setAttribute('tabindex', '-1');
                     });
                     btn.classList.add('active');
                     btn.setAttribute('aria-selected', 'true');
+                    btn.setAttribute('tabindex', '0');
                     const cat = btn.dataset.cat;
 
                     // Animated filter transition
@@ -2495,6 +2565,8 @@
             window.addEventListener('resize', resize); resize();
 
             let startTime = performance.now();
+            /* CHANGE D1: preserve WebGL timeline on tab resume — record pause moment so dt continues smoothly */
+            let pauseTime = null;
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -2515,11 +2587,17 @@
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     if (rafId !== null) {
+                        /* CHANGE D1: preserve WebGL timeline on tab resume — record pause moment, don't reset startTime */
+                        pauseTime = performance.now();
                         cancelAnimationFrame(rafId);
                         rafId = null;
                     }
                 } else if (rafId === null) {
-                    startTime = performance.now();
+                    /* CHANGE D1: preserve WebGL timeline on tab resume — offset startTime by paused duration so dt 不跳 */
+                    if (pauseTime !== null) {
+                        startTime += performance.now() - pauseTime;
+                        pauseTime = null;
+                    }
                     rafId = requestAnimationFrame(render);
                 }
             });
