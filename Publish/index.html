@@ -524,11 +524,7 @@
             perspective: 1000px;
             transform-style: preserve-3d;
         }
-        /* CHANGE A1: card hover spring bezier — mouseleave snap-back also uses spring */
-        .card.is-visible:not(:hover) {
-            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-                        box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+        /* CHANGE C1: removed redundant .card.is-visible:not(:hover) block — identical spring transition already declared above */
         .card.tilt-active {
             transition: none;
         }
@@ -858,6 +854,8 @@
             line-height: 1.9;
             color: var(--fg-2);
             text-align: justify;
+            /* CHANGE C2: 中文 catalog 排版 — 末行靠左,避免短句被強制撐滿 */
+            text-align-last: left;
             margin-bottom: 20px;
             display: -webkit-box;
             -webkit-line-clamp: 5;
@@ -1145,6 +1143,8 @@
             line-height: 1.95;
             color: var(--fg-2);
             text-align: justify;
+            /* CHANGE C2: 中文 catalog 排版 — 末行靠左,避免短句被強制撐滿 */
+            text-align-last: left;
             margin-bottom: 24px;
             white-space: pre-wrap;
         }
@@ -1652,19 +1652,38 @@
             .brand-title { opacity: 1 !important; filter: none !important; transform: none !important; }
         }
 
-        /* CHANGE C3: contact section scroll-reveal entrance animation (legacy — kept for back-compat, no longer used on section) */
-        .contact-reveal {
+        /* CHANGE C1: removed legacy section-level reveal block — Round 17 D3 stagger handles entrance */
+
+        /* CHANGE C3: scroll invite — 英雄動畫完成後淡入,首次滾動後淡出 */
+        .scroll-invite {
+            display: block;
+            text-align: center;
+            font-size: 1rem;
+            color: var(--gold-500);
             opacity: 0;
-            transform: translateY(24px);
-            transition: opacity 0.7s cubic-bezier(0.25, 1, 0.5, 1),
-                        transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+            margin-top: -4px;
+            letter-spacing: 0;
+            animation: scrollInviteFade 1s 4s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+                       scrollInviteBob 2.2s 5s ease-in-out infinite;
+            will-change: opacity, transform;
+            transition: opacity 0.4s ease;
         }
-        .contact-reveal.visible {
-            opacity: 1;
-            transform: translateY(0);
+        @keyframes scrollInviteFade {
+            to { opacity: 0.55; }
+        }
+        @keyframes scrollInviteBob {
+            0%, 100% { transform: translateY(0); }
+            50%      { transform: translateY(5px); }
+        }
+        header.header-compact .scroll-invite {
+            opacity: 0 !important;
+            animation: none;
         }
         @media (prefers-reduced-motion: reduce) {
-            .contact-reveal { opacity: 1 !important; transform: none !important; }
+            .scroll-invite {
+                animation: none !important;
+                opacity: 0.55 !important;
+            }
         }
 
         /* CHANGE D3: contact stagger — individual children fade-in with 100ms stagger */
@@ -1775,6 +1794,9 @@
 
                 <div class="ruyi-center"></div>
             </div>
+
+            <!-- CHANGE C3: scroll invite — 英雄下方滾動引導 -->
+            <div class="scroll-invite" aria-hidden="true">▾</div>
         </header>
 
         <!-- Category filter — 懸絲標籤 rail (built dynamically from sheet data) -->
@@ -1797,7 +1819,7 @@
     </div>
 
     <!-- Contact Section -->
-    <!-- CHANGE D3: contact stagger — removed .contact-reveal from section, individual children animate with stagger -->
+    <!-- CHANGE D3: contact stagger — section-level reveal removed; individual children animate with stagger -->
     <section id="contact" class="contact-section">
         <div class="contact-inner">
             <div class="contact-brand">
@@ -2036,10 +2058,22 @@
 
             if (sentinel) headerObserver.observe(sentinel);
 
+            /* CHANGE C3: scroll invite fade-out flag — fires once on first scroll past 20px */
+            let scrollInviteHidden = false;
             let ticking = false;
             window.addEventListener('scroll', () => {
                 if (!ticking) {
                     window.requestAnimationFrame(() => {
+                        /* CHANGE C3: hide scroll invite on first meaningful scroll */
+                        if (!scrollInviteHidden && window.scrollY > 20) {
+                            const invite = document.querySelector('.scroll-invite');
+                            if (invite) {
+                                invite.style.opacity = '0';
+                                invite.style.animation = 'none';
+                                invite.style.willChange = 'auto';
+                            }
+                            scrollInviteHidden = true;
+                        }
                         const scrollHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
                         const maxScroll = Math.round(scrollHeight - window.innerHeight);
                         if (maxScroll > 0) {
