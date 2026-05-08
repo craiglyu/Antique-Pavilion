@@ -56,6 +56,8 @@ Jibao\ Xuan\ Design\ System/
 
 # ── ⚙️ Claude Code 本地設定 ────────────────────────────
 .claude/settings.local.json
+.claude/launch.json.local-bak
+.claude/worktrees/
 # .claude/commands/ 保留入 Git（自訂 Skills）
 
 # ── 🐍 Python 暫存 ────────────────────────────────────

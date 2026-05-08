@@ -166,10 +166,10 @@ def score(analysis: dict) -> dict:
 # ── Brief 生成 ────────────────────────────────────────────────────────────────
 
 NEXT_TASKS = [
-    # C1/C2/C4 done in Round 4. C5 is next micro-polish.
-    "C5: 8px grid 間距微調（item-era / material-badges gap→16px；ruyi-divider margin→32px；card padding 24→32px）",
-    "E1: 漸進式圖片載入 — 對 Drive thumbnail 加 IntersectionObserver lazy-load + blur-in reveal（替換 eager-load）",
-    "E2: 骨架卡片 — gallery 尚未載入時顯示 3 張 skeleton card（pulse 動畫，純 CSS）",
+    # Rounds 1–26 done. Next: SEO / sharing / mobile polish.
+    "F1: OpenGraph + Twitter Card meta 標籤（og:title / og:description / og:image 指向背景圖）",
+    "F2: 行動裝置 modal swipe 手勢 — touchstart/touchend 左右滑動切換藏品（取代 ‹/› 按鈕點擊）",
+    "F3: 無藏品時的 empty-state — 顯示印章插圖 + 「典藏籌備中，敬請期待」文案（取代空白 gallery）",
 ]
 
 def generate_brief(round_n: int, commit_hash: str, commit_msg: str,
