@@ -493,8 +493,8 @@
         .card {
             width: 100%;
             background: var(--paper-200);
-            border-radius: 4px;
-            box-shadow: 0 10px 30px var(--shadow);
+            /* CHANGE A1 (Round 26): border-radius 4px → 2px — 與 modal/skeleton 一致 */
+            border-radius: 2px;
             overflow: hidden;
             position: relative;
             display: flex;
@@ -949,7 +949,7 @@
             margin-bottom: 6px;
             color: var(--seal-red);
             transition: transform 0.1s linear;
-            will-change: transform;
+            /* CHANGE A2 (Round 26): will-change 移出 CSS，改由 JS 動態管理 — 避免順常佔用 compositor layer */
         }
         #scroll-progress-track {
             width: 2px; height: 50dvh;
@@ -1335,7 +1335,8 @@
             font-size: 0.95rem;
             letter-spacing: 0.15em;
             text-decoration: none;
-            border-radius: 3px;
+            /* CHANGE A1 (Round 26): border-radius 3px → 2px — 全站容器語言統一 */
+            border-radius: 2px;
             background: transparent;
             transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                         color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
@@ -1448,7 +1449,8 @@
         }
         .skeleton-info {
             width: 50%;
-            padding: 48px 50px;
+            /* CHANGE A3 (Round 26): padding 50px → 48px (= 6 × 8px) — 8px grid 對齊 */
+            padding: 48px 48px;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -2082,8 +2084,18 @@
 
             /* CHANGE C3: scroll invite fade-out flag — fires once on first scroll past 20px */
             let scrollInviteHidden = false;
+            /* CHANGE A2 (Round 26): scroll-seal will-change 動態套用 + 150ms debounce 清除 */
+            let sealWillChangeTimer;
             let ticking = false;
             window.addEventListener('scroll', () => {
+                /* CHANGE A2 (Round 26): 滾動連續期間保持 will-change，停滾 150ms 後清除 */
+                if (scrollSeal) {
+                    scrollSeal.style.willChange = 'transform';
+                    clearTimeout(sealWillChangeTimer);
+                    sealWillChangeTimer = setTimeout(() => {
+                        scrollSeal.style.willChange = 'auto';
+                    }, 150);
+                }
                 if (!ticking) {
                     window.requestAnimationFrame(() => {
                         /* CHANGE C3: hide scroll invite on first meaningful scroll */
