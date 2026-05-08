@@ -478,7 +478,8 @@
         .gallery-container {
             max-width: 1100px;
             margin: 0 auto;
-            padding: 360px 40px 100px;
+            /* CHANGE A3: dead CSS cleanup — 360px top was overridden by inline padding-top:40px; reflect actual rendered value */
+            padding: 40px 40px 100px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -507,9 +508,10 @@
         .card.from-left  { transform: translateY(20px) translateX(-60px); }
         .card.from-right { transform: translateY(20px) translateX(60px); }
         .card.is-visible { opacity: 1; transform: translateY(0) translateX(0); }
+        /* CHANGE A1: card hover spring bezier — swap Material ease for spring overshoot */
         .card.is-visible {
-            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-                        box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .card:hover {
             transform: translateY(-5px);
@@ -522,9 +524,10 @@
             perspective: 1000px;
             transform-style: preserve-3d;
         }
+        /* CHANGE A1: card hover spring bezier — mouseleave snap-back also uses spring */
         .card.is-visible:not(:hover) {
-            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-                        box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .card.tilt-active {
             transition: none;
@@ -1225,22 +1228,7 @@
             box-shadow: none;
         }
 
-        /* Tweaks panel */
-        #tweaks-panel {
-            position: fixed;
-            right: 20px; bottom: 20px;
-            width: 260px;
-            background: rgba(247, 244, 237, 0.97);
-            border: 1px solid rgba(196, 154, 69, 0.4);
-            border-radius: 6px;
-            padding: 16px 18px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            font-family: var(--font-display);
-            font-size: 0.85rem;
-            color: var(--fg-1);
-            z-index: 500;
-            display: none;
-        }
+        /* CHANGE A3: dead CSS cleanup — removed empty-shell #tweaks-panel block; full definition retained at L1475 */
 
         /* =========================================================
            Contact Section — 洽詢典藏
@@ -1802,7 +1790,8 @@
             </div>
         </div>
 
-        <div id="gallery" class="gallery-container" style="padding-top: 40px;">
+        <!-- CHANGE A3: dead CSS cleanup — removed inline padding-top:40px; CSS now reflects the real value -->
+        <div id="gallery" class="gallery-container">
             <div class="loading">載入典藏中<span class="loading-dots"><span>·</span><span>·</span><span>·</span></span></div>
         </div>
     </div>
@@ -1832,19 +1821,19 @@
                     對館藏器物有興趣，歡迎透過 LINE 私訊掌櫃，<br>
                     我們將於 24 小時內回覆您的詢問。
                 </p>
-                <!-- LINE_ID_PLACEHOLDER: replace href with https://line.me/ti/p/[YOUR_LINE_ID] and remove aria-disabled when ready -->
-                <a class="contact-line-btn"
-                   href="#"
-                   aria-disabled="true"
-                   title="LINE 洽詢即將開放，敬請期待"
-                   onclick="event.preventDefault(); return false;"
-                   target="_blank" rel="noopener noreferrer">
+                <!-- CHANGE A2: LINE button a11y — <a href=#> → <button disabled>; native disabled blocks all activation paths -->
+                <!-- LINE_ID_PLACEHOLDER: when ready, replace this <button> with <a class="contact-line-btn" href="https://line.me/ti/p/[YOUR_LINE_ID]" target="_blank" rel="noopener noreferrer"> and remove disabled/aria-disabled/title -->
+                <button type="button"
+                        class="contact-line-btn"
+                        disabled
+                        aria-disabled="true"
+                        title="LINE 洽詢即將開放，敬請期待">
                     <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                         <path fill="currentColor"
                           d="M19.365 9.89c.50 0 .907.41.907.91s-.406.91-.907.91h-1.44v.91h1.44c.5 0 .907.41.907.91s-.406.91-.907.91H17.01a.91.91 0 01-.907-.91V9.89c0-.5.406-.91.907-.91h2.355zm-5.423 3.64a.91.91 0 01-.907.91.915.915 0 01-.73-.365L10.58 11.8v1.73a.91.91 0 01-1.814 0V9.89c0-.5.406-.91.907-.91.283 0 .535.127.701.326l1.727 2.277V9.89c0-.5.406-.91.907-.91s.907.41.907.91v3.64zM8.09 13.53a.91.91 0 01-.907.91.91.91 0 01-.906-.91V9.89c0-.5.406-.91.906-.91s.907.41.907.91v3.64zM6.27 8.07H3.916a.91.91 0 00-.907.91v3.64c0 .5.406.91.907.91H6.27c.5 0 .906-.41.906-.91s-.406-.91-.906-.91H4.823v-.455H6.27c.5 0 .906-.41.906-.91s-.406-.455-.906-.455H4.823v-.455H6.27c.5 0 .906-.41.906-.91s-.406-.91-.906-.91zM12 2C6.477 2 2 6.145 2 11.243c0 4.561 3.614 8.373 8.49 9.088.33.071.779.218.893.5.102.257.067.66.033.92l-.144.866c-.044.257-.203 1.004.88.547 1.082-.457 5.84-3.44 7.97-5.89C21.397 15.59 22 13.496 22 11.243 22 6.145 17.523 2 12 2z"/>
                     </svg>
                     LINE 洽詢掌櫃
-                </a>
+                </button>
                 <p class="contact-note">
                     ※ 本館典藏圖片及鑑定資料受著作權保護，未經授權不得轉載。
                 </p>
