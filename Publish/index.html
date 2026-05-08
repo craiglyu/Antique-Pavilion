@@ -635,8 +635,8 @@
 
         .info-box {
             width: 50%;
-            /* CHANGE C5: padding 40px→32px，8px grid 對齊 */
-            padding: 32px 50px;
+            /* CHANGE A2 (Round 25): padding 50px → 48px (= 6 × 8px), 8px grid 對齊 */
+            padding: 32px 48px;
             box-sizing: border-box;  /* padding included in width — prevents text overflow */
             position: relative;
             /* Layer 1 (top): 菱格錦 diamond brocade — evokes 錦緞 fabric weave
@@ -681,7 +681,8 @@
         .card--landscape .info-box { width: 42%; }
         .card--feature .img-box  { width: 62%; height: 520px; }
         /* Feature info-box: flush-top so seal + lot-number form header row */
-        .card--feature .info-box { width: 38%; padding: 16px 40px 50px; justify-content: flex-start; }
+                /* CHANGE A2 (Round 25): feature info-box bottom 50px → 48px — 8px grid */
+        .card--feature .info-box { width: 38%; padding: 16px 40px 48px; justify-content: flex-start; }
 
         /* Seal */
         .seal-wrapper {
@@ -1003,8 +1004,8 @@
             width: 90%;
             max-width: 900px;
             max-height: 90dvh;
-            border-radius: 8px;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            /* CHANGE A1 (Round 25): border-radius 8px → 2px — 高端拍賣行 lightbox 最多 0–2px */
+            border-radius: 2px;
             display: flex;
             flex-direction: row;
             overflow: hidden;
@@ -1429,7 +1430,8 @@
         .skeleton-card {
             width: 100%;
             background: var(--paper-200);
-            border-radius: 4px;
+            /* CHANGE A1 (Round 25): skeleton border-radius 4px → 2px — 與 modal 一致 */
+            border-radius: 2px;
             border: 1px solid rgba(0,0,0,0.05);
             display: flex;
             overflow: hidden;
@@ -1805,7 +1807,13 @@
             </div>
 
             <!-- CHANGE C3: scroll invite — 英雄下方滾動引導 -->
-            <div class="scroll-invite" aria-hidden="true">▾</div>
+                        <!-- CHANGE A3 (Round 25): 毛筆箭頭 SVG 取代 ASCII ▾ -->
+            <div class="scroll-invite" aria-hidden="true">
+                <svg viewBox="0 0 16 10" width="16" height="10" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">
+                    <path d="M2 2 L8 8"></path>
+                    <path d="M14 2 L8 8"></path>
+                </svg>
+            </div>
         </header>
 
         <!-- Category filter — 懸絲標籤 rail (built dynamically from sheet data) -->
