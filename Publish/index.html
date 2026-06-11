@@ -4,6 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- /* GPT-R1-01: 補印章語言 favicon / sharing metadata，避免收藏與分享時呈現瀏覽器預設空白圖示。 */ -->
+    <meta name="description" content="吉寶軒中國骨董數位典藏展示頁，呈現瓷器、玉器、銅器與文房器物的工藝故事、年代資訊與鑑定參考，提供 LINE 洽詢與預約看展。">
+    <meta property="og:title" content="吉寶軒 Jibao Xuan — 傳承・鑑光・典藏">
+    <meta property="og:description" content="中國骨董數位典藏展示頁，呈現器物工藝、年代脈絡與鑑定參考，邀請貴賓 LINE 洽詢或預約看展。">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:site_name" content="吉寶軒 Jibao Xuan">
+    <meta property="og:image" content="https://craiglyu.github.io/Antique-Pavilion/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="吉寶軒 Jibao Xuan — 傳承・鑑光・典藏">
+    <meta name="twitter:description" content="中國骨董數位典藏展示頁，呈現器物工藝、年代脈絡與鑑定參考，邀請貴賓 LINE 洽詢或預約看展。">
+    <meta name="twitter:image" content="https://craiglyu.github.io/Antique-Pavilion/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='18' fill='%238a2a2a'/%3E%3Crect x='14' y='14' width='152' height='152' rx='10' fill='none' stroke='%23c49a45' stroke-width='6'/%3E%3Ctext x='90' y='112' text-anchor='middle' font-size='92' font-family='DFKai-SB,BiauKai,Kaiti%20TC,Noto%20Serif%20TC,serif' font-weight='400' fill='%23f7f4ed'%3E吉%3C/text%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='18' fill='%238a2a2a'/%3E%3Crect x='14' y='14' width='152' height='152' rx='10' fill='none' stroke='%23c49a45' stroke-width='6'/%3E%3Ctext x='90' y='112' text-anchor='middle' font-size='92' font-family='DFKai-SB,BiauKai,Kaiti%20TC,Noto%20Serif%20TC,serif' font-weight='400' fill='%23f7f4ed'%3E吉%3C/text%3E%3C/svg%3E">
     <title>吉寶軒 Jibao Xuan — 傳承・鑑光・典藏</title>
     <!-- Three-tier Chinese type system + Latin auction face -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -170,6 +184,9 @@
             /* CHANGE ROUND5: remove padding from transition — non-compositor; visual gap handled via opacity */
             transition: background 0.6s ease, backdrop-filter 0.6s ease,
                         border-bottom 0.6s ease, box-shadow 0.6s ease;
+            /* FIX-06: 透明展開狀態的 header 盒高 400px+，會攔截其下分類列的點擊
+               （elementFromPoint 實測命中 HEADER）。header 內無互動元素 → 放行點擊。 */
+            pointer-events: none;
         }
 
         header.header-compact {
@@ -179,6 +196,8 @@
             border-bottom: 1px solid rgba(196, 154, 69, 0.3);
             padding: 16px 20px 12px;
             box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
+            /* FIX-06: compact 後是不透明實心 bar，恢復攔截 — 避免點擊穿透到底下捲動中的卡片 */
+            pointer-events: auto;
         }
 
         /* Brand mark — font strategy:
@@ -787,7 +806,9 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            font-family: var(--font-latin);
+            /* FIX-07: era 內容是中文（清朝/民國…），--font-latin 的 Georgia→serif 會讓中文
+               fallback 到新細明體（自家 L84 警告的陷阱）。改為 Latin 面領頭 + 標楷體承接中文。 */
+            font-family: 'Cormorant Garamond', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             font-size: 0.8rem;
             letter-spacing: 0.18em;
             color: var(--gold-700);
@@ -968,6 +989,41 @@
             transition: transform 0.1s linear;
         }
 
+        /* GPT-R1-02: 60 屏長頁需要不干擾進度尺的回頂途徑；進場 0.4s、離場 0.2s 符合 Emil rule。 */
+        #backToTop {
+            position: fixed;
+            right: 16px;
+            bottom: 24px;
+            width: 48px;
+            height: 48px;
+            border: 1px solid var(--gold-500);
+            border-radius: 2px;
+            background: var(--seal-red);
+            color: var(--paper);
+            z-index: 210;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(8px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        #backToTop.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+            transition-duration: 0.4s;
+        }
+        #backToTop:hover {
+            transform: translateY(-2px);
+        }
+        #backToTop .back-top-glyph {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            line-height: 1;
+        }
+
         /* =========================================================
            Modal
            ========================================================= */
@@ -1115,7 +1171,8 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            font-family: var(--font-latin);
+            /* FIX-07: 同 .item-era — era 為中文，避免 --font-latin 尾端 serif 落入新細明體 */
+            font-family: 'Cormorant Garamond', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             font-size: 0.78rem;
             letter-spacing: 0.2em;
             color: var(--gold-700);
@@ -1518,6 +1575,24 @@
             border-radius: 2px;
         }
 
+        /* FIX-08a: 中尺寸斷點 — 1200px 以下 12 個分類 tab 會被 flex 壓縮成直排
+           （1024px 實測：「全部典藏」label 變 4 行 × 1 字、按鈕高 112px）。
+           提早切到橫向捲動；flex-shrink:0 保住 label 不折行。
+           首末 auto margin：內容未滿版時仍置中，overflow 時 auto 歸零自動靠左可捲。 */
+        @media (max-width: 1200px) {
+            .category-rail {
+                justify-content: flex-start;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+            .category-rail::-webkit-scrollbar { display: none; }
+            .cat-btn { flex-shrink: 0; }
+            .cat-btn:first-child { margin-left: auto; }
+            .cat-btn:last-child { margin-right: auto; }
+            .category-rail-wrap::after { display: block; }
+        }
+
         @media (max-width: 768px) {
             /* ── 如意雲 Mobile Fix ─────────────────────────────────────────
                Desktop: 300px SVG viewBox fits 300px container → circles look good
@@ -1545,8 +1620,11 @@
             /* ── Card layout ──────────────────────────────────────────────
                Card variant rules (.card--portrait/landscape/feature .img-box) carry
                higher specificity than .img-box alone → must !important-override here  */
+            /* FIX-08b: 原 padding-top 220px 是為了避開 317px 固定 header，
+               但分類列重新定位到 hero 下方（margin-top 300px）後，
+               gallery 只需與分類列保持正常間距。 */
             .gallery-container {
-                padding: 220px 16px 40px;
+                padding: 40px 16px 40px;
                 gap: 32px;
             }
             .card, .card.odd, .card.even {
@@ -1602,8 +1680,11 @@
             }
 
             /* ── Category rail ── */
+            /* FIX-08b: 原 margin-top: 0 讓分類列跑到文件最頂（viewport y≈8），
+               被 317px 固定 header 永久蓋住且與品牌標題重疊 7px — 手機篩選等於失效。
+               改為 300px：分類列落在 hero 結尾正下方，可見、可點。 */
             .category-rail-wrap {
-                margin-top: 0;
+                margin-top: 300px;
             }
             .category-rail-wrap::after { display: block; }
             .category-rail {
@@ -1638,7 +1719,8 @@
         .modal-close:focus-visible,
         .modal-nav:focus-visible,
         .contact-line-btn:focus-visible,
-        .modal-action:focus-visible {
+        .modal-action:focus-visible,
+        #backToTop:focus-visible {
             outline: 2px solid var(--gold);
             outline-offset: 2px;
         }
@@ -1663,6 +1745,8 @@
             .ruyi-center { opacity: 1 !important; }
             /* Also ensure brand-title is visible without the blur-reveal animation */
             .brand-title { opacity: 1 !important; filter: none !important; transform: none !important; }
+            /* GPT-R1-02: 回頂鈕在減少動態下保留可見狀態切換，但取消位移動作。 */
+            #backToTop { transform: none !important; }
         }
 
         /* CHANGE C1: removed legacy section-level reveal block — Round 17 D3 stagger handles entrance */
@@ -1742,6 +1826,7 @@
                    D cx=229 cy=12 r=10  — small summit lobe
                    E cx=182 cy=44 r=15  — trailing lobe
                  Tail: S-curve from E, fading to the outer edge.
+                 [2026-06-11 Craig 拍板] 此版本保留 — 不再重畫結構（GPT/Claude 皆同）。
             -->
             <symbol id="ruyi-chain" viewBox="0 0 300 70" overflow="visible">
                 <!-- Trailing tail — graceful S-curve, fades outward -->
@@ -1900,6 +1985,11 @@
         </div>
     </div>
 
+    <!-- GPT-R1-02: 印章式回頂按鈕，讓深頁瀏覽者不必捲回 60 屏頂端。 -->
+    <button id="backToTop" type="button" aria-label="回到頁首" aria-hidden="true" tabindex="-1">
+        <span class="back-top-glyph" aria-hidden="true">上</span>
+    </button>
+
     <!-- Modal -->
     <div class="modal-overlay" id="artifactModal">
         <!-- CHANGE A1 (Round 24): ARIA dialog semantics — role/aria-modal/aria-labelledby for screen readers; focus trap already handled in openModal() -->
@@ -1977,6 +2067,11 @@
         ];
 
         let artifactsData = [];
+        /* FIX-09: 目前作用中的分類篩選 — modal 前後導覽需在篩選結果內移動 */
+        let activeCategory = 'all';
+        /* GPT-R1-03: Sheet 實際分類映射，取代已失效的汝窯/玉珮/器鼎死碼，恢復 DP-002 比例節奏。 */
+        const CARD_LANDSCAPE_CATS = new Set(['銅器', '金屬器', '香爐', '手爐', '銅香爐', '書畫']);
+        const CARD_PORTRAIT_CATS = new Set(['玉器', '陶瓷', '木器', '雜項', '祭祀器']);
 
         const revealObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
@@ -2072,6 +2167,27 @@
             const progressBar = document.getElementById('scroll-progress-bar');
             /* CHANGE C2: 印章旋轉元素 */
             const scrollSeal = document.getElementById('scroll-seal');
+            /* GPT-R1-02: 回頂按鈕狀態只由 scrollY 控制，不參與 layout。 */
+            const backToTopBtn = document.getElementById('backToTop');
+            const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+            function setBackToTopVisible(visible) {
+                if (!backToTopBtn) return;
+                backToTopBtn.classList.toggle('is-visible', visible);
+                backToTopBtn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+                backToTopBtn.tabIndex = visible ? 0 : -1;
+            }
+            function syncBackToTop() {
+                setBackToTopVisible(window.scrollY > window.innerHeight * 2);
+            }
+            if (backToTopBtn) {
+                backToTopBtn.addEventListener('click', () => {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: reducedMotionQuery.matches ? 'auto' : 'smooth'
+                    });
+                });
+                syncBackToTop();
+            }
 
             const headerObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
@@ -2126,6 +2242,7 @@
                         if (window.scrollY > 0 && window.scrollY >= maxScroll - 50) {
                             header.classList.add('header-compact');
                         }
+                        syncBackToTop();
                         ticking = false;
                     });
                     ticking = true;
@@ -2143,6 +2260,15 @@
                 .split(/[、,\/／]/)
                 .map(s => s.trim())
                 .filter(Boolean);
+        }
+
+        function pickCardVariant(item, index) {
+            const cats = splitCategoryCell(item && item.category);
+            if (index === 0 || (index + 1) % 7 === 0) return 'feature';
+            if (cats.some(cat => CARD_LANDSCAPE_CATS.has(cat))) return 'landscape';
+            if (cats.some(cat => CARD_PORTRAIT_CATS.has(cat))) return 'portrait';
+            /* GPT-R1-03: 未知分類仍按固定節奏插入橫幅，避免所有卡片退回 portrait。 */
+            return (index + 1) % 4 === 0 ? 'landscape' : 'portrait';
         }
 
         // Build hanging-tag buttons for each category found in sheet data.
@@ -2264,6 +2390,8 @@
                     btn.setAttribute('aria-selected', 'true');
                     btn.setAttribute('tabindex', '0');
                     const cat = btn.dataset.cat;
+                    /* FIX-09: 記錄目前篩選，供 modal 導覽使用 */
+                    activeCategory = cat;
 
                     // Animated filter transition
                     const cards = document.querySelectorAll('.card');
@@ -2361,9 +2489,25 @@
         let modalTriggerElement = null;
         let modalFocusTrapHandler = null;
 
+        /* FIX-09: 篩選後仍可見的 artifactsData index 清單（'all' = 全部） */
+        function filteredIndexes() {
+            if (activeCategory === 'all') return artifactsData.map((_, i) => i);
+            const out = [];
+            artifactsData.forEach((item, i) => {
+                if (splitCategoryCell(item.category).includes(activeCategory)) out.push(i);
+            });
+            return out;
+        }
+
         function navigateModal(direction) {
-            const target = currentModalIndex + direction;
-            if (!artifactsData || target < 0 || target >= artifactsData.length) return;
+            /* FIX-09: 原本走全域 index — 篩「玉器」開 modal 按下一件會跳到隱藏分類。
+               改為在 filteredIndexes() 內前後移動。 */
+            const list = filteredIndexes();
+            const pos = list.indexOf(currentModalIndex);
+            if (pos === -1) return;
+            const targetPos = pos + direction;
+            if (targetPos < 0 || targetPos >= list.length) return;
+            const target = list[targetPos];
             /* quick clip-path exit → re-open new item */
             const overlay = document.getElementById('artifactModal');
             overlay.classList.add('closing');
@@ -2381,11 +2525,14 @@
             modalTriggerElement = document.activeElement;
 
             /* CHANGE B2: persist index + update nav button states */
+            /* FIX-09: prev/next 啟用狀態以篩選後清單的位置計算，而非全域 index */
             currentModalIndex = index;
             const prevBtn = document.getElementById('modalPrev');
             const nextBtn = document.getElementById('modalNext');
-            if (prevBtn) prevBtn.disabled = index <= 0;
-            if (nextBtn) nextBtn.disabled = index >= (artifactsData.length - 1);
+            const navList = filteredIndexes();
+            const navPos = navList.indexOf(index);
+            if (prevBtn) prevBtn.disabled = navPos <= 0;
+            if (nextBtn) nextBtn.disabled = navPos === -1 || navPos >= (navList.length - 1);
 
             let highResUrl = item.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='80' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='18' fill='%238a6f2f' letter-spacing='6' opacity='0.6'>暫無圖片</text></svg>";
             if (item.imageUrl) {
@@ -2447,8 +2594,14 @@
             const focusableSelector = 'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
             const focusables = overlay.querySelectorAll(focusableSelector);
             if (focusables.length > 0) {
-                // 延後一個 frame 等 modal transition 開始後再聚焦
-                requestAnimationFrame(() => focusables[0].focus());
+                /* GPT-R1-04: headless + keyboard 實測顯示單一 rAF 偶爾讓焦點停在觸發卡片；
+                   立即 focus，再用 rAF/短 timeout 補焦；240ms 覆蓋鍵盤 Enter 後焦點回彈。 */
+                const focusFirst = () => focusables[0].focus({ preventScroll: true });
+                focusFirst();
+                requestAnimationFrame(focusFirst);
+                setTimeout(focusFirst, 80);
+                setTimeout(focusFirst, 240);
+                setTimeout(focusFirst, 700);
             }
             modalFocusTrapHandler = (e) => {
                 if (e.key !== 'Tab') return;
@@ -2710,14 +2863,8 @@
                         const layoutClass = isOdd ? 'odd' : 'even';
                         const inClass = isOdd ? 'from-left' : 'from-right';
 
-                        // DP-002: assign proportion variant based on category
-                        const portraitCats  = ['汝窯', '玉珮', '陶版畫'];
-                        const landscapeCats = ['器鼎', '龍銀'];
-                        const cat = item.category || '';
-                        const variant = index === 0 ? 'feature'
-                            : portraitCats.includes(cat)  ? 'portrait'
-                            : landscapeCats.includes(cat) ? 'landscape'
-                            : 'portrait';
+                        // DP-002: assign proportion variant based on actual Sheet categories + cadence
+                        const variant = pickCardVariant(item, index);
 
                         const card = document.createElement('div');
                         card.className = `card card--${variant} ${layoutClass} ${inClass}`;
@@ -2731,7 +2878,25 @@
                         card.addEventListener('keydown', (e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                openModal(index);
+                            }
+                        });
+                        card.addEventListener('keyup', (e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                /* GPT-R1-04: keyboard open on keyup mirrors native button timing,
+                                   so modal focus trap can move focus after the activation key completes. */
+                                e.preventDefault();
+                                e.currentTarget.blur();
+                                setTimeout(() => {
+                                    openModal(index);
+                                    setTimeout(() => {
+                                        const closeBtn = document.querySelector('#artifactModal .modal-close');
+                                        if (closeBtn) closeBtn.focus({ preventScroll: true });
+                                    }, 320);
+                                    setTimeout(() => {
+                                        const closeBtn = document.querySelector('#artifactModal .modal-close');
+                                        if (closeBtn) closeBtn.focus({ preventScroll: true });
+                                    }, 700);
+                                }, 0);
                             }
                         });
 
