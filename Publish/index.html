@@ -11,11 +11,13 @@
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
     <meta property="og:site_name" content="吉寶軒 Jibao Xuan">
-    <meta property="og:image" content="https://craiglyu.github.io/Antique-Pavilion/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp">
+    <!-- /* GPT-R2-01: 修正 GitHub Pages 分享圖與 canonical URL，避免舊 repo slug 造成 OG/Twitter 404。 */ -->
+    <meta property="og:url" content="https://craiglyu.github.io/jibao-xuan-site/">
+    <meta property="og:image" content="https://craiglyu.github.io/jibao-xuan-site/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="吉寶軒 Jibao Xuan — 傳承・鑑光・典藏">
     <meta name="twitter:description" content="中國骨董數位典藏展示頁，呈現器物工藝、年代脈絡與鑑定參考，邀請貴賓 LINE 洽詢或預約看展。">
-    <meta name="twitter:image" content="https://craiglyu.github.io/Antique-Pavilion/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp">
+    <meta name="twitter:image" content="https://craiglyu.github.io/jibao-xuan-site/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='18' fill='%238a2a2a'/%3E%3Crect x='14' y='14' width='152' height='152' rx='10' fill='none' stroke='%23c49a45' stroke-width='6'/%3E%3Ctext x='90' y='112' text-anchor='middle' font-size='92' font-family='DFKai-SB,BiauKai,Kaiti%20TC,Noto%20Serif%20TC,serif' font-weight='400' fill='%23f7f4ed'%3E吉%3C/text%3E%3C/svg%3E">
     <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='18' fill='%238a2a2a'/%3E%3Crect x='14' y='14' width='152' height='152' rx='10' fill='none' stroke='%23c49a45' stroke-width='6'/%3E%3Ctext x='90' y='112' text-anchor='middle' font-size='92' font-family='DFKai-SB,BiauKai,Kaiti%20TC,Noto%20Serif%20TC,serif' font-weight='400' fill='%23f7f4ed'%3E吉%3C/text%3E%3C/svg%3E">
     <title>吉寶軒 Jibao Xuan — 傳承・鑑光・典藏</title>
@@ -87,6 +89,17 @@
 
             /* Shadow */
             --shadow: rgba(0, 0, 0, 0.15);
+
+            /* Motion */
+            /* GPT-R2-02: 收斂常用 easing / duration，避免局部動畫各自漂移；離場維持入場約 1/2。 */
+            --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+            --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-material: cubic-bezier(0.4, 0, 0.2, 1);
+            --dur-quick: 0.2s;
+            --dur-base: 0.4s;
+            --dur-slow: 0.7s;
+            --dur-brand: 0.9s;
 
             /* Type tiers — three-layer Chinese system
                Fallback chain strategy (Windows TC):
@@ -219,7 +232,7 @@
             transform: scale(0.95);
             /* 1s delay → Google Fonts CJK subsets (吉/寶/軒 in separate woff2 files)
                have time to load before title becomes visible → no per-char font swap FOUT */
-            animation: titleReveal 2s 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: titleReveal 2s 1s var(--ease-out) forwards;
             /* CHANGE B1: restrict brand-title transition to compositor-only — no letter-spacing
                原本 transition: all 在 header-compact 切換時 letter-spacing 1.5rem→0.8rem 觸發 layout reflow。
                改為僅含 compositor 友善屬性 + font-size（仍會 reflow，但已是必要 size 切換），
@@ -274,8 +287,8 @@
             /* CHANGE F1: pure compositor solution — scaleY(0) + visibility, no max-height/margin-top */
             transform: scaleY(0);
             visibility: hidden;
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 1, 1),
-                        transform 0.3s cubic-bezier(0.4, 0, 1, 1),
+            transition: opacity 0.3s var(--ease-exit),
+                        transform 0.3s var(--ease-exit),
                         visibility 0.3s;
         }
 
@@ -284,7 +297,7 @@
             display: inline-block;
             opacity: 0;
             transform: translateY(8px);
-            animation: sloganWordIn 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: sloganWordIn var(--dur-slow) var(--ease-out) forwards;
         }
         .brand-slogan > span:nth-child(1) { animation-delay: 2.5s; }
         .brand-slogan > span:nth-child(3) { animation-delay: 3.0s; }
@@ -335,9 +348,9 @@
         .cloud-left { left: 0; display: flex; justify-content: flex-end; }
         .cloud-right { right: 0; display: flex; justify-content: flex-start; transform: scaleX(-1); }
 
-        .cloud-left  { animation: cloudEnterLeft 3s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+        .cloud-left  { animation: cloudEnterLeft 3s var(--ease-out) forwards,
                                   cloudFloat 5s ease-in-out 3s infinite; }
-        .cloud-right { animation: cloudEnterRight 3s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+        .cloud-right { animation: cloudEnterRight 3s var(--ease-out) forwards,
                                   cloudFloatRight 5s ease-in-out 3s infinite; }
 
         .ruyi-svg {
@@ -373,7 +386,7 @@
             background: linear-gradient(90deg, transparent, var(--ink), transparent);
             opacity: 0;
             transform: scaleX(0);
-            animation: lineReveal 2s 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: lineReveal 2s 2.5s var(--ease-out) forwards;
         }
 
         @keyframes cloudEnterLeft {
@@ -473,7 +486,7 @@
             height: 2px;
             background: var(--gold);
             transform: scaleX(0);
-            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform var(--dur-base) var(--ease-out);
         }
         .cat-btn:hover .cat-glyph { color: var(--fg-1); }
         .cat-btn:hover .cat-label { color: var(--fg-2); }
@@ -490,7 +503,7 @@
             min-height: 100dvh;
             /* CHANGE D3: opening fade-in — wrapper appears with a 0.3s delay after
                the body paints so the ink-wash bg is already visible beneath it */
-            animation: pageWrapperReveal 1.2s 0.3s cubic-bezier(0.25, 1, 0.5, 1) both;
+            animation: pageWrapperReveal 1.2s 0.3s var(--ease-out) both;
         }
         @keyframes pageWrapperReveal {
             from { opacity: 0; transform: translateY(8px); }
@@ -521,7 +534,7 @@
             border: 1px solid rgba(0, 0, 0, 0.05);
             opacity: 0;
             transform: translateY(20px) translateX(60px);
-            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1),
+            transition: opacity 0.8s ease, transform 0.8s var(--ease-out),
                         box-shadow 0.4s ease;
             will-change: transform, opacity;
         }
@@ -535,16 +548,17 @@
            Now: opacity fades 0.8s ease, transform/box-shadow keep spring — hover unaffected (opacity static). */
         .card.is-visible {
             transition: opacity 0.8s ease,
-                        transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-                        box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+                        transform var(--dur-base) var(--ease-out),
+                        box-shadow var(--dur-base) var(--ease-out);
         }
         .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 50px rgba(196, 154, 69, 0.3);
+            /* GPT-R2-03: hover 從展示式大 lift/金光收斂成型錄式微動，避免蓋過器物本身。 */
+            transform: translateY(-3px);
+            box-shadow: 0 14px 36px rgba(196, 154, 69, 0.18);
             z-index: 10;
         }
 
-        /* CHANGE C1: 3D tilt 視差效果 — mousemove 驅動 ±3° rotateXY */
+        /* CHANGE C1: 3D tilt 視差效果 — mousemove 驅動微量 rotateXY */
         .card {
             perspective: 1000px;
             transform-style: preserve-3d;
@@ -586,8 +600,8 @@
             width: 100%; height: 100%;
             object-fit: cover;
             filter: brightness(0.93);  /* DP-005: no sepia — preserve original glaze colours */
-            transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1),
-                        filter 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform var(--dur-brand) var(--ease-out),
+                        filter var(--dur-brand) var(--ease-out);
         }
         /* CHANGE E1: 漸進式圖片載入 — blur-in reveal */
         .antique-img[data-lazy="true"] {
@@ -597,12 +611,12 @@
         .antique-img.loaded {
             filter: brightness(0.93) blur(0);
             opacity: 1;
-            transition: filter 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-                        opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: filter 0.6s var(--ease-out),
+                        opacity 0.6s var(--ease-out);
         }
         .card:hover .antique-img {
-            transform: scale(1.08);
-            filter: brightness(1.02);
+            transform: scale(1.035);
+            filter: brightness(1);
         }
 
         .vignette-cloud {
@@ -613,7 +627,7 @@
             -webkit-backdrop-filter: blur(12px);
             background: rgba(247, 244, 237, 0.4);
             opacity: 1;
-            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity var(--dur-brand) var(--ease-out);
             pointer-events: none;
             z-index: 2;
         }
@@ -630,7 +644,7 @@
             animation-play-state: paused;
             pointer-events: none;
             z-index: 3;
-            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity var(--dur-brand) var(--ease-out);
         }
         .card:hover .moving-cloud { opacity: 0; }
         /* CHANGE B5: 中心卡片才播放雲動畫 */
@@ -644,13 +658,13 @@
             border: 1px solid var(--gold);
             opacity: 0;
             transform: scale(1.05);
-            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
-                        transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity var(--dur-brand) var(--ease-out),
+                        transform var(--dur-brand) var(--ease-out);
             pointer-events: none;
             z-index: 4;
             mix-blend-mode: overlay;
         }
-        .card:hover .focus-border { opacity: 0.8; transform: scale(1); }
+        .card:hover .focus-border { opacity: 0.55; transform: scale(1); }
 
         .info-box {
             width: 50%;
@@ -714,7 +728,7 @@
         .seal-svg {
             width: 100%; height: 100%;
             /* CHANGE A2 (Round 23): seal-svg hover ease → spring cubic-bezier(0.34,1.56,0.64,1) — match .contact-seal feel */
-            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: transform 0.35s var(--ease-spring);
             overflow: visible;
         }
         .seal-wrapper:hover .seal-svg { transform: scale(1.1) rotate(-5deg); }
@@ -1045,14 +1059,14 @@
         /* Exit — 2× faster than entrance (Emil rule) */
         .modal-overlay.closing {
             opacity: 0;
-            transition: opacity 0.24s cubic-bezier(0.4, 0, 1, 1),
+            transition: opacity 0.24s var(--ease-exit),
                         visibility 0.24s;
         }
         .modal-overlay.closing .modal-content {
             transform: scale(0.97) translateY(8px);
             opacity: 0;
-            transition: transform 0.24s cubic-bezier(0.4, 0, 1, 1),
-                        opacity 0.24s cubic-bezier(0.4, 0, 1, 1);
+            transition: transform 0.24s var(--ease-exit),
+                        opacity 0.24s var(--ease-exit);
         }
 
         .modal-content {
@@ -1068,7 +1082,7 @@
             position: relative;
             transform: scale(0.95) translateY(20px);
             opacity: 0;
-            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
+            transition: transform 0.5s var(--ease-out), opacity 0.5s ease;
             border: 1px solid rgba(196, 154, 69, 0.3);
         }
         .modal-overlay.active .modal-content {
@@ -1136,7 +1150,7 @@
             object-fit: contain;
             filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45));
             /* CHANGE B3: click-to-zoom */
-            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform 0.35s var(--ease-out);
             cursor: zoom-in;
             transform-origin: center center;
         }
@@ -1332,7 +1346,7 @@
             gap: 12px;
         }
         .contact-seal {
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: transform var(--dur-base) var(--ease-spring);
         }
         .contact-seal:hover { transform: rotate(-5deg) scale(1.08); }
         .contact-title {
@@ -1395,10 +1409,10 @@
             /* CHANGE A1 (Round 26): border-radius 3px → 2px — 全站容器語言統一 */
             border-radius: 2px;
             background: transparent;
-            transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                        color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-                        box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: background 0.3s var(--ease-material),
+                        color 0.3s var(--ease-material),
+                        transform 0.25s var(--ease-material),
+                        box-shadow 0.25s var(--ease-material);
         }
         .contact-line-btn:hover {
             background: var(--line-green);
@@ -1469,11 +1483,11 @@
             transform: scale(0.97) translateY(4px);
             pointer-events: none;
             /* CHANGE A1 (Round 23): 0.22s → 0.18s — 精確 2× Emil exit rule (0.36s enter ÷ 2 = 0.18s) */
-            transition: opacity 0.18s cubic-bezier(0.4, 0, 1, 1),
-                        transform 0.18s cubic-bezier(0.4, 0, 1, 1);
+            transition: opacity 0.18s var(--ease-exit),
+                        transform 0.18s var(--ease-exit);
         }
         .card.filter-showing {
-            animation: cardFilterIn 0.36s cubic-bezier(0.25, 1, 0.5, 1) both;
+            animation: cardFilterIn 0.36s var(--ease-out) both;
         }
         @keyframes cardFilterIn {
             from { opacity: 0; transform: scale(0.97) translateY(4px); }
@@ -1654,12 +1668,12 @@
             .card.odd .info-box::before { display: none !important; }
 
             .card.in-center .antique-img {
-                transform: scale(1.08);
-                filter: brightness(1.02);
+                transform: scale(1.035);
+                filter: brightness(1);
             }
             .card.in-center .vignette-cloud,
             .card.in-center .moving-cloud { opacity: 0; }
-            .card.in-center .focus-border { opacity: 0.8; transform: scale(1); }
+            .card.in-center .focus-border { opacity: 0.55; transform: scale(1); }
 
             .item-name { padding-right: 72px; font-size: 1.4rem; min-height: 48px; }
 
@@ -1760,7 +1774,7 @@
             opacity: 0;
             margin-top: -4px;
             letter-spacing: 0;
-            animation: scrollInviteFade 1s 4s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+            animation: scrollInviteFade 1s 4s var(--ease-out) forwards,
                        scrollInviteBob 2.2s 5s ease-in-out infinite;
             will-change: opacity, transform;
             transition: opacity 0.4s ease;
@@ -1787,8 +1801,8 @@
         .contact-child-reveal {
             opacity: 0;
             transform: translateY(20px);
-            transition: opacity 0.7s cubic-bezier(0.25, 1, 0.5, 1),
-                        transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity var(--dur-slow) var(--ease-out),
+                        transform var(--dur-slow) var(--ease-out);
         }
         .contact-child-reveal.visible {
             opacity: 1;
@@ -2987,12 +3001,12 @@
                     const percentX = (x - centerX) / centerX;
                     const percentY = (y - centerY) / centerY;
                     
-                    // ±3° 旋轉範圍
-                    const rotateY = percentX * 3;
-                    const rotateX = -percentY * 3;
+                    // GPT-R2-03: tilt 從 ±3° 收斂到 ±2°，配合 hover pass 的拍賣型錄式微動。
+                    const rotateY = percentX * 2;
+                    const rotateX = -percentY * 2;
                     
                     card.classList.add('tilt-active');
-                    card.style.transform = `translateY(-5px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                    card.style.transform = `translateY(-3px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
                 });
                 
                 card.addEventListener('mouseleave', () => {
