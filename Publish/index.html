@@ -890,6 +890,13 @@
             color: var(--fg-3);
             margin: 0;
         }
+        /* CHANGE QW5: 邊緣狀態次要引導行 — 較小、較淡，帶下一步 */
+        .empty-state .empty-sub {
+            font-size: 0.8rem;
+            letter-spacing: 0.15em;
+            color: var(--fg-muted);
+            margin-top: 12px;
+        }
 
         .item-story {
             font-family: var(--font-body);
@@ -1742,6 +1749,16 @@
             outline: 2px solid var(--gold);
             outline-offset: 4px;
         }
+        /* CHANGE QW3: sr-only live region — 視覺隱藏、僅供輔助科技讀取 */
+        .sr-only {
+            position: absolute;
+            width: 1px; height: 1px;
+            padding: 0; margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
 
         /* Accessibility — honor user's motion preference */
         @media (prefers-reduced-motion: reduce) {
@@ -1876,9 +1893,12 @@
         </defs>
     </svg>
 
-    <div class="bg-layer"></div>
-    <canvas id="glCanvas"></canvas>
-    <div class="ink-vignette"></div>
+    <!-- CHANGE QW3: 裝飾層對輔助科技隱藏 -->
+    <div class="bg-layer" aria-hidden="true"></div>
+    <canvas id="glCanvas" aria-hidden="true"></canvas>
+    <div class="ink-vignette" aria-hidden="true"></div>
+    <!-- CHANGE QW3: 篩選 / 載入狀態的 polite 播報區 -->
+    <div id="a11y-status" class="sr-only" role="status" aria-live="polite"></div>
 
     <div class="page-wrapper">
         <div id="header-sentinel" style="position:absolute;top:0;left:0;width:100%;height:150px;visibility:hidden;pointer-events:none;"></div>
@@ -2010,19 +2030,24 @@
         <div class="modal-content"
              role="dialog"
              aria-modal="true"
-             aria-labelledby="modalTitle">
+             aria-labelledby="modalTitle"
+             tabindex="-1">
             <button class="modal-close" aria-label="關閉典藏詳情" onclick="closeModal()">✕</button>
             <!-- CHANGE B2: 上下藏品導覽 -->
             <button class="modal-nav prev" id="modalPrev" aria-label="上一件典藏" onclick="navigateModal(-1)">‹</button>
             <button class="modal-nav next" id="modalNext" aria-label="下一件典藏" onclick="navigateModal(1)">›</button>
             <div class="modal-left">
-                <img src="" alt="典藏詳情圖" class="modal-img" id="modalImg">
+                <img src="" alt="典藏詳情圖" class="modal-img" id="modalImg" referrerpolicy="no-referrer" decoding="async">
             </div>
             <div class="modal-right">
                 <h2 class="modal-title" id="modalTitle"></h2>
                 <div class="modal-era" id="modalEra"></div>
                 <div class="modal-badges" id="modalBadges"></div>
-                <!-- DP-003: 策展人鑑定摘要 -->
+                <!-- CHANGE QW4: 敘事先於鑑價 — 故事 → 金句 → 鑑定參考 → 洽詢（原為先價後事） -->
+                <div class="modal-story" id="modalStory"></div>
+                <!-- CHANGE B1: highlightQuote 金句 blockquote -->
+                <blockquote class="modal-highlight-quote" id="modalHighlightQuote" style="display:none;"></blockquote>
+                <!-- DP-003: 策展人鑑定摘要（QW4: 移至故事與金句之後） -->
                 <div class="modal-appraisal" id="modalAppraisal">
                     <div class="appraisal-divider">
                         <span class="appraisal-label">鑑定參考</span>
@@ -2031,9 +2056,6 @@
                     <div class="appraisal-row appraisal-price" id="modalRefPrice"></div>
                     <div class="appraisal-note" id="modalDisplayRec"></div>
                 </div>
-                <div class="modal-story" id="modalStory"></div>
-                <!-- CHANGE B1: highlightQuote 金句 blockquote -->
-                <blockquote class="modal-highlight-quote" id="modalHighlightQuote" style="display:none;"></blockquote>
                 <div class="modal-tags" id="modalTags"></div>
                 <!-- CHANGE TIER A4: 術語統一「典藏」 -->
                 <button class="modal-action"
@@ -2087,6 +2109,16 @@
         const CARD_LANDSCAPE_CATS = new Set(['銅器', '金屬器', '香爐', '手爐', '銅香爐', '書畫']);
         const CARD_PORTRAIT_CATS = new Set(['玉器', '陶瓷', '木器', '雜項', '祭祀器']);
 
+        /* CHANGE QW1: 品牌印章佔位圖 — 圖片 404/限流時的 onerror fallback（避免破圖 icon） */
+        const IMG_PLACEHOLDER = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='48' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='13' fill='%238a6f2f' letter-spacing='4' opacity='0.6'>暫無圖片</text></svg>";
+        const IMG_PLACEHOLDER_LG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='80' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='18' fill='%238a6f2f' letter-spacing='6' opacity='0.6'>暫無圖片</text></svg>";
+
+        /* CHANGE QW3: aria-live 播報 helper — 更新 sr-only #a11y-status */
+        function announce(msg) {
+            const el = document.getElementById('a11y-status');
+            if (el) el.textContent = msg;
+        }
+
         const revealObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
@@ -2115,6 +2147,14 @@
                     const img = entry.target;
                     const src = img.dataset.src;
                     if (src) {
+                        /* CHANGE QW1: Drive thumbnail 404/限流時回退品牌佔位圖，避免破圖 icon */
+                        img.onerror = () => {
+                            img.onerror = null;
+                            img.src = IMG_PLACEHOLDER;
+                            img.classList.add('loaded');
+                            img.removeAttribute('data-lazy');
+                            img.removeAttribute('data-src');
+                        };
                         img.src = src;
                         img.onload = () => {
                             img.classList.add('loaded');
@@ -2445,6 +2485,10 @@
                             emptyEl.innerHTML = '<span class="empty-glyph">虛</span><p>此專場尚無典藏</p>';
                             gallery.appendChild(emptyEl);
                         }
+                        /* CHANGE QW3: 播報篩選結果供報讀器 */
+                        const catLabelEl = btn.querySelector('.cat-label');
+                        const catLabel = (catLabelEl && catLabelEl.textContent) || (cat === 'all' ? '全部典藏' : cat);
+                        announce(visible === 0 ? `${catLabel}・此專場尚無典藏` : `${catLabel}・共 ${visible} 件典藏`);
                     /* CHANGE A3 (Round 24): tighten 240 → 190ms — filter-hiding is 0.18s=180ms + 10ms buffer; old 240ms left a 60ms gap */
                     }, 190);
                 });
@@ -2548,14 +2592,17 @@
             if (prevBtn) prevBtn.disabled = navPos <= 0;
             if (nextBtn) nextBtn.disabled = navPos === -1 || navPos >= (navList.length - 1);
 
-            let highResUrl = item.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='80' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='18' fill='%238a6f2f' letter-spacing='6' opacity='0.6'>暫無圖片</text></svg>";
+            let highResUrl = item.imageUrl || IMG_PLACEHOLDER_LG;
             if (item.imageUrl) {
                 const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
                 if (idMatch) highResUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w2000`;
             }
 
-            document.getElementById('modalImg').src = highResUrl;
-            document.getElementById('modalImg').alt = item.itemName || '';
+            /* CHANGE QW1: modal 高解圖 404/限流時回退品牌佔位圖（onerror 先於 src 設定） */
+            const modalImgElInit = document.getElementById('modalImg');
+            modalImgElInit.onerror = () => { modalImgElInit.onerror = null; modalImgElInit.src = IMG_PLACEHOLDER_LG; };
+            modalImgElInit.src = highResUrl;
+            modalImgElInit.alt = item.itemName || '';
             document.getElementById('modalTitle').textContent = item.itemName || '';
             document.getElementById('modalEra').textContent = item.era || '年代待考';
 
@@ -2606,16 +2653,18 @@
                焦點先移至第一個可聚焦元素（modal-close 或 nav button）。 */
             const overlay = document.getElementById('artifactModal');
             const focusableSelector = 'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
-            const focusables = overlay.querySelectorAll(focusableSelector);
-            if (focusables.length > 0) {
-                /* GPT-R1-04: headless + keyboard 實測顯示單一 rAF 偶爾讓焦點停在觸發卡片；
-                   立即 focus，再用 rAF/短 timeout 補焦；240ms 覆蓋鍵盤 Enter 後焦點回彈。 */
-                const focusFirst = () => focusables[0].focus({ preventScroll: true });
-                focusFirst();
-                requestAnimationFrame(focusFirst);
-                setTimeout(focusFirst, 80);
-                setTimeout(focusFirst, 240);
-                setTimeout(focusFirst, 700);
+            /* CHANGE QW3: 焦點落在 .modal-content（tabindex=-1），報讀器先唸品名而非「關閉」；
+               transitionend 補一次 + rAF 作 reduced-motion fallback，取代原多重 setTimeout hack。 */
+            const modalContentEl = overlay.querySelector('.modal-content');
+            if (modalContentEl) {
+                const focusModal = () => modalContentEl.focus({ preventScroll: true });
+                focusModal();
+                requestAnimationFrame(focusModal);
+                modalContentEl.addEventListener('transitionend', function onEnter(e) {
+                    if (e.target !== modalContentEl) return;
+                    focusModal();
+                    modalContentEl.removeEventListener('transitionend', onEnter);
+                });
             }
             modalFocusTrapHandler = (e) => {
                 if (e.key !== 'Tab') return;
@@ -2663,6 +2712,14 @@
                 console.info('[JBX] WebGL fog disabled — low-core device (cores=%d, mem=%dGB)', cores, memGB);
                 const canvas = document.getElementById('glCanvas');
                 if (canvas) canvas.style.display = 'none';
+                return;
+            }
+
+            /* CHANGE QW2: 尊重 OS 減少動態 — 整頁最大動態元素在 reduced-motion 下不啟動 */
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                console.info('[JBX] WebGL fog disabled — prefers-reduced-motion');
+                const rmCanvas = document.getElementById('glCanvas');
+                if (rmCanvas) rmCanvas.style.display = 'none';
                 return;
             }
 
@@ -2806,26 +2863,46 @@
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
                 rafId = requestAnimationFrame(render);
             }
-            rafId = requestAnimationFrame(render);
 
-            /* CHANGE C2: 分頁隱藏時取消 raf，重新可見時重啟（調整 startTime 防時間跳躍）*/
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    if (rafId !== null) {
-                        /* CHANGE D1: preserve WebGL timeline on tab resume — record pause moment, don't reset startTime */
-                        pauseTime = performance.now();
-                        cancelAnimationFrame(rafId);
-                        rafId = null;
-                    }
-                } else if (rafId === null) {
-                    /* CHANGE D1: preserve WebGL timeline on tab resume — offset startTime by paused duration so dt 不跳 */
+            /* CHANGE QW2: 統一暫停/恢復 — 分頁隱藏 OR 捲離 hero 皆暫停 rAF，兩者都回復才續跑；
+               沿用 startTime 補償避免 dt 跳躍。 */
+            let pageHidden = false;
+            let heroOut = false;
+            function pauseFog() {
+                if (rafId !== null) {
+                    pauseTime = performance.now();
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
+            }
+            function resumeFog() {
+                if (!pageHidden && !heroOut && rafId === null) {
                     if (pauseTime !== null) {
                         startTime += performance.now() - pauseTime;
                         pauseTime = null;
                     }
                     rafId = requestAnimationFrame(render);
                 }
+            }
+            rafId = requestAnimationFrame(render);
+
+            /* CHANGE C2 + QW2: 分頁隱藏時取消 raf，重新可見時重啟（調整 startTime 防時間跳躍）*/
+            document.addEventListener('visibilitychange', () => {
+                pageHidden = document.hidden;
+                if (pageHidden) pauseFog(); else resumeFog();
             });
+
+            /* CHANGE QW2: 捲離 hero（header-sentinel 離開視窗）即暫停 fog，省 GPU/主執行緒；回到 hero 再續。 */
+            const fogHeroSentinel = document.getElementById('header-sentinel');
+            if (fogHeroSentinel) {
+                const fogHeroObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        heroOut = !entry.isIntersecting;
+                        if (heroOut) pauseFog(); else resumeFog();
+                    });
+                }, { threshold: 0 });
+                fogHeroObserver.observe(fogHeroSentinel);
+            }
         }
 
         /* ============ Artifacts fetch + render ============ */
@@ -2857,7 +2934,7 @@
                     artifactsData = json.data;
 
                     json.data.forEach((item, index) => {
-                        let imageUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='48' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='13' fill='%238a6f2f' letter-spacing='4' opacity='0.6'>暫無圖片</text></svg>";
+                        let imageUrl = IMG_PLACEHOLDER;
                         if (item.imageUrl) {
                             const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
                             if (idMatch) imageUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
@@ -2896,21 +2973,11 @@
                         });
                         card.addEventListener('keyup', (e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
-                                /* GPT-R1-04: keyboard open on keyup mirrors native button timing,
-                                   so modal focus trap can move focus after the activation key completes. */
+                                /* CHANGE QW3: keyup 開啟後由 openModal 統一將焦點移到 .modal-content，
+                                   移除原本對 close 鈕的多重 setTimeout 補焦。 */
                                 e.preventDefault();
                                 e.currentTarget.blur();
-                                setTimeout(() => {
-                                    openModal(index);
-                                    setTimeout(() => {
-                                        const closeBtn = document.querySelector('#artifactModal .modal-close');
-                                        if (closeBtn) closeBtn.focus({ preventScroll: true });
-                                    }, 320);
-                                    setTimeout(() => {
-                                        const closeBtn = document.querySelector('#artifactModal .modal-close');
-                                        if (closeBtn) closeBtn.focus({ preventScroll: true });
-                                    }, 700);
-                                }, 0);
+                                openModal(index);
                             }
                         });
 
@@ -2922,7 +2989,7 @@
                         card.innerHTML = `
                             <div class="img-box">
                                 <!-- CHANGE E1: data-lazy + data-src 替換 eager loading，IntersectionObserver 負責載入 -->
-                                <img class="antique-img" data-lazy="true" data-src="${imageUrl}" alt="${(item.itemName || '典藏')}，${(item.era || '年代不詳')}，${(item.category || '')}">
+                                <img class="antique-img" data-lazy="true" data-src="${imageUrl}" referrerpolicy="no-referrer" decoding="async" alt="${(item.itemName || '典藏')}，${(item.era || '年代不詳')}，${(item.category || '')}">
                                 <div class="vignette-cloud"></div>
                                 <div class="moving-cloud"></div>
                                 <div class="focus-border"></div>
@@ -2969,12 +3036,18 @@
                        卡片 DOM 尚未存在 → querySelectorAll('.card') 回傳空 NodeList，tilt 完全失效。
                        移至此處：卡片已渲染完畢，正確掛上 mousemove listener。 */
                     initCardTilt();
+                    /* CHANGE QW3: 載入完成播報供報讀器 */
+                    announce(`已載入 ${artifactsData.length} 件典藏`);
                 } else {
-                    gallery.innerHTML = '<div class="loading">庫房目前空置，或無法取得資料。</div>';
+                    /* CHANGE QW5: 無資料態品牌化 — 印章插圖 + 得體文案 + 下一步 */
+                    gallery.innerHTML = '<div class="empty-state"><span class="empty-glyph">吉</span><p>典藏籌備中，敬請期待</p><p class="empty-sub">可透過頁尾洽詢掌櫃，先行預約蒞臨鑑賞</p></div>';
+                    announce('典藏籌備中，敬請期待');
                 }
             } catch (e) {
+                /* CHANGE QW5: 錯誤態品牌化 — 不外洩 GAS URL / 例外字串（僅 console 保留除錯） */
                 console.error(e);
-                gallery.innerHTML = `<div class="loading" style="color:${getComputedStyle(document.documentElement).getPropertyValue('--seal-red')};">連線失敗：請檢查 GAS 部署網址。<br><small style="font-family:var(--font-latin); font-style:italic;">${e.message}</small></div>`;
+                gallery.innerHTML = '<div class="empty-state"><span class="empty-glyph">軒</span><p>典藏連線暫時中斷</p><p class="empty-sub">請稍後再試，或透過頁尾洽詢掌櫃</p></div>';
+                announce('典藏連線暫時中斷，請稍後再試');
             }
         }
 
