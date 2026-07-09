@@ -3,7 +3,24 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CHANGE D6: viewport-fit=cover 讓背景延伸到瀏海/圓角邊緣，配合 env(safe-area-inset-*) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- /* GPT-R1-01: 補印章語言 favicon / sharing metadata，避免收藏與分享時呈現瀏覽器預設空白圖示。 */ -->
+    <meta name="description" content="吉寶軒中國骨董數位典藏展示頁，呈現瓷器、玉器、銅器與文房器物的工藝故事、年代資訊與鑑定參考，提供 LINE 洽詢與預約看展。">
+    <meta property="og:title" content="吉寶軒 Jibao Xuan — 傳承・鑑光・典藏">
+    <meta property="og:description" content="中國骨董數位典藏展示頁，呈現器物工藝、年代脈絡與鑑定參考，邀請貴賓 LINE 洽詢或預約看展。">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:site_name" content="吉寶軒 Jibao Xuan">
+    <!-- /* GPT-R2-01: 修正 GitHub Pages 分享圖與 canonical URL，避免舊 repo slug 造成 OG/Twitter 404。 */ -->
+    <meta property="og:url" content="https://craiglyu.github.io/jibao-xuan-site/">
+    <meta property="og:image" content="https://craiglyu.github.io/jibao-xuan-site/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="吉寶軒 Jibao Xuan — 傳承・鑑光・典藏">
+    <meta name="twitter:description" content="中國骨董數位典藏展示頁，呈現器物工藝、年代脈絡與鑑定參考，邀請貴賓 LINE 洽詢或預約看展。">
+    <meta name="twitter:image" content="https://craiglyu.github.io/jibao-xuan-site/seedream-4.0_Optimized_Refinement_Prompt_Seamless_Digital_Background_1.5_._Enhance_this_maste-0.webp">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='18' fill='%238a2a2a'/%3E%3Crect x='14' y='14' width='152' height='152' rx='10' fill='none' stroke='%23c49a45' stroke-width='6'/%3E%3Ctext x='90' y='112' text-anchor='middle' font-size='92' font-family='DFKai-SB,BiauKai,Kaiti%20TC,Noto%20Serif%20TC,serif' font-weight='400' fill='%23f7f4ed'%3E吉%3C/text%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='18' fill='%238a2a2a'/%3E%3Crect x='14' y='14' width='152' height='152' rx='10' fill='none' stroke='%23c49a45' stroke-width='6'/%3E%3Ctext x='90' y='112' text-anchor='middle' font-size='92' font-family='DFKai-SB,BiauKai,Kaiti%20TC,Noto%20Serif%20TC,serif' font-weight='400' fill='%23f7f4ed'%3E吉%3C/text%3E%3C/svg%3E">
     <title>吉寶軒 Jibao Xuan — 傳承・鑑光・典藏</title>
     <!-- Three-tier Chinese type system + Latin auction face -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -73,6 +90,17 @@
 
             /* Shadow */
             --shadow: rgba(0, 0, 0, 0.15);
+
+            /* Motion */
+            /* GPT-R2-02: 收斂常用 easing / duration，避免局部動畫各自漂移；離場維持入場約 1/2。 */
+            --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+            --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+            --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ease-material: cubic-bezier(0.4, 0, 0.2, 1);
+            --dur-quick: 0.2s;
+            --dur-base: 0.4s;
+            --dur-slow: 0.7s;
+            --dur-brand: 0.9s;
 
             /* Type tiers — three-layer Chinese system
                Fallback chain strategy (Windows TC):
@@ -170,6 +198,9 @@
             /* CHANGE ROUND5: remove padding from transition — non-compositor; visual gap handled via opacity */
             transition: background 0.6s ease, backdrop-filter 0.6s ease,
                         border-bottom 0.6s ease, box-shadow 0.6s ease;
+            /* FIX-06: 透明展開狀態的 header 盒高 400px+，會攔截其下分類列的點擊
+               （elementFromPoint 實測命中 HEADER）。header 內無互動元素 → 放行點擊。 */
+            pointer-events: none;
         }
 
         header.header-compact {
@@ -179,6 +210,8 @@
             border-bottom: 1px solid rgba(196, 154, 69, 0.3);
             padding: 16px 20px 12px;
             box-shadow: 0 4px 20px rgba(44, 44, 44, 0.08);
+            /* FIX-06: compact 後是不透明實心 bar，恢復攔截 — 避免點擊穿透到底下捲動中的卡片 */
+            pointer-events: auto;
         }
 
         /* Brand mark — font strategy:
@@ -189,18 +222,19 @@
               of 寶/軒 → causes per-char mix. LXGW WenKai TC avoids this entirely.  */
         .brand-title {
             font-family: 'LXGW WenKai TC', '標楷體', 'DFKai-SB', 'BiauKai', 'Noto Serif TC', Georgia, serif;
-            font-size: 5rem;
+            /* CHANGE D5: clamp 字級 — 窄屏（320–375）避免 5rem 溢出，寬屏維持原視覺 5rem */
+            font-size: clamp(2.5rem, 11vw, 5rem);
             font-weight: normal;
             color: var(--ink);
             margin: 0;
-            /* CHANGE A1: letter-spacing 直接設為最終值 1.5rem，不參與動畫（避免 layout reflow） */
-            letter-spacing: 1.5rem;
+            /* CHANGE A1: letter-spacing 最終值；CHANGE D5: clamp 下限收斂避免窄屏溢出（不參與動畫） */
+            letter-spacing: clamp(0.4rem, 3.5vw, 1.5rem);
             filter: blur(10px);
             opacity: 0;
             transform: scale(0.95);
             /* 1s delay → Google Fonts CJK subsets (吉/寶/軒 in separate woff2 files)
                have time to load before title becomes visible → no per-char font swap FOUT */
-            animation: titleReveal 2s 1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: titleReveal 2s 1s var(--ease-out) forwards;
             /* CHANGE B1: restrict brand-title transition to compositor-only — no letter-spacing
                原本 transition: all 在 header-compact 切換時 letter-spacing 1.5rem→0.8rem 觸發 layout reflow。
                改為僅含 compositor 友善屬性 + font-size（仍會 reflow，但已是必要 size 切換），
@@ -255,8 +289,8 @@
             /* CHANGE F1: pure compositor solution — scaleY(0) + visibility, no max-height/margin-top */
             transform: scaleY(0);
             visibility: hidden;
-            transition: opacity 0.3s cubic-bezier(0.4, 0, 1, 1),
-                        transform 0.3s cubic-bezier(0.4, 0, 1, 1),
+            transition: opacity 0.3s var(--ease-exit),
+                        transform 0.3s var(--ease-exit),
                         visibility 0.3s;
         }
 
@@ -265,7 +299,7 @@
             display: inline-block;
             opacity: 0;
             transform: translateY(8px);
-            animation: sloganWordIn 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: sloganWordIn var(--dur-slow) var(--ease-out) forwards;
         }
         .brand-slogan > span:nth-child(1) { animation-delay: 2.5s; }
         .brand-slogan > span:nth-child(3) { animation-delay: 3.0s; }
@@ -316,9 +350,9 @@
         .cloud-left { left: 0; display: flex; justify-content: flex-end; }
         .cloud-right { right: 0; display: flex; justify-content: flex-start; transform: scaleX(-1); }
 
-        .cloud-left  { animation: cloudEnterLeft 3s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+        .cloud-left  { animation: cloudEnterLeft 3s var(--ease-out) forwards,
                                   cloudFloat 5s ease-in-out 3s infinite; }
-        .cloud-right { animation: cloudEnterRight 3s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+        .cloud-right { animation: cloudEnterRight 3s var(--ease-out) forwards,
                                   cloudFloatRight 5s ease-in-out 3s infinite; }
 
         .ruyi-svg {
@@ -354,7 +388,7 @@
             background: linear-gradient(90deg, transparent, var(--ink), transparent);
             opacity: 0;
             transform: scaleX(0);
-            animation: lineReveal 2s 2.5s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            animation: lineReveal 2s 2.5s var(--ease-out) forwards;
         }
 
         @keyframes cloudEnterLeft {
@@ -454,7 +488,7 @@
             height: 2px;
             background: var(--gold);
             transform: scaleX(0);
-            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform var(--dur-base) var(--ease-out);
         }
         .cat-btn:hover .cat-glyph { color: var(--fg-1); }
         .cat-btn:hover .cat-label { color: var(--fg-2); }
@@ -471,7 +505,7 @@
             min-height: 100dvh;
             /* CHANGE D3: opening fade-in — wrapper appears with a 0.3s delay after
                the body paints so the ink-wash bg is already visible beneath it */
-            animation: pageWrapperReveal 1.2s 0.3s cubic-bezier(0.25, 1, 0.5, 1) both;
+            animation: pageWrapperReveal 1.2s 0.3s var(--ease-out) both;
         }
         @keyframes pageWrapperReveal {
             from { opacity: 0; transform: translateY(8px); }
@@ -502,7 +536,7 @@
             border: 1px solid rgba(0, 0, 0, 0.05);
             opacity: 0;
             transform: translateY(20px) translateX(60px);
-            transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.25, 1, 0.5, 1),
+            transition: opacity 0.8s ease, transform 0.8s var(--ease-out),
                         box-shadow 0.4s ease;
             will-change: transform, opacity;
         }
@@ -516,16 +550,17 @@
            Now: opacity fades 0.8s ease, transform/box-shadow keep spring — hover unaffected (opacity static). */
         .card.is-visible {
             transition: opacity 0.8s ease,
-                        transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-                        box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+                        transform var(--dur-base) var(--ease-out),
+                        box-shadow var(--dur-base) var(--ease-out);
         }
         .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 50px rgba(196, 154, 69, 0.3);
+            /* GPT-R2-03: hover 從展示式大 lift/金光收斂成型錄式微動，避免蓋過器物本身。 */
+            transform: translateY(-3px);
+            box-shadow: 0 14px 36px rgba(196, 154, 69, 0.18);
             z-index: 10;
         }
 
-        /* CHANGE C1: 3D tilt 視差效果 — mousemove 驅動 ±3° rotateXY */
+        /* CHANGE C1: 3D tilt 視差效果 — mousemove 驅動微量 rotateXY */
         .card {
             perspective: 1000px;
             transform-style: preserve-3d;
@@ -567,8 +602,8 @@
             width: 100%; height: 100%;
             object-fit: cover;
             filter: brightness(0.93);  /* DP-005: no sepia — preserve original glaze colours */
-            transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1),
-                        filter 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform var(--dur-brand) var(--ease-out),
+                        filter var(--dur-brand) var(--ease-out);
         }
         /* CHANGE E1: 漸進式圖片載入 — blur-in reveal */
         .antique-img[data-lazy="true"] {
@@ -578,12 +613,12 @@
         .antique-img.loaded {
             filter: brightness(0.93) blur(0);
             opacity: 1;
-            transition: filter 0.6s cubic-bezier(0.25, 1, 0.5, 1),
-                        opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: filter 0.6s var(--ease-out),
+                        opacity 0.6s var(--ease-out);
         }
         .card:hover .antique-img {
-            transform: scale(1.08);
-            filter: brightness(1.02);
+            transform: scale(1.035);
+            filter: brightness(1);
         }
 
         .vignette-cloud {
@@ -594,7 +629,7 @@
             -webkit-backdrop-filter: blur(12px);
             background: rgba(247, 244, 237, 0.4);
             opacity: 1;
-            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity var(--dur-brand) var(--ease-out);
             pointer-events: none;
             z-index: 2;
         }
@@ -611,7 +646,7 @@
             animation-play-state: paused;
             pointer-events: none;
             z-index: 3;
-            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity var(--dur-brand) var(--ease-out);
         }
         .card:hover .moving-cloud { opacity: 0; }
         /* CHANGE B5: 中心卡片才播放雲動畫 */
@@ -625,13 +660,13 @@
             border: 1px solid var(--gold);
             opacity: 0;
             transform: scale(1.05);
-            transition: opacity 1.2s cubic-bezier(0.25, 1, 0.5, 1),
-                        transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity var(--dur-brand) var(--ease-out),
+                        transform var(--dur-brand) var(--ease-out);
             pointer-events: none;
             z-index: 4;
             mix-blend-mode: overlay;
         }
-        .card:hover .focus-border { opacity: 0.8; transform: scale(1); }
+        .card:hover .focus-border { opacity: 0.55; transform: scale(1); }
 
         .info-box {
             width: 50%;
@@ -695,7 +730,7 @@
         .seal-svg {
             width: 100%; height: 100%;
             /* CHANGE A2 (Round 23): seal-svg hover ease → spring cubic-bezier(0.34,1.56,0.64,1) — match .contact-seal feel */
-            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: transform 0.35s var(--ease-spring);
             overflow: visible;
         }
         .seal-wrapper:hover .seal-svg { transform: scale(1.1) rotate(-5deg); }
@@ -783,11 +818,33 @@
             padding-right: 88px; /* clear 60px seal @ right:30 + breathing room */
             min-height: 60px;
         }
+        /* CHANGE D4: 品名按鈕 — 重置原生外觀、繼承 h2 排版；成為卡片唯一可聚焦動作元素（報讀器 H 鍵可列品名） */
+        .item-name-btn {
+            appearance: none;
+            -webkit-appearance: none;
+            background: none;
+            border: 0;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            color: inherit;
+            letter-spacing: inherit;
+            line-height: inherit;
+            text-align: start;
+            width: 100%;
+            cursor: pointer;
+        }
+        .item-name-btn:focus-visible {
+            outline: 2px solid var(--gold);
+            outline-offset: 3px;
+        }
         .item-era {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-family: var(--font-latin);
+            /* FIX-07: era 內容是中文（清朝/民國…），--font-latin 的 Georgia→serif 會讓中文
+               fallback 到新細明體（自家 L84 警告的陷阱）。改為 Latin 面領頭 + 標楷體承接中文。 */
+            font-family: 'Cormorant Garamond', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             font-size: 0.8rem;
             letter-spacing: 0.18em;
             color: var(--gold-700);
@@ -854,6 +911,13 @@
             font-size: 0.95rem;
             color: var(--fg-3);
             margin: 0;
+        }
+        /* CHANGE QW5: 邊緣狀態次要引導行 — 較小、較淡，帶下一步 */
+        .empty-state .empty-sub {
+            font-size: 0.8rem;
+            letter-spacing: 0.15em;
+            color: var(--fg-muted);
+            margin-top: 12px;
         }
 
         .item-story {
@@ -934,7 +998,8 @@
         /* Scroll progress */
         #scroll-progress-wrap {
             position: fixed;
-            right: 16px; top: 20px;
+            /* CHANGE D6: 右側安全區內縮（橫向瀏海裝置） */
+            right: calc(16px + env(safe-area-inset-right)); top: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -968,6 +1033,42 @@
             transition: transform 0.1s linear;
         }
 
+        /* GPT-R1-02: 60 屏長頁需要不干擾進度尺的回頂途徑；進場 0.4s、離場 0.2s 符合 Emil rule。 */
+        #backToTop {
+            position: fixed;
+            /* CHANGE D6: 安全區 — 底部/右側內縮，避開系統手勢條與圓角，並與右上進度尺分屬上下不碰撞 */
+            right: calc(16px + env(safe-area-inset-right));
+            bottom: calc(24px + env(safe-area-inset-bottom));
+            width: 48px;
+            height: 48px;
+            border: 1px solid var(--gold-500);
+            border-radius: 2px;
+            background: var(--seal-red);
+            color: var(--paper);
+            z-index: 210;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(8px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        #backToTop.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+            transition-duration: 0.4s;
+        }
+        #backToTop:hover {
+            transform: translateY(-2px);
+        }
+        #backToTop .back-top-glyph {
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            line-height: 1;
+        }
+
         /* =========================================================
            Modal
            ========================================================= */
@@ -989,14 +1090,14 @@
         /* Exit — 2× faster than entrance (Emil rule) */
         .modal-overlay.closing {
             opacity: 0;
-            transition: opacity 0.24s cubic-bezier(0.4, 0, 1, 1),
+            transition: opacity 0.24s var(--ease-exit),
                         visibility 0.24s;
         }
         .modal-overlay.closing .modal-content {
             transform: scale(0.97) translateY(8px);
             opacity: 0;
-            transition: transform 0.24s cubic-bezier(0.4, 0, 1, 1),
-                        opacity 0.24s cubic-bezier(0.4, 0, 1, 1);
+            transition: transform 0.24s var(--ease-exit),
+                        opacity 0.24s var(--ease-exit);
         }
 
         .modal-content {
@@ -1012,7 +1113,7 @@
             position: relative;
             transform: scale(0.95) translateY(20px);
             opacity: 0;
-            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
+            transition: transform 0.5s var(--ease-out), opacity 0.5s ease;
             border: 1px solid rgba(196, 154, 69, 0.3);
         }
         .modal-overlay.active .modal-content {
@@ -1080,14 +1181,20 @@
             object-fit: contain;
             filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.45));
             /* CHANGE B3: click-to-zoom */
-            transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform 0.35s var(--ease-out);
             cursor: zoom-in;
             transform-origin: center center;
         }
         .modal-img.zoomed {
             transform: scale(1.85);
-            cursor: zoom-out;
+            /* CHANGE D6: 放大態可拖曳平移 → grab 游標（實際 transform 由 JS inline 覆蓋以帶入平移量） */
+            cursor: grab;
             filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.6));
+        }
+        /* CHANGE D6: 拖曳平移中 — 停用 transform transition 使平移即時跟手；游標 grabbing */
+        .modal-img.panning {
+            transition: none;
+            cursor: grabbing;
         }
 
         .modal-right {
@@ -1115,7 +1222,8 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            font-family: var(--font-latin);
+            /* FIX-07: 同 .item-era — era 為中文，避免 --font-latin 尾端 serif 落入新細明體 */
+            font-family: 'Cormorant Garamond', '標楷體', 'DFKai-SB', 'BiauKai', 'Kaiti TC', 'STKaiti', 'KaiTi', 'Noto Serif TC', Georgia, serif;
             font-size: 0.78rem;
             letter-spacing: 0.2em;
             color: var(--gold-700);
@@ -1275,7 +1383,7 @@
             gap: 12px;
         }
         .contact-seal {
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: transform var(--dur-base) var(--ease-spring);
         }
         .contact-seal:hover { transform: rotate(-5deg) scale(1.08); }
         .contact-title {
@@ -1338,10 +1446,10 @@
             /* CHANGE A1 (Round 26): border-radius 3px → 2px — 全站容器語言統一 */
             border-radius: 2px;
             background: transparent;
-            transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                        color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-                        box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: background 0.3s var(--ease-material),
+                        color 0.3s var(--ease-material),
+                        transform 0.25s var(--ease-material),
+                        box-shadow 0.25s var(--ease-material);
         }
         .contact-line-btn:hover {
             background: var(--line-green);
@@ -1374,6 +1482,7 @@
         /* Category rail wrap + fade */
         .category-rail-wrap {
             position: relative;
+            /* CHANGE D5: 300px 僅為無 JS 後備；syncHeroSpacing() 於載入/resize/fonts.ready 動態量測 hero 實高覆蓋 */
             margin-top: 300px;
         }
         .category-rail-wrap::after {
@@ -1412,11 +1521,11 @@
             transform: scale(0.97) translateY(4px);
             pointer-events: none;
             /* CHANGE A1 (Round 23): 0.22s → 0.18s — 精確 2× Emil exit rule (0.36s enter ÷ 2 = 0.18s) */
-            transition: opacity 0.18s cubic-bezier(0.4, 0, 1, 1),
-                        transform 0.18s cubic-bezier(0.4, 0, 1, 1);
+            transition: opacity 0.18s var(--ease-exit),
+                        transform 0.18s var(--ease-exit);
         }
         .card.filter-showing {
-            animation: cardFilterIn 0.36s cubic-bezier(0.25, 1, 0.5, 1) both;
+            animation: cardFilterIn 0.36s var(--ease-out) both;
         }
         @keyframes cardFilterIn {
             from { opacity: 0; transform: scale(0.97) translateY(4px); }
@@ -1518,6 +1627,24 @@
             border-radius: 2px;
         }
 
+        /* FIX-08a: 中尺寸斷點 — 1200px 以下 12 個分類 tab 會被 flex 壓縮成直排
+           （1024px 實測：「全部典藏」label 變 4 行 × 1 字、按鈕高 112px）。
+           提早切到橫向捲動；flex-shrink:0 保住 label 不折行。
+           首末 auto margin：內容未滿版時仍置中，overflow 時 auto 歸零自動靠左可捲。 */
+        @media (max-width: 1200px) {
+            .category-rail {
+                justify-content: flex-start;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+            .category-rail::-webkit-scrollbar { display: none; }
+            .cat-btn { flex-shrink: 0; }
+            .cat-btn:first-child { margin-left: auto; }
+            .cat-btn:last-child { margin-right: auto; }
+            .category-rail-wrap::after { display: block; }
+        }
+
         @media (max-width: 768px) {
             /* ── 如意雲 Mobile Fix ─────────────────────────────────────────
                Desktop: 300px SVG viewBox fits 300px container → circles look good
@@ -1545,8 +1672,11 @@
             /* ── Card layout ──────────────────────────────────────────────
                Card variant rules (.card--portrait/landscape/feature .img-box) carry
                higher specificity than .img-box alone → must !important-override here  */
+            /* FIX-08b: 原 padding-top 220px 是為了避開 317px 固定 header，
+               但分類列重新定位到 hero 下方（margin-top 300px）後，
+               gallery 只需與分類列保持正常間距。 */
             .gallery-container {
-                padding: 220px 16px 40px;
+                padding: 40px 16px 40px;
                 gap: 32px;
             }
             .card, .card.odd, .card.even {
@@ -1576,12 +1706,12 @@
             .card.odd .info-box::before { display: none !important; }
 
             .card.in-center .antique-img {
-                transform: scale(1.08);
-                filter: brightness(1.02);
+                transform: scale(1.035);
+                filter: brightness(1);
             }
             .card.in-center .vignette-cloud,
             .card.in-center .moving-cloud { opacity: 0; }
-            .card.in-center .focus-border { opacity: 0.8; transform: scale(1); }
+            .card.in-center .focus-border { opacity: 0.55; transform: scale(1); }
 
             .item-name { padding-right: 72px; font-size: 1.4rem; min-height: 48px; }
 
@@ -1602,8 +1732,11 @@
             }
 
             /* ── Category rail ── */
+            /* FIX-08b: 原 margin-top: 0 讓分類列跑到文件最頂（viewport y≈8），
+               被 317px 固定 header 永久蓋住且與品牌標題重疊 7px — 手機篩選等於失效。
+               改為 300px：分類列落在 hero 結尾正下方，可見、可點。 */
             .category-rail-wrap {
-                margin-top: 0;
+                margin-top: 300px;
             }
             .category-rail-wrap::after { display: block; }
             .category-rail {
@@ -1638,13 +1771,24 @@
         .modal-close:focus-visible,
         .modal-nav:focus-visible,
         .contact-line-btn:focus-visible,
-        .modal-action:focus-visible {
+        .modal-action:focus-visible,
+        #backToTop:focus-visible {
             outline: 2px solid var(--gold);
             outline-offset: 2px;
         }
         .card:focus-visible {
             outline: 2px solid var(--gold);
             outline-offset: 4px;
+        }
+        /* CHANGE QW3: sr-only live region — 視覺隱藏、僅供輔助科技讀取 */
+        .sr-only {
+            position: absolute;
+            width: 1px; height: 1px;
+            padding: 0; margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
 
         /* Accessibility — honor user's motion preference */
@@ -1663,6 +1807,8 @@
             .ruyi-center { opacity: 1 !important; }
             /* Also ensure brand-title is visible without the blur-reveal animation */
             .brand-title { opacity: 1 !important; filter: none !important; transform: none !important; }
+            /* GPT-R1-02: 回頂鈕在減少動態下保留可見狀態切換，但取消位移動作。 */
+            #backToTop { transform: none !important; }
         }
 
         /* CHANGE C1: removed legacy section-level reveal block — Round 17 D3 stagger handles entrance */
@@ -1676,7 +1822,7 @@
             opacity: 0;
             margin-top: -4px;
             letter-spacing: 0;
-            animation: scrollInviteFade 1s 4s cubic-bezier(0.25, 1, 0.5, 1) forwards,
+            animation: scrollInviteFade 1s 4s var(--ease-out) forwards,
                        scrollInviteBob 2.2s 5s ease-in-out infinite;
             will-change: opacity, transform;
             transition: opacity 0.4s ease;
@@ -1703,8 +1849,8 @@
         .contact-child-reveal {
             opacity: 0;
             transform: translateY(20px);
-            transition: opacity 0.7s cubic-bezier(0.25, 1, 0.5, 1),
-                        transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: opacity var(--dur-slow) var(--ease-out),
+                        transform var(--dur-slow) var(--ease-out);
         }
         .contact-child-reveal.visible {
             opacity: 1;
@@ -1742,6 +1888,7 @@
                    D cx=229 cy=12 r=10  — small summit lobe
                    E cx=182 cy=44 r=15  — trailing lobe
                  Tail: S-curve from E, fading to the outer edge.
+                 [2026-06-11 Craig 拍板] 此版本保留 — 不再重畫結構（GPT/Claude 皆同）。
             -->
             <symbol id="ruyi-chain" viewBox="0 0 300 70" overflow="visible">
                 <!-- Trailing tail — graceful S-curve, fades outward -->
@@ -1777,9 +1924,12 @@
         </defs>
     </svg>
 
-    <div class="bg-layer"></div>
-    <canvas id="glCanvas"></canvas>
-    <div class="ink-vignette"></div>
+    <!-- CHANGE QW3: 裝飾層對輔助科技隱藏 -->
+    <div class="bg-layer" aria-hidden="true"></div>
+    <canvas id="glCanvas" aria-hidden="true"></canvas>
+    <div class="ink-vignette" aria-hidden="true"></div>
+    <!-- CHANGE QW3: 篩選 / 載入狀態的 polite 播報區 -->
+    <div id="a11y-status" class="sr-only" role="status" aria-live="polite"></div>
 
     <div class="page-wrapper">
         <div id="header-sentinel" style="position:absolute;top:0;left:0;width:100%;height:150px;visibility:hidden;pointer-events:none;"></div>
@@ -1900,25 +2050,37 @@
         </div>
     </div>
 
+    <!-- GPT-R1-02: 印章式回頂按鈕，讓深頁瀏覽者不必捲回 60 屏頂端。 -->
+    <button id="backToTop" type="button" aria-label="回到頁首" aria-hidden="true" tabindex="-1">
+        <span class="back-top-glyph" aria-hidden="true">上</span>
+    </button>
+
     <!-- Modal -->
     <div class="modal-overlay" id="artifactModal">
         <!-- CHANGE A1 (Round 24): ARIA dialog semantics — role/aria-modal/aria-labelledby for screen readers; focus trap already handled in openModal() -->
         <div class="modal-content"
              role="dialog"
              aria-modal="true"
-             aria-labelledby="modalTitle">
+             aria-labelledby="modalTitle"
+             tabindex="-1">
             <button class="modal-close" aria-label="關閉典藏詳情" onclick="closeModal()">✕</button>
             <!-- CHANGE B2: 上下藏品導覽 -->
             <button class="modal-nav prev" id="modalPrev" aria-label="上一件典藏" onclick="navigateModal(-1)">‹</button>
             <button class="modal-nav next" id="modalNext" aria-label="下一件典藏" onclick="navigateModal(1)">›</button>
             <div class="modal-left">
-                <img src="" alt="典藏詳情圖" class="modal-img" id="modalImg">
+                <!-- CHANGE D3: 放大圖鍵盤可達 — role=button + tabindex + aria-pressed（狀態由 JS 同步；aria-label 於 openModal 動態帶入品名） -->
+                <img src="" alt="典藏詳情圖" class="modal-img" id="modalImg" referrerpolicy="no-referrer" decoding="async"
+                     role="button" tabindex="0" aria-pressed="false">
             </div>
             <div class="modal-right">
                 <h2 class="modal-title" id="modalTitle"></h2>
                 <div class="modal-era" id="modalEra"></div>
                 <div class="modal-badges" id="modalBadges"></div>
-                <!-- DP-003: 策展人鑑定摘要 -->
+                <!-- CHANGE QW4: 敘事先於鑑價 — 故事 → 金句 → 鑑定參考 → 洽詢（原為先價後事） -->
+                <div class="modal-story" id="modalStory"></div>
+                <!-- CHANGE B1: highlightQuote 金句 blockquote -->
+                <blockquote class="modal-highlight-quote" id="modalHighlightQuote" style="display:none;"></blockquote>
+                <!-- DP-003: 策展人鑑定摘要（QW4: 移至故事與金句之後） -->
                 <div class="modal-appraisal" id="modalAppraisal">
                     <div class="appraisal-divider">
                         <span class="appraisal-label">鑑定參考</span>
@@ -1927,9 +2089,6 @@
                     <div class="appraisal-row appraisal-price" id="modalRefPrice"></div>
                     <div class="appraisal-note" id="modalDisplayRec"></div>
                 </div>
-                <div class="modal-story" id="modalStory"></div>
-                <!-- CHANGE B1: highlightQuote 金句 blockquote -->
-                <blockquote class="modal-highlight-quote" id="modalHighlightQuote" style="display:none;"></blockquote>
                 <div class="modal-tags" id="modalTags"></div>
                 <!-- CHANGE TIER A4: 術語統一「典藏」 -->
                 <button class="modal-action"
@@ -1977,6 +2136,21 @@
         ];
 
         let artifactsData = [];
+        /* FIX-09: 目前作用中的分類篩選 — modal 前後導覽需在篩選結果內移動 */
+        let activeCategory = 'all';
+        /* GPT-R1-03: Sheet 實際分類映射，取代已失效的汝窯/玉珮/器鼎死碼，恢復 DP-002 比例節奏。 */
+        const CARD_LANDSCAPE_CATS = new Set(['銅器', '金屬器', '香爐', '手爐', '銅香爐', '書畫']);
+        const CARD_PORTRAIT_CATS = new Set(['玉器', '陶瓷', '木器', '雜項', '祭祀器']);
+
+        /* CHANGE QW1: 品牌印章佔位圖 — 圖片 404/限流時的 onerror fallback（避免破圖 icon） */
+        const IMG_PLACEHOLDER = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='48' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='13' fill='%238a6f2f' letter-spacing='4' opacity='0.6'>暫無圖片</text></svg>";
+        const IMG_PLACEHOLDER_LG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='80' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='18' fill='%238a6f2f' letter-spacing='6' opacity='0.6'>暫無圖片</text></svg>";
+
+        /* CHANGE QW3: aria-live 播報 helper — 更新 sr-only #a11y-status */
+        function announce(msg) {
+            const el = document.getElementById('a11y-status');
+            if (el) el.textContent = msg;
+        }
 
         const revealObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
@@ -2006,6 +2180,14 @@
                     const img = entry.target;
                     const src = img.dataset.src;
                     if (src) {
+                        /* CHANGE QW1: Drive thumbnail 404/限流時回退品牌佔位圖，避免破圖 icon */
+                        img.onerror = () => {
+                            img.onerror = null;
+                            img.src = IMG_PLACEHOLDER;
+                            img.classList.add('loaded');
+                            img.removeAttribute('data-lazy');
+                            img.removeAttribute('data-src');
+                        };
                         img.src = src;
                         img.onload = () => {
                             img.classList.add('loaded');
@@ -2019,12 +2201,35 @@
         }, { rootMargin: '50px' });
 
         /* ============ Boot ============ */
+        /* CHANGE D5: 動態量測 hero 實高 → category-rail-wrap margin-top，取代 300px magic number。
+           量測「展開態」高度：resize 時若當前為 compact，先暫移除 class 量測再還原（同一 frame 內、不觸發 paint）。 */
+        function syncHeroSpacing() {
+            const header = document.getElementById('main-header');
+            const wrap = document.querySelector('.category-rail-wrap');
+            if (!header || !wrap) return;
+            const wasCompact = header.classList.contains('header-compact');
+            if (wasCompact) header.classList.remove('header-compact');
+            const h = header.offsetHeight;
+            if (wasCompact) header.classList.add('header-compact');
+            if (h > 0) wrap.style.marginTop = Math.round(h) + 'px';
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             applyTweaks(TWEAK_DEFAULTS);
             fetchArtifacts();
             initWebGLFog();
             initTweaks();
             initCategoryFilter();
+            initModalInteractions();
+
+            /* CHANGE D5: hero 間距同步 — 載入 + 字型就緒 + resize（debounce 150ms）皆重量測 */
+            syncHeroSpacing();
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncHeroSpacing);
+            let heroSpaceTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(heroSpaceTimer);
+                heroSpaceTimer = setTimeout(syncHeroSpacing, 150);
+            });
 
             /* CHANGE D3: contact stagger — observe section, then stagger 100ms across .contact-inner > * children
                threshold 0.15 so reveal triggers slightly earlier; each child gets .contact-child-reveal then .visible */
@@ -2072,6 +2277,27 @@
             const progressBar = document.getElementById('scroll-progress-bar');
             /* CHANGE C2: 印章旋轉元素 */
             const scrollSeal = document.getElementById('scroll-seal');
+            /* GPT-R1-02: 回頂按鈕狀態只由 scrollY 控制，不參與 layout。 */
+            const backToTopBtn = document.getElementById('backToTop');
+            const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+            function setBackToTopVisible(visible) {
+                if (!backToTopBtn) return;
+                backToTopBtn.classList.toggle('is-visible', visible);
+                backToTopBtn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+                backToTopBtn.tabIndex = visible ? 0 : -1;
+            }
+            function syncBackToTop() {
+                setBackToTopVisible(window.scrollY > window.innerHeight * 2);
+            }
+            if (backToTopBtn) {
+                backToTopBtn.addEventListener('click', () => {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: reducedMotionQuery.matches ? 'auto' : 'smooth'
+                    });
+                });
+                syncBackToTop();
+            }
 
             const headerObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
@@ -2126,6 +2352,7 @@
                         if (window.scrollY > 0 && window.scrollY >= maxScroll - 50) {
                             header.classList.add('header-compact');
                         }
+                        syncBackToTop();
                         ticking = false;
                     });
                     ticking = true;
@@ -2143,6 +2370,15 @@
                 .split(/[、,\/／]/)
                 .map(s => s.trim())
                 .filter(Boolean);
+        }
+
+        function pickCardVariant(item, index) {
+            const cats = splitCategoryCell(item && item.category);
+            if (index === 0 || (index + 1) % 7 === 0) return 'feature';
+            if (cats.some(cat => CARD_LANDSCAPE_CATS.has(cat))) return 'landscape';
+            if (cats.some(cat => CARD_PORTRAIT_CATS.has(cat))) return 'portrait';
+            /* GPT-R1-03: 未知分類仍按固定節奏插入橫幅，避免所有卡片退回 portrait。 */
+            return (index + 1) % 4 === 0 ? 'landscape' : 'portrait';
         }
 
         // Build hanging-tag buttons for each category found in sheet data.
@@ -2264,6 +2500,8 @@
                     btn.setAttribute('aria-selected', 'true');
                     btn.setAttribute('tabindex', '0');
                     const cat = btn.dataset.cat;
+                    /* FIX-09: 記錄目前篩選，供 modal 導覽使用 */
+                    activeCategory = cat;
 
                     // Animated filter transition
                     const cards = document.querySelectorAll('.card');
@@ -2303,6 +2541,10 @@
                             emptyEl.innerHTML = '<span class="empty-glyph">虛</span><p>此專場尚無典藏</p>';
                             gallery.appendChild(emptyEl);
                         }
+                        /* CHANGE QW3: 播報篩選結果供報讀器 */
+                        const catLabelEl = btn.querySelector('.cat-label');
+                        const catLabel = (catLabelEl && catLabelEl.textContent) || (cat === 'all' ? '全部典藏' : cat);
+                        announce(visible === 0 ? `${catLabel}・此專場尚無典藏` : `${catLabel}・共 ${visible} 件典藏`);
                     /* CHANGE A3 (Round 24): tighten 240 → 190ms — filter-hiding is 0.18s=180ms + 10ms buffer; old 240ms left a 60ms gap */
                     }, 190);
                 });
@@ -2361,15 +2603,123 @@
         let modalTriggerElement = null;
         let modalFocusTrapHandler = null;
 
+        /* FIX-09: 篩選後仍可見的 artifactsData index 清單（'all' = 全部） */
+        function filteredIndexes() {
+            if (activeCategory === 'all') return artifactsData.map((_, i) => i);
+            const out = [];
+            artifactsData.forEach((item, i) => {
+                if (splitCategoryCell(item.category).includes(activeCategory)) out.push(i);
+            });
+            return out;
+        }
+
+        /* ============ CHANGE D3 + D6: modal 圖縮放 + 平移 + 觸控手勢 ============ */
+        let modalZoom = { on: false, panX: 0, panY: 0, dragging: false };
+        function _modalImg() { return document.getElementById('modalImg'); }
+        function applyModalZoom() {
+            const img = _modalImg(); if (!img) return;
+            if (modalZoom.on) {
+                img.style.transform = `translate(${modalZoom.panX}px, ${modalZoom.panY}px) scale(1.85)`;
+                img.classList.add('zoomed');
+                img.setAttribute('aria-pressed', 'true');
+            } else {
+                img.style.transform = '';
+                img.classList.remove('zoomed', 'panning');
+                img.setAttribute('aria-pressed', 'false');
+            }
+        }
+        function resetModalZoom() { modalZoom.on = false; modalZoom.panX = 0; modalZoom.panY = 0; modalZoom.dragging = false; applyModalZoom(); }
+        function toggleModalZoom() { modalZoom.on = !modalZoom.on; modalZoom.panX = 0; modalZoom.panY = 0; applyModalZoom(); }
+        function _clampModalPan() {
+            const img = _modalImg(); if (!img) return;
+            const maxX = img.offsetWidth * 0.42, maxY = img.offsetHeight * 0.42;
+            modalZoom.panX = Math.max(-maxX, Math.min(maxX, modalZoom.panX));
+            modalZoom.panY = Math.max(-maxY, Math.min(maxY, modalZoom.panY));
+        }
+        function initModalInteractions() {
+            const img = _modalImg();
+            const content = document.querySelector('.modal-content');
+            if (!img || img.dataset.zoomBound) return;
+            img.dataset.zoomBound = '1';
+
+            /* 縮放：滑鼠點擊 / 鍵盤 Enter,Space（放大態拖曳後的 click 不誤切換） */
+            img.addEventListener('click', () => { if (!modalZoom.dragging) toggleModalZoom(); });
+            img.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleModalZoom(); }
+            });
+
+            /* 放大態滑鼠拖曳平移 */
+            img.addEventListener('mousedown', (e) => {
+                if (!modalZoom.on) return;
+                e.preventDefault();
+                modalZoom.dragging = false;
+                const sx = e.clientX, sy = e.clientY, bx = modalZoom.panX, by = modalZoom.panY;
+                img.classList.add('panning');
+                const move = (ev) => {
+                    const dx = ev.clientX - sx, dy = ev.clientY - sy;
+                    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) modalZoom.dragging = true;
+                    modalZoom.panX = bx + dx; modalZoom.panY = by + dy;
+                    _clampModalPan(); applyModalZoom();
+                };
+                const up = () => {
+                    img.classList.remove('panning');
+                    document.removeEventListener('mousemove', move);
+                    document.removeEventListener('mouseup', up);
+                    setTimeout(() => { modalZoom.dragging = false; }, 0);
+                };
+                document.addEventListener('mousemove', move);
+                document.addEventListener('mouseup', up);
+            });
+
+            /* 觸控：放大態在圖上拖曳平移 */
+            let tsx = 0, tsy = 0, tbx = 0, tby = 0;
+            img.addEventListener('touchstart', (e) => {
+                if (!modalZoom.on) return;
+                const t = e.touches[0]; tsx = t.clientX; tsy = t.clientY; tbx = modalZoom.panX; tby = modalZoom.panY;
+                img.classList.add('panning');
+            }, { passive: true });
+            img.addEventListener('touchmove', (e) => {
+                if (!modalZoom.on) return;
+                const t = e.touches[0];
+                modalZoom.panX = tbx + (t.clientX - tsx); modalZoom.panY = tby + (t.clientY - tsy);
+                _clampModalPan(); applyModalZoom();
+                e.preventDefault();   /* 阻止頁面捲動並避免觸發下方 swipe */
+            }, { passive: false });
+            img.addEventListener('touchend', () => { img.classList.remove('panning'); }, { passive: true });
+
+            /* 觸控：未放大時於 modal 水平滑動切換藏品（左滑→下一件） */
+            if (content) {
+                let sx = 0, sy = 0, sZoom = false;
+                content.addEventListener('touchstart', (e) => {
+                    const t = e.touches[0]; sx = t.clientX; sy = t.clientY; sZoom = modalZoom.on;
+                }, { passive: true });
+                content.addEventListener('touchend', (e) => {
+                    if (sZoom || modalZoom.on) return;   /* 放大態不切件 */
+                    const t = e.changedTouches[0];
+                    const dx = t.clientX - sx, dy = t.clientY - sy;
+                    if (Math.abs(dx) > 40 && Math.abs(dy) < 30) navigateModal(dx < 0 ? 1 : -1);
+                }, { passive: true });
+            }
+        }
+
         function navigateModal(direction) {
-            const target = currentModalIndex + direction;
-            if (!artifactsData || target < 0 || target >= artifactsData.length) return;
+            /* FIX-09: 原本走全域 index — 篩「玉器」開 modal 按下一件會跳到隱藏分類。
+               改為在 filteredIndexes() 內前後移動。 */
+            const list = filteredIndexes();
+            const pos = list.indexOf(currentModalIndex);
+            if (pos === -1) return;
+            const targetPos = pos + direction;
+            if (targetPos < 0 || targetPos >= list.length) return;
+            const target = list[targetPos];
             /* quick clip-path exit → re-open new item */
             const overlay = document.getElementById('artifactModal');
             overlay.classList.add('closing');
             setTimeout(() => {
                 overlay.classList.remove('closing');
                 openModal(target);
+                /* CHANGE D2: 切上/下件後以 aria-live 播報新品名（focus 停留在同容器不會自動重讀） */
+                const it = artifactsData[target];
+                if (it) announce((it.itemName || '典藏') + '，' + (it.era || ''));
             }, 160);
         }
 
@@ -2381,20 +2731,26 @@
             modalTriggerElement = document.activeElement;
 
             /* CHANGE B2: persist index + update nav button states */
+            /* FIX-09: prev/next 啟用狀態以篩選後清單的位置計算，而非全域 index */
             currentModalIndex = index;
             const prevBtn = document.getElementById('modalPrev');
             const nextBtn = document.getElementById('modalNext');
-            if (prevBtn) prevBtn.disabled = index <= 0;
-            if (nextBtn) nextBtn.disabled = index >= (artifactsData.length - 1);
+            const navList = filteredIndexes();
+            const navPos = navList.indexOf(index);
+            if (prevBtn) prevBtn.disabled = navPos <= 0;
+            if (nextBtn) nextBtn.disabled = navPos === -1 || navPos >= (navList.length - 1);
 
-            let highResUrl = item.imageUrl || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='800'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='80' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='18' fill='%238a6f2f' letter-spacing='6' opacity='0.6'>暫無圖片</text></svg>";
+            let highResUrl = item.imageUrl || IMG_PLACEHOLDER_LG;
             if (item.imageUrl) {
                 const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
                 if (idMatch) highResUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w2000`;
             }
 
-            document.getElementById('modalImg').src = highResUrl;
-            document.getElementById('modalImg').alt = item.itemName || '';
+            /* CHANGE QW1: modal 高解圖 404/限流時回退品牌佔位圖（onerror 先於 src 設定） */
+            const modalImgElInit = document.getElementById('modalImg');
+            modalImgElInit.onerror = () => { modalImgElInit.onerror = null; modalImgElInit.src = IMG_PLACEHOLDER_LG; };
+            modalImgElInit.src = highResUrl;
+            modalImgElInit.alt = item.itemName || '';
             document.getElementById('modalTitle').textContent = item.itemName || '';
             document.getElementById('modalEra').textContent = item.era || '年代待考';
 
@@ -2433,10 +2789,10 @@
 
             document.body.style.overflow = 'hidden';
 
-            /* CHANGE B3: click-to-zoom — reset zoom state each time modal opens */
+            /* CHANGE B3 + D3 + D6: 每次開 modal 重置縮放/平移狀態（互動監聽器於 initModalInteractions 綁定一次） */
             const modalImgEl = document.getElementById('modalImg');
-            modalImgEl.classList.remove('zoomed');
-            modalImgEl.onclick = () => modalImgEl.classList.toggle('zoomed');
+            modalImgEl.setAttribute('aria-label', (item.itemName || '典藏') + ' — 點擊或按 Enter 放大檢視');
+            resetModalZoom();
 
             document.getElementById('artifactModal').classList.add('active');
 
@@ -2445,10 +2801,18 @@
                焦點先移至第一個可聚焦元素（modal-close 或 nav button）。 */
             const overlay = document.getElementById('artifactModal');
             const focusableSelector = 'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
-            const focusables = overlay.querySelectorAll(focusableSelector);
-            if (focusables.length > 0) {
-                // 延後一個 frame 等 modal transition 開始後再聚焦
-                requestAnimationFrame(() => focusables[0].focus());
+            /* CHANGE QW3: 焦點落在 .modal-content（tabindex=-1），報讀器先唸品名而非「關閉」；
+               transitionend 補一次 + rAF 作 reduced-motion fallback，取代原多重 setTimeout hack。 */
+            const modalContentEl = overlay.querySelector('.modal-content');
+            if (modalContentEl) {
+                const focusModal = () => modalContentEl.focus({ preventScroll: true });
+                focusModal();
+                requestAnimationFrame(focusModal);
+                modalContentEl.addEventListener('transitionend', function onEnter(e) {
+                    if (e.target !== modalContentEl) return;
+                    focusModal();
+                    modalContentEl.removeEventListener('transitionend', onEnter);
+                });
             }
             modalFocusTrapHandler = (e) => {
                 if (e.key !== 'Tab') return;
@@ -2496,6 +2860,14 @@
                 console.info('[JBX] WebGL fog disabled — low-core device (cores=%d, mem=%dGB)', cores, memGB);
                 const canvas = document.getElementById('glCanvas');
                 if (canvas) canvas.style.display = 'none';
+                return;
+            }
+
+            /* CHANGE QW2: 尊重 OS 減少動態 — 整頁最大動態元素在 reduced-motion 下不啟動 */
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                console.info('[JBX] WebGL fog disabled — prefers-reduced-motion');
+                const rmCanvas = document.getElementById('glCanvas');
+                if (rmCanvas) rmCanvas.style.display = 'none';
                 return;
             }
 
@@ -2639,26 +3011,46 @@
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
                 rafId = requestAnimationFrame(render);
             }
-            rafId = requestAnimationFrame(render);
 
-            /* CHANGE C2: 分頁隱藏時取消 raf，重新可見時重啟（調整 startTime 防時間跳躍）*/
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    if (rafId !== null) {
-                        /* CHANGE D1: preserve WebGL timeline on tab resume — record pause moment, don't reset startTime */
-                        pauseTime = performance.now();
-                        cancelAnimationFrame(rafId);
-                        rafId = null;
-                    }
-                } else if (rafId === null) {
-                    /* CHANGE D1: preserve WebGL timeline on tab resume — offset startTime by paused duration so dt 不跳 */
+            /* CHANGE QW2: 統一暫停/恢復 — 分頁隱藏 OR 捲離 hero 皆暫停 rAF，兩者都回復才續跑；
+               沿用 startTime 補償避免 dt 跳躍。 */
+            let pageHidden = false;
+            let heroOut = false;
+            function pauseFog() {
+                if (rafId !== null) {
+                    pauseTime = performance.now();
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                }
+            }
+            function resumeFog() {
+                if (!pageHidden && !heroOut && rafId === null) {
                     if (pauseTime !== null) {
                         startTime += performance.now() - pauseTime;
                         pauseTime = null;
                     }
                     rafId = requestAnimationFrame(render);
                 }
+            }
+            rafId = requestAnimationFrame(render);
+
+            /* CHANGE C2 + QW2: 分頁隱藏時取消 raf，重新可見時重啟（調整 startTime 防時間跳躍）*/
+            document.addEventListener('visibilitychange', () => {
+                pageHidden = document.hidden;
+                if (pageHidden) pauseFog(); else resumeFog();
             });
+
+            /* CHANGE QW2: 捲離 hero（header-sentinel 離開視窗）即暫停 fog，省 GPU/主執行緒；回到 hero 再續。 */
+            const fogHeroSentinel = document.getElementById('header-sentinel');
+            if (fogHeroSentinel) {
+                const fogHeroObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        heroOut = !entry.isIntersecting;
+                        if (heroOut) pauseFog(); else resumeFog();
+                    });
+                }, { threshold: 0 });
+                fogHeroObserver.observe(fogHeroSentinel);
+            }
         }
 
         /* ============ Artifacts fetch + render ============ */
@@ -2690,7 +3082,7 @@
                     artifactsData = json.data;
 
                     json.data.forEach((item, index) => {
-                        let imageUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><rect width='100%25' height='100%25' fill='%23ede8dc'/><text x='50%25' y='46%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='48' fill='%23c49a45' opacity='0.5'>軒</text><text x='50%25' y='60%25' text-anchor='middle' dominant-baseline='middle' font-family='serif' font-size='13' fill='%238a6f2f' letter-spacing='4' opacity='0.6'>暫無圖片</text></svg>";
+                        let imageUrl = IMG_PLACEHOLDER;
                         if (item.imageUrl) {
                             const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
                             if (idMatch) imageUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w1000`;
@@ -2710,30 +3102,18 @@
                         const layoutClass = isOdd ? 'odd' : 'even';
                         const inClass = isOdd ? 'from-left' : 'from-right';
 
-                        // DP-002: assign proportion variant based on category
-                        const portraitCats  = ['汝窯', '玉珮', '陶版畫'];
-                        const landscapeCats = ['器鼎', '龍銀'];
-                        const cat = item.category || '';
-                        const variant = index === 0 ? 'feature'
-                            : portraitCats.includes(cat)  ? 'portrait'
-                            : landscapeCats.includes(cat) ? 'landscape'
-                            : 'portrait';
+                        // DP-002: assign proportion variant based on actual Sheet categories + cadence
+                        const variant = pickCardVariant(item, index);
 
-                        const card = document.createElement('div');
+                        /* CHANGE D4: 卡片語意化 — <article> 取代 <div role=button>；
+                           真正可聚焦的動作元素改為掛在品名 h2 上的 <button>（見 innerHTML），
+                           報讀器 H 鍵因此可列出每件品名；整張卡片仍可點（保留大命中區）。 */
+                        const card = document.createElement('article');
                         card.className = `card card--${variant} ${layoutClass} ${inClass}`;
                         card.style.cursor = 'pointer';
                         card.dataset.category = item.category || '';
-                        card.setAttribute('onclick', `openModal(${index})`);
-                        /* CHANGE C1: card keyboard accessibility — tabindex, role=button, keydown Enter/Space */
-                        card.setAttribute('tabindex', '0');
-                        card.setAttribute('role', 'button');
-                        card.setAttribute('aria-label', `${item.itemName || '典藏'}, ${item.era || '年代不詳'}`);
-                        card.addEventListener('keydown', (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                openModal(index);
-                            }
-                        });
+                        /* 整卡點擊 = 開 modal；品名按鈕會 stopPropagation 避免重複觸發 */
+                        card.addEventListener('click', () => openModal(index));
 
                         if (index < 6) card.classList.add('is-visible');
 
@@ -2743,7 +3123,7 @@
                         card.innerHTML = `
                             <div class="img-box">
                                 <!-- CHANGE E1: data-lazy + data-src 替換 eager loading，IntersectionObserver 負責載入 -->
-                                <img class="antique-img" data-lazy="true" data-src="${imageUrl}" alt="${(item.itemName || '典藏')}，${(item.era || '年代不詳')}，${(item.category || '')}">
+                                <img class="antique-img" data-lazy="true" data-src="${imageUrl}" referrerpolicy="no-referrer" decoding="async" alt="${(item.itemName || '典藏')}，${(item.era || '年代不詳')}，${(item.category || '')}">
                                 <div class="vignette-cloud"></div>
                                 <div class="moving-cloud"></div>
                                 <div class="focus-border"></div>
@@ -2758,7 +3138,7 @@
                                     </svg>
                                 </div>
                                 <div class="lot-number">LOT <span class="lot-num-val">${String(index + 1).padStart(3, '0')}</span></div>
-                                <h2 class="item-name">${item.itemName || ''}</h2>
+                                <h2 class="item-name"><button type="button" class="item-name-btn">${item.itemName || '典藏'}</button></h2>
                                 <div class="item-era">${item.era || '年代待考'}</div>
                                 <div class="material-badges">${badgesHtml}</div>
                                 <div class="item-story-wrap">
@@ -2769,6 +3149,10 @@
                             </div>
                         `;
                         gallery.appendChild(card);
+
+                        /* CHANGE D4: 品名按鈕 = 真正可聚焦/鍵盤可達的開 modal 動作；stopPropagation 避免與整卡 click 重複 */
+                        const nameBtn = card.querySelector('.item-name-btn');
+                        if (nameBtn) nameBtn.addEventListener('click', (e) => { e.stopPropagation(); openModal(index); });
 
                         if (index >= 6) {
                             const staggerIndex = (index - 6) % 5;  // reset every 5 cards so total stagger ≤ 400ms
@@ -2790,12 +3174,18 @@
                        卡片 DOM 尚未存在 → querySelectorAll('.card') 回傳空 NodeList，tilt 完全失效。
                        移至此處：卡片已渲染完畢，正確掛上 mousemove listener。 */
                     initCardTilt();
+                    /* CHANGE QW3: 載入完成播報供報讀器 */
+                    announce(`已載入 ${artifactsData.length} 件典藏`);
                 } else {
-                    gallery.innerHTML = '<div class="loading">庫房目前空置，或無法取得資料。</div>';
+                    /* CHANGE QW5: 無資料態品牌化 — 印章插圖 + 得體文案 + 下一步 */
+                    gallery.innerHTML = '<div class="empty-state"><span class="empty-glyph">吉</span><p>典藏籌備中，敬請期待</p><p class="empty-sub">可透過頁尾洽詢掌櫃，先行預約蒞臨鑑賞</p></div>';
+                    announce('典藏籌備中，敬請期待');
                 }
             } catch (e) {
+                /* CHANGE QW5: 錯誤態品牌化 — 不外洩 GAS URL / 例外字串（僅 console 保留除錯） */
                 console.error(e);
-                gallery.innerHTML = `<div class="loading" style="color:${getComputedStyle(document.documentElement).getPropertyValue('--seal-red')};">連線失敗：請檢查 GAS 部署網址。<br><small style="font-family:var(--font-latin); font-style:italic;">${e.message}</small></div>`;
+                gallery.innerHTML = '<div class="empty-state"><span class="empty-glyph">軒</span><p>典藏連線暫時中斷</p><p class="empty-sub">請稍後再試，或透過頁尾洽詢掌櫃</p></div>';
+                announce('典藏連線暫時中斷，請稍後再試');
             }
         }
 
@@ -2822,12 +3212,12 @@
                     const percentX = (x - centerX) / centerX;
                     const percentY = (y - centerY) / centerY;
                     
-                    // ±3° 旋轉範圍
-                    const rotateY = percentX * 3;
-                    const rotateX = -percentY * 3;
+                    // GPT-R2-03: tilt 從 ±3° 收斂到 ±2°，配合 hover pass 的拍賣型錄式微動。
+                    const rotateY = percentX * 2;
+                    const rotateX = -percentY * 2;
                     
                     card.classList.add('tilt-active');
-                    card.style.transform = `translateY(-5px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                    card.style.transform = `translateY(-3px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
                 });
                 
                 card.addEventListener('mouseleave', () => {
