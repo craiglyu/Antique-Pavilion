@@ -241,6 +241,60 @@ def test_batch_empty_list_returns_empty_list():
     assert CuratorAgent().review_batch([]) == []
 
 
+def test_batch_matching_image_fingerprint_routes_both_to_conflict():
+    entries = [
+        _good_entry(auth_log_id="A", imageFingerprint="sha256:abc123"),
+        _good_entry(auth_log_id="B", imageFingerprint="SHA256:ABC123"),
+    ]
+    reviews = CuratorAgent().review_batch(entries)
+
+    assert [r.verdict for r in reviews] == [Verdict.CONFLICT, Verdict.CONFLICT]
+    assert all(r.promote_to_kb is False for r in reviews)
+    assert "B" in reviews[0].reasons[-1]
+    assert "A" in reviews[1].reasons[-1]
+
+
+def test_batch_matching_drive_file_id_routes_both_to_conflict():
+    entries = [
+        _good_entry(
+            auth_log_id="A",
+            imageUrl="https://drive.google.com/file/d/abc_123-XYZ/view?usp=sharing",
+        ),
+        _good_entry(
+            auth_log_id="B",
+            imageUrl="https://drive.google.com/thumbnail?id=abc_123-XYZ&sz=w1000",
+        ),
+    ]
+    reviews = CuratorAgent().review_batch(entries)
+
+    assert [r.verdict for r in reviews] == [Verdict.CONFLICT, Verdict.CONFLICT]
+    assert all("影像識別碼" in r.reasons[-1] for r in reviews)
+
+
+def test_batch_duplicate_image_does_not_override_rejection():
+    entries = [
+        _good_entry(auth_log_id="bad", isValid=False, imageFingerprint="same-image"),
+        _good_entry(auth_log_id="review", imageFingerprint="same-image"),
+    ]
+    reviews = CuratorAgent().review_batch(entries)
+
+    assert reviews[0].verdict == Verdict.REJECTED
+    assert reviews[1].verdict == Verdict.CONFLICT
+    assert reviews[1].promote_to_kb is False
+
+
+def test_batch_unique_or_missing_image_identity_preserves_single_item_verdicts():
+    entries = [
+        _good_entry(auth_log_id="A", imageFingerprint="one"),
+        _good_entry(auth_log_id="B", imageFingerprint="two"),
+        _good_entry(auth_log_id="C"),
+    ]
+    reviews = CuratorAgent().review_batch(entries)
+
+    assert [r.verdict for r in reviews] == [Verdict.PASSED, Verdict.PASSED, Verdict.PASSED]
+    assert all(r.promote_to_kb for r in reviews)
+
+
 def test_summary_counts_by_verdict():
     entries = [
         _good_entry(auth_log_id="P1", confidence=0.95),
