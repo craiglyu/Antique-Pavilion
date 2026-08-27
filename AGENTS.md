@@ -1,5 +1,8 @@
 # AGENTS.md — Antique Pavilion (吉寶軒) Project Reference
 
+> **這份檔案是本專案唯一的規則來源。** `CLAUDE.md` 只是指向這裡的指標，不含內容。
+> 任何 agent（Claude / Codex / GPT / Grok / 未來的任何一個）都以本檔為準。
+
 > Single source of truth for technical constraints, architecture, and quick references that all
 > agents (PM, Designer, Dev, Marketing, Curator, Auto-Dev, GAS-Dev) must respect.
 >
@@ -31,7 +34,7 @@ and craftsmanship. Aesthetic reference points: Sotheby's Asia, Christie's Hong K
 | AI judgment | **Gemini 2.5 Flash** via GAS | $30/month hard cap |
 | Discord I/O | **Python bot in WSL2** (`scripts/ap_org_bot.py`) | GAS IP is blocked by Discord (error 40333) |
 | Knowledge base | **Notion (8 DBs)**, opt-in via `NOTION_API_KEY` | Long-form, structured, queryable |
-| Skills | `.Codex/commands/*.md` (8 skills) | Loaded by agents via prompts/_core/_domain |
+| Skills | `.claude/commands/*.md` (9 skills) | Plain markdown — readable by ANY agent, not just Claude |
 
 **Hard constraints**:
 - No JS framework / npm packages / build step
@@ -128,7 +131,7 @@ only after a week of zero post-hoc Craig vetoes.
 | Gemini API | **USD 30** | `infra/budget_gate.py` SQLite ledger; raise BudgetExceeded |
 | Opus API (design rulings) | **USD 15** | Same — must require Craig confirmation per call |
 | Notion API | n/a (free tier) | Throttle abuse only |
-| Anthropic CLI (Codex MAX/Pro) | n/a (subscription) | Throttle runaways |
+| Anthropic CLI (Claude MAX/Pro) | n/a (subscription) | Throttle runaways |
 
 `/usage-status` shows live ledger. `infra/budget_gate.MONTHLY_CAPS` is the source of truth.
 
@@ -141,7 +144,7 @@ Antique Digital Pavilion/
 ├── AGENTS.md                           ← THIS FILE
 ├── AP_Multi_Agent_ORG_Blueprint_v1.1.md  ← architecture vision
 ├── AP_Sustainability_Roadmap_v0.2.md     ← 90-day execution plan
-├── CHG_LOG.json                          ← append-only change log
+├── CHG_LOG.json                          ← append-only change log（§12 完工協議強制寫入）
 ├── index.html                            ← local dev gallery
 ├── Publish/index.html                    ← what GitHub Pages serves
 ├── config/
@@ -171,7 +174,8 @@ Antique Digital Pavilion/
 │   ├── budget_state.sqlite               ← gitignored
 │   ├── ap_council_state/                 ← gitignored except _schema.json
 │   └── opus_inbox/, opus_rulings/        ← gitignored
-├── tests/                                ← 51+ tests, run via `pytest -q`
+├── tests/                                ← 292+ tests, run via `pytest -q`
+│   └── test_change_log_contract.py       ← §12 完工協議的機器檢查
 └── ap_discord_bot.py                     ← separate bot for Gemini authentication pipeline
 ```
 
@@ -304,6 +308,94 @@ Authoritative source: `AP_Sustainability_Roadmap_v0.2.md`.
 **Partner / collaborator** (`1495302135112401067`):
 - Authorised to leave feedback in `#ap-feedback` (gets 📝 reaction, no agent fires immediately).
 - NOT authorised for Tier 1 sign-off.
+
+---
+
+## 12. 完工協議（Definition of Done）— 所有 agent 一律適用
+
+> 這一節是 2026-08-27 補上的。在此之前，本檔從頭到尾沒有規定「完工要記錄」，
+> `CHG_LOG.json` 只在 §7 目錄樹裡出現過一次、當一個標籤。結果是四個 session、
+> 1429 行的前端工作躺在工作區從未提交，接手的 agent 無從得知專案真實進度。
+>
+> **不是 agent 不守規矩，是沒有規矩可守。**
+
+### 12.1 一個切片完成 = 三樣東西同時存在
+
+缺任何一樣都**不算完成**，不得回報「已完成」：
+
+| # | 產出 | 格式 | 為什麼 |
+|---|---|---|---|
+| 1 | **檔內註解** | `CHANGE <TAG>: <說明>` | 唯一在 Claude / Codex / GPT 三方都存活下來的慣例——因為它就寫在被改的檔案裡，不需要記得去開第二個檔 |
+| 2 | **`CHG_LOG.json` entry** | 見 §12.3 | 讓 repo 本身能回答「現在做到哪」，不依賴任何人的記憶或 session 歷史 |
+| 3 | **git commit** | `<type>(<scope>): <摘要>` | **未 commit 不算完成。** 工作區不是交付物 |
+
+`<TAG>` 命名格式：**`<前綴>-<描述>`**，大寫、以連字號分隔。
+範例：`R9-IMG`、`A4-HONEST`、`SOL-OBJECT-FIRST`。
+裸編號（`A1`、`D3`、`ROUND5`）是協議之前的歷史寫法，**不再新增**。
+
+### 12.2 這條規則有牙齒
+
+`tests/test_change_log_contract.py` 會斷言：`Publish/index.html` 裡每一個
+不在凍結清單中的 `CHANGE` tag，都必須出現在某筆 `CHG_LOG.json` entry 的
+`change_tags` 陣列裡。漏登錄 = `pytest` 紅燈。
+
+```bash
+python3 -m pytest tests/test_change_log_contract.py -q
+```
+
+凍結清單 `LEGACY_TAGS` 收錄協議建立當下已存在的 41 個 tag，**只能縮小，不能增加**。
+
+### 12.3 `CHG_LOG.json` entry 最小範本
+
+必要欄位：`ts` / `category` / `scope` / `summary`。
+動到 `Publish/index.html` 的 entry **必須**再加 `change_tags`。新 entry 放在陣列**最前面**。
+
+```json
+{
+  "ts": "2026-08-27T00:00:00Z",
+  "category": "design",
+  "scope": "epic-discover.c3",
+  "summary": "注入 VisualArtwork + ItemList JSON-LD",
+  "change_tags": ["C3-JSONLD"],
+  "rationale": "全站原本無任何結構化資料，Rich Results 偵測不到藏品。",
+  "breaking": false,
+  "rollback": "git revert <sha>"
+}
+```
+
+`category` 用 commit 的 type：`design` / `feat` / `fix` / `chore` / `docs` / `perf`。
+
+### 12.4 交付前的自檢清單
+
+回報「完成」之前，逐項確認：
+
+```bash
+git status --short                 # 工作區乾淨？沒有該提交卻沒提交的檔案？
+python3 -m pytest tests/ -q        # 全綠？（含 §12.2 的協議檢查）
+git diff --check                   # 無行尾空白／衝突標記？
+git --no-pager log --oneline -3    # 我的 commit 真的在裡面？
+```
+
+動到 `Publish/index.html` 時，額外做 inline `<script>` 的 `node --check`，
+並在 1440 / 1024 / 375 用**真實 GAS 資料**驗證（不是 mock）。
+
+### 12.5 停手條件
+
+命中以下任一項，**停下來交回 Craig**，不要自行決定：
+
+- Tier 1 事項（見 §5）：首頁 IA、品牌方向、公開內容、新功能、任何真偽／鑑定措辭
+- 需要真實藝廊資料：LINE ID、地址、營業時間、Google Maps、電話
+- 需要動到凍結欄位或 `era` 列舉（見 §3、§4）→ 需 DD-XXX
+- 規則檔之間互相矛盾 → 回報衝突，不要靠猜
+
+### 12.6 不要新增平行紀錄系統
+
+本專案曾同時存在四套紀錄（git commit / `CHG_LOG.json` /
+`memory/gpt_polish_log.md` / 檔內註解），沒有一套是完整的。
+**現在只有兩套**：`CHG_LOG.json`（結構化事實）＋ git（差異與時序）。
+`memory/gpt_polish_log.md` 已凍結為歷史檔案，不再寫入。
+
+需要長篇敘述就寫進 commit message body，不要再開新檔。
 
 ---
 
