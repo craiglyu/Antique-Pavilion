@@ -77,3 +77,15 @@ reports/_chrome_profile/
 # Claude Design Loop (auto-generated)
 DESIGN_BRIEF_NEXT.md
 memory/design_review_log.md
+
+# ── 🔒 2026-08-27 補洞：GAS 原始碼含 hardcode 金鑰 ──────
+# 原規則只擋 memory/ 下的 GAS 檔，檔案搬到 scripts/GAS/ 後漏出保護範圍。
+# scripts/GAS/AntiqueAnalysis_AI.md 內含明文 DISCORD_BOT_TOKEN 與 GEMINI_KEY。
+scripts/GAS/
+
+# 本機稽核產出（42MB 圖片與 xlsx，不入 Git）
+reports/
+
+# Claude Code 本機權限設定（defaultMode 因人而異，不應共用）
+.claude/settings.json
+.claude/settings.local.json
