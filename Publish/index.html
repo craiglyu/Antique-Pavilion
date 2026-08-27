@@ -1794,17 +1794,8 @@
             margin: 0;
             letter-spacing: 0.05em;
         }
-        /* CHANGE TIER A1: LINE 按鈕為「即將開放」狀態，禁用互動 */
-        .contact-line-btn[aria-disabled="true"] {
-            cursor: not-allowed;
-            opacity: 0.85;
-        }
-        .contact-line-btn[aria-disabled="true"]:hover {
-            background: transparent;
-            color: var(--line-green);
-            transform: none;
-            box-shadow: none;
-        }
+        /* CHANGE A4-HONEST: 移除 [aria-disabled] 態樣式——按鈕已移除，規則不可能命中。
+           .contact-line-btn 基礎樣式保留，供 LINE ID 就緒後直接還原。 */
         .contact-line-btn {
             display: inline-flex;
             align-items: center;
@@ -3339,23 +3330,20 @@
             </div>
             <div class="contact-divider" aria-hidden="true"></div>
             <div class="contact-body">
+                <!-- CHANGE A4-HONEST: 移除「24 小時內回覆」時效承諾。
+                     Sol 提案 §3.5 與 AP_Design_Loop_v3_Strategy.md A4 均要求：
+                     實體賞件資料齊備前，公開頁不得承諾回覆時效或洽詢管道。 -->
                 <p class="contact-desc">
-                    對館藏器物有興趣，歡迎透過 LINE 私訊掌櫃，<br>
-                    我們將於 24 小時內回覆您的詢問。
+                    本館典藏以實物賞鑑為主，器物細節須經眼見手摹方能盡見。<br>
+                    貴賓洽詢與蒞臨賞件資訊整備中，開放後將於此處公布。
                 </p>
-                <!-- CHANGE A2: LINE button a11y — <a href=#> → <button disabled>; native disabled blocks all activation paths -->
-                <!-- LINE_ID_PLACEHOLDER: when ready, replace this <button> with <a class="contact-line-btn" href="https://line.me/ti/p/[YOUR_LINE_ID]" target="_blank" rel="noopener noreferrer"> and remove disabled/aria-disabled/title -->
-                <button type="button"
-                        class="contact-line-btn"
-                        disabled
-                        aria-disabled="true"
-                        title="LINE 洽詢即將開放，敬請期待">
-                    <svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                        <path fill="currentColor"
-                          d="M19.365 9.89c.50 0 .907.41.907.91s-.406.91-.907.91h-1.44v.91h1.44c.5 0 .907.41.907.91s-.406.91-.907.91H17.01a.91.91 0 01-.907-.91V9.89c0-.5.406-.91.907-.91h2.355zm-5.423 3.64a.91.91 0 01-.907.91.915.915 0 01-.73-.365L10.58 11.8v1.73a.91.91 0 01-1.814 0V9.89c0-.5.406-.91.907-.91.283 0 .535.127.701.326l1.727 2.277V9.89c0-.5.406-.91.907-.91s.907.41.907.91v3.64zM8.09 13.53a.91.91 0 01-.907.91.91.91 0 01-.906-.91V9.89c0-.5.406-.91.906-.91s.907.41.907.91v3.64zM6.27 8.07H3.916a.91.91 0 00-.907.91v3.64c0 .5.406.91.907.91H6.27c.5 0 .906-.41.906-.91s-.406-.91-.906-.91H4.823v-.455H6.27c.5 0 .906-.41.906-.91s-.406-.455-.906-.455H4.823v-.455H6.27c.5 0 .906-.41.906-.91s-.406-.91-.906-.91zM12 2C6.477 2 2 6.145 2 11.243c0 4.561 3.614 8.373 8.49 9.088.33.071.779.218.893.5.102.257.067.66.033.92l-.144.866c-.044.257-.203 1.004.88.547 1.082-.457 5.84-3.44 7.97-5.89C21.397 15.59 22 13.496 22 11.243 22 6.145 17.523 2 12 2z"/>
-                    </svg>
-                    LINE 洽詢掌櫃
-                </button>
+                <!-- CHANGE A4-HONEST: 移除 disabled 的 LINE 按鈕。
+                     Sol 提案 §3.5「不顯示 disabled LINE 按鈕」——一顆永遠按不下去的 CTA
+                     對高端藏家是壞掉的漏斗，不是禮貌的預告。
+                     LINE_ID_PLACEHOLDER — 取得真實 LINE ID 後（Tier 1，需 Craig 核准）於此還原：
+                     <a class="contact-line-btn" href="https://line.me/ti/p/[LINE_ID]"
+                        target="_blank" rel="noopener noreferrer"> + .line-icon SVG。
+                     被移除的完整 markup 見 commit e82cb19 的 Publish/index.html:3346-3362。 -->
                 <p class="contact-note">
                     ※ 本館典藏圖片及鑑定資料受著作權保護，未經授權不得轉載。
                 </p>
