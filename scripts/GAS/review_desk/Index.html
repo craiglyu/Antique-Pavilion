@@ -1,0 +1,1278 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>吉寶軒｜藏品審核台</title>
+  <style>
+    :root {
+      --paper: #f7f4ed;
+      --paper-deep: #efe9dc;
+      --paper-bright: #fcfaf5;
+      --ink: #2c2c2c;
+      --ink-soft: #615c52;
+      --ink-faint: #91897b;
+      --gold: #c49a45;
+      --gold-deep: #9f762d;
+      --seal: #8a2a2a;
+      --line: rgba(74, 62, 43, .18);
+      --line-strong: rgba(138, 42, 42, .35);
+      --ok: #49644d;
+      --hold: #9c6f25;
+      --archive: #635e57;
+      --danger: #8a2a2a;
+      --shadow: 0 22px 60px rgba(55, 43, 24, .10);
+      --serif: "Noto Serif TC", "Songti TC", "PMingLiU", serif;
+      --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      --ease: cubic-bezier(.22, 1, .36, 1);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--paper); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 86% 4%, rgba(196, 154, 69, .10), transparent 24rem),
+        linear-gradient(110deg, rgba(255, 255, 255, .58), transparent 40%),
+        var(--paper);
+      font-family: var(--sans);
+      min-height: 100vh;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    :focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; }
+
+    .shell { min-height: 100vh; }
+    .topbar {
+      position: sticky;
+      z-index: 30;
+      top: 0;
+      display: grid;
+      grid-template-columns: minmax(250px, 1fr) auto minmax(250px, 1fr);
+      align-items: center;
+      min-height: 82px;
+      padding: 14px clamp(18px, 3vw, 48px);
+      border-bottom: 1px solid var(--line);
+      background: rgba(247, 244, 237, .92);
+      backdrop-filter: blur(14px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .seal {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--seal);
+      color: var(--seal);
+      font-family: var(--serif);
+      font-size: 12px;
+      line-height: 1.05;
+      letter-spacing: .08em;
+    }
+    .brand-copy strong {
+      display: block;
+      font-family: var(--serif);
+      font-size: 19px;
+      font-weight: 600;
+      letter-spacing: .22em;
+    }
+    .brand-copy small, .eyebrow {
+      color: var(--ink-faint);
+      font-family: Georgia, serif;
+      font-size: 10px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    .desk-title {
+      font-family: var(--serif);
+      font-size: 16px;
+      letter-spacing: .18em;
+      white-space: nowrap;
+    }
+    .top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+    .mode-switch { display: flex; padding: 3px; border: 1px solid var(--line); background: rgba(255,255,255,.38); }
+    .mode-button { min-height: 36px; padding: 6px 12px; border: 0; background: transparent; cursor: pointer; font-size: 12px; }
+    .mode-button.is-active { color: var(--paper-bright); background: var(--ink); }
+    .private-mark {
+      padding: 7px 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: 2px;
+      color: var(--seal);
+      font-size: 11px;
+      letter-spacing: .1em;
+    }
+    .quiet-button, .filter-button, .group-button, .action-button, .dialog-button {
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: transparent;
+      cursor: pointer;
+      transition: transform .18s var(--ease), border-color .18s ease, background .18s ease;
+    }
+    .quiet-button { padding: 0 15px; }
+    .quiet-button:hover, .filter-button:hover, .group-button:hover, .action-button:hover,
+    .dialog-button:hover { border-color: rgba(138, 42, 42, .55); }
+    .quiet-button:active, .action-button:active, .dialog-button:active { transform: translateY(1px); }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(100px, 1fr));
+      border-bottom: 1px solid var(--line);
+      background: rgba(252, 250, 245, .6);
+    }
+    .summary-card {
+      min-height: 84px;
+      padding: 17px clamp(16px, 2vw, 30px);
+      border-right: 1px solid var(--line);
+    }
+    .summary-card:last-child { border-right: 0; }
+    .summary-card span { display: block; color: var(--ink-faint); font-size: 11px; letter-spacing: .08em; }
+    .summary-card strong { display: block; margin-top: 6px; font-family: Georgia, serif; font-size: 25px; font-weight: 400; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr);
+      min-height: calc(100vh - 167px);
+    }
+    .workspace.is-catalog { grid-template-columns: minmax(0, 1fr); }
+    .workspace.is-catalog .rail { display: none; }
+    .rail {
+      padding: 28px 18px;
+      border-right: 1px solid var(--line);
+      background: rgba(239, 233, 220, .46);
+    }
+    .rail-title { margin: 0 10px 14px; color: var(--ink-faint); font-size: 11px; letter-spacing: .16em; }
+    .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 24px; }
+    .filter-button { min-height: 38px; padding: 7px; color: var(--ink-soft); font-size: 12px; }
+    .filter-button.is-active { border-color: var(--seal); color: var(--seal); background: rgba(138, 42, 42, .04); }
+    .group-list { display: grid; gap: 5px; }
+    .group-button {
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      align-items: center;
+      width: 100%;
+      padding: 10px 9px;
+      text-align: left;
+    }
+    .group-button.is-active { border-color: var(--gold-deep); background: rgba(255, 255, 255, .68); }
+    .group-button strong { font-family: Georgia, serif; font-weight: 400; }
+    .group-button span { overflow: hidden; color: var(--ink-soft); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .group-button i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--hold);
+    }
+    .group-button i.is-complete { background: var(--ok); }
+    .group-button i.is-conflict { background: var(--seal); }
+
+    .review-stage { padding: clamp(26px, 4vw, 56px); min-width: 0; }
+    .stage-heading {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 24px;
+      max-width: 1500px;
+      margin: 0 auto 28px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .stage-heading h1 {
+      margin: 5px 0 8px;
+      font-family: var(--serif);
+      font-size: clamp(25px, 3vw, 38px);
+      font-weight: 500;
+      letter-spacing: .08em;
+    }
+    .stage-heading p { max-width: 760px; margin: 0; color: var(--ink-soft); font-family: var(--serif); line-height: 1.8; }
+    .stage-counter { color: var(--ink-faint); font-family: Georgia, serif; font-size: 12px; letter-spacing: .12em; }
+
+    .artifact-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--card-count, 2), minmax(0, 1fr));
+      gap: 18px;
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+    .artifact-card {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border: 1px solid var(--line);
+      background: rgba(252, 250, 245, .86);
+      box-shadow: var(--shadow);
+    }
+    .artifact-card[data-role="keeper"] { border-top: 2px solid var(--gold-deep); }
+    .artifact-card[data-role="factual-conflict"] { border-top: 2px solid var(--seal); }
+    .artifact-card[data-role="manual-review"] { border-top: 2px solid var(--ink-soft); }
+    .artifact-figure {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      margin: 0;
+      overflow: hidden;
+      background: #e8e1d4;
+    }
+    .artifact-figure img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .image-open {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      border: 0;
+      background: transparent;
+      cursor: zoom-in;
+    }
+    .role-badge, .status-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      font-size: 11px;
+      letter-spacing: .05em;
+    }
+    .role-badge { position: absolute; top: 14px; left: 14px; background: rgba(252, 250, 245, .92); }
+    .role-badge[data-role="keeper"] { color: var(--gold-deep); border-color: rgba(159, 118, 45, .5); }
+    .role-badge[data-role="factual-conflict"] { color: var(--seal); border-color: rgba(138, 42, 42, .55); }
+    .artifact-body { display: flex; flex: 1; flex-direction: column; padding: 22px; }
+    .artifact-meta-line { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .artifact-id { color: var(--ink-faint); font-family: Georgia, serif; font-size: 11px; }
+    .artifact-card h2 { margin: 18px 0 16px; font-family: var(--serif); font-size: clamp(20px, 2vw, 28px); font-weight: 500; line-height: 1.45; }
+    .metadata { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 18px; border-top: 1px solid var(--line); }
+    .field {
+      min-width: 0;
+      padding: 12px 10px 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .field:nth-child(even) { padding-left: 12px; border-left: 1px solid var(--line); }
+    .field.is-different { background: linear-gradient(90deg, rgba(196, 154, 69, .08), transparent); }
+    .field dt { margin-bottom: 5px; color: var(--ink-faint); font-size: 10px; letter-spacing: .08em; }
+    .field dd { margin: 0; overflow-wrap: anywhere; font-family: var(--serif); font-size: 14px; line-height: 1.6; }
+    .narrative { margin: 0 0 20px; color: var(--ink-soft); font-family: var(--serif); font-size: 14px; line-height: 1.9; }
+    .narrative strong { display: block; margin-bottom: 6px; color: var(--ink); font-family: var(--sans); font-size: 11px; letter-spacing: .12em; }
+    .narrative span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+    .card-actions { display: grid; grid-template-columns: 1.1fr 1fr; gap: 7px; margin-top: auto; padding-top: 18px; border-top: 1px solid var(--line); }
+    .action-button { padding: 9px 10px; font-size: 12px; }
+    .action-button[data-action="publish"] { color: var(--paper-bright); border-color: var(--ok); background: var(--ok); }
+    .action-button[data-action="archive"] { color: var(--archive); }
+    .action-button[data-action="reject"] { color: var(--danger); }
+    .action-button[data-action="edit"] { color: var(--gold-deep); }
+
+    .empty-state, .loading-state { max-width: 700px; margin: 13vh auto; text-align: center; color: var(--ink-soft); }
+    .empty-state h2, .loading-state h2 { font-family: var(--serif); font-weight: 500; letter-spacing: .08em; }
+    .loading-line { width: 120px; height: 1px; margin: 24px auto; overflow: hidden; background: var(--line); }
+    .loading-line::after { content: ""; display: block; width: 45%; height: 100%; background: var(--gold); animation: loading 1.2s var(--ease) infinite; }
+    @keyframes loading { from { transform: translateX(-120%); } to { transform: translateX(260%); } }
+
+    dialog {
+      width: min(720px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 2px;
+      color: var(--ink);
+      background: var(--paper-bright);
+      box-shadow: 0 28px 90px rgba(28, 24, 18, .28);
+    }
+    dialog::backdrop { background: rgba(24, 22, 18, .72); backdrop-filter: blur(5px); }
+    .dialog-head { display: flex; justify-content: space-between; gap: 20px; padding: 24px 26px; border-bottom: 1px solid var(--line); }
+    .dialog-head h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 24px; font-weight: 500; }
+    .dialog-close { width: 44px; height: 44px; border: 1px solid var(--line); background: transparent; cursor: pointer; }
+    .dialog-body { padding: 26px; overflow: auto; }
+    .dialog-body p { color: var(--ink-soft); line-height: 1.7; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-field { display: grid; gap: 7px; }
+    .form-field.is-wide { grid-column: 1 / -1; }
+    .form-field label { color: var(--ink-soft); font-size: 12px; letter-spacing: .06em; }
+    .form-field input, .form-field select, .form-field textarea {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 1px;
+      color: var(--ink);
+      background: #fffefb;
+    }
+    .form-field textarea { min-height: 120px; resize: vertical; font-family: var(--serif); line-height: 1.7; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 26px 24px; }
+    .dialog-button { padding: 9px 18px; }
+    .dialog-button.is-primary { color: var(--paper-bright); border-color: var(--seal); background: var(--seal); }
+    .image-dialog { width: min(1100px, calc(100vw - 32px)); background: #181713; }
+    .image-dialog .dialog-head { color: var(--paper); border-color: rgba(255, 255, 255, .16); }
+    .image-dialog .dialog-close { color: var(--paper); border-color: rgba(255, 255, 255, .22); }
+    .image-dialog img { display: block; width: 100%; max-height: calc(100vh - 150px); object-fit: contain; }
+    .toast {
+      position: fixed;
+      z-index: 80;
+      right: 24px;
+      bottom: 24px;
+      max-width: min(440px, calc(100vw - 48px));
+      padding: 14px 17px;
+      border-left: 3px solid var(--ok);
+      background: var(--ink);
+      color: var(--paper);
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity .2s ease, transform .2s var(--ease);
+    }
+    .toast.is-visible { opacity: 1; transform: translateY(0); }
+    .toast.is-error { border-color: var(--seal); }
+    .catalog-toolbar {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) 190px 190px;
+      gap: 10px;
+      max-width: 1500px;
+      margin: 0 auto 24px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: rgba(252,250,245,.78);
+    }
+    .catalog-toolbar input, .catalog-toolbar select {
+      min-height: 44px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 1px;
+      color: var(--ink);
+      background: #fffefb;
+    }
+    .catalog-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+    .catalog-card {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border: 1px solid var(--line);
+      background: rgba(252,250,245,.9);
+    }
+    .catalog-card.is-selected { border-color: var(--gold-deep); box-shadow: inset 0 0 0 1px var(--gold-deep); }
+    .catalog-card .artifact-figure { aspect-ratio: 5 / 4; }
+    .catalog-card-body { display: flex; flex: 1; flex-direction: column; padding: 17px; }
+    .catalog-card h2 { margin: 12px 0; font-family: var(--serif); font-size: 20px; font-weight: 500; line-height: 1.5; }
+    .catalog-facts { display: flex; flex-wrap: wrap; gap: 7px 14px; margin-bottom: 15px; color: var(--ink-soft); font-size: 12px; }
+    .catalog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
+    .compare-button { grid-column: 1 / -1; color: var(--gold-deep); }
+    .compare-tray {
+      position: fixed;
+      z-index: 60;
+      right: 24px;
+      bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      max-width: calc(100vw - 48px);
+      padding: 12px 14px;
+      border: 1px solid var(--line-strong);
+      background: var(--ink);
+      color: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    .compare-tray[hidden] { display: none; }
+    .compare-tray span { font-size: 12px; }
+    .compare-tray button { min-height: 40px; padding: 8px 13px; border: 1px solid rgba(255,255,255,.35); color: var(--paper); background: transparent; cursor: pointer; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 1024px) {
+      .topbar { grid-template-columns: 1fr auto; }
+      .desk-title { display: none; }
+      .workspace { grid-template-columns: 1fr; }
+      .rail { position: sticky; z-index: 20; top: 82px; padding: 12px 18px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .rail-title { display: none; }
+      .filters { display: flex; margin: 0 0 9px; overflow-x: auto; }
+      .filter-button { flex: 0 0 auto; padding-inline: 14px; }
+      .group-list { display: flex; overflow-x: auto; padding-bottom: 4px; }
+      .group-button { flex: 0 0 150px; }
+      .artifact-grid { --card-count: 2 !important; }
+      .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 700px) {
+      .topbar { min-height: 72px; padding: 12px 16px; }
+      .brand-copy small, .private-mark { display: none; }
+      .mode-switch { position: fixed; z-index: 35; right: 12px; bottom: 12px; box-shadow: var(--shadow); background: var(--paper-bright); }
+      .brand-copy strong { font-size: 17px; }
+      .summary {
+        display: flex;
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: auto;
+        overscroll-behavior-inline: contain;
+      }
+      .summary-card { flex: 0 0 96px; min-height: 74px; padding: 14px 16px; }
+      .workspace { min-height: calc(100vh - 147px); }
+      .rail { top: 72px; min-width: 0; max-width: 100vw; padding-inline: 12px; overflow: hidden; }
+      .group-list { max-width: 100%; }
+      .review-stage { padding: 28px 15px 48px; }
+      .stage-heading { grid-template-columns: 1fr; gap: 10px; }
+      .artifact-grid { --card-count: 1 !important; }
+      .catalog-toolbar { grid-template-columns: 1fr; }
+      .catalog-grid { grid-template-columns: 1fr; }
+      .compare-tray { right: 12px; bottom: 64px; max-width: calc(100vw - 24px); }
+      .artifact-card h2 { font-size: 23px; }
+      .card-actions { grid-template-columns: 1fr 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-field.is-wide { grid-column: auto; }
+      .dialog-body, .dialog-head { padding: 20px; }
+      .dialog-actions { padding: 15px 20px 20px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand" aria-label="吉寶軒">
+        <span class="seal" aria-hidden="true">吉<br>寶</span>
+        <span class="brand-copy"><strong>吉寶軒</strong><small>Jibao Xuan</small></span>
+      </div>
+      <div class="desk-title">藏 品 審 核 台</div>
+      <div class="top-actions">
+        <div class="mode-switch" id="mode-switch" aria-label="管理模式">
+          <button class="mode-button is-active" type="button" data-mode="review">重複覆核</button>
+          <button class="mode-button" type="button" data-mode="catalog">全部藏品</button>
+        </div>
+        <span class="private-mark">INTERNAL · 非公開</span>
+        <button class="quiet-button" id="refresh-button" type="button">重新整理</button>
+      </div>
+    </header>
+
+    <section class="summary" id="summary" aria-label="審核摘要"></section>
+
+    <main class="workspace" id="workspace">
+      <aside class="rail" aria-label="重複群組導覽">
+        <p class="rail-title">REVIEW QUEUE</p>
+        <div class="filters" id="filters">
+          <button class="filter-button is-active" type="button" data-filter="all">全部</button>
+          <button class="filter-button" type="button" data-filter="pending">待審</button>
+          <button class="filter-button" type="button" data-filter="conflict">衝突</button>
+          <button class="filter-button" type="button" data-filter="complete">已處理</button>
+        </div>
+        <nav class="group-list" id="group-list"></nav>
+      </aside>
+
+      <section class="review-stage" id="review-stage">
+        <div class="loading-state">
+          <p class="eyebrow">Curator Review Desk</p>
+          <h2>正在讀取審核佇列</h2>
+          <div class="loading-line" aria-hidden="true"></div>
+          <p>藏品資料仍由 Google Sheet 管理。</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="decision-dialog" aria-labelledby="decision-title">
+    <form method="dialog" id="decision-form">
+      <div class="dialog-head">
+        <div><span class="eyebrow">Review Decision</span><h2 id="decision-title">確認審核操作</h2></div>
+        <button class="dialog-close" type="button" data-close-dialog aria-label="關閉">×</button>
+      </div>
+      <div class="dialog-body">
+        <p id="decision-description"></p>
+        <div class="form-field is-wide">
+          <label for="decision-note">審核備註（選填）</label>
+          <textarea id="decision-note" maxlength="1000" placeholder="例如：與 D-01 保留件為同一照片，先下架封存。"></textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="dialog-button" type="button" data-close-dialog>取消</button>
+        <button class="dialog-button is-primary" id="decision-submit" type="submit">確認寫入 Sheet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <form method="dialog" id="edit-form">
+      <div class="dialog-head">
+        <div><span class="eyebrow">Catalogue Editor</span><h2 id="edit-title">編輯藏品資料</h2></div>
+        <button class="dialog-close" type="button" data-close-dialog aria-label="關閉">×</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="form-field is-wide"><label for="edit-userCaption">原始描述</label><textarea id="edit-userCaption" name="userCaption" maxlength="1000"></textarea></div>
+          <div class="form-field is-wide"><label for="edit-itemName">品名</label><input id="edit-itemName" name="itemName" maxlength="120" required></div>
+          <div class="form-field"><label for="edit-category">分類</label><input id="edit-category" name="category" maxlength="80" required></div>
+          <div class="form-field"><label for="edit-era">年代</label><select id="edit-era" name="era" required></select></div>
+          <div class="form-field is-wide"><label for="edit-story">故事</label><textarea id="edit-story" name="story" maxlength="3000"></textarea></div>
+          <div class="form-field"><label for="edit-refItem">拍賣參考品</label><textarea id="edit-refItem" name="refItem" maxlength="600"></textarea></div>
+          <div class="form-field"><label for="edit-refPrice">參考價格</label><textarea id="edit-refPrice" name="refPrice" maxlength="300"></textarea></div>
+          <div class="form-field is-wide"><label for="edit-imageUrl">Drive 圖片 URL</label><input id="edit-imageUrl" name="imageUrl" type="url" maxlength="500" placeholder="https://drive.google.com/file/d/…/view"></div>
+          <div class="form-field is-wide"><label for="edit-tags">標籤</label><input id="edit-tags" name="tags" maxlength="500"></div>
+          <div class="form-field is-wide"><label for="edit-displayRecommendation">展示建議</label><textarea id="edit-displayRecommendation" name="displayRecommendation" maxlength="1500"></textarea></div>
+          <div class="form-field is-wide"><label for="edit-note">變更原因</label><input id="edit-note" maxlength="1000" placeholder="供 Review Audit 留存"></div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="dialog-button" type="button" data-close-dialog>取消</button>
+        <button class="dialog-button is-primary" id="edit-submit" type="submit">儲存變更</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="image-dialog" id="image-dialog" aria-labelledby="image-title">
+    <div class="dialog-head">
+      <div><span class="eyebrow">Object Inspection</span><h2 id="image-title">藏品影像</h2></div>
+      <button class="dialog-close" type="button" data-close-dialog aria-label="關閉">×</button>
+    </div>
+    <img id="image-preview" alt="">
+  </dialog>
+
+  <dialog id="compare-dialog" aria-labelledby="compare-title">
+    <form method="dialog" id="compare-form">
+      <div class="dialog-head">
+        <div><span class="eyebrow">Manual Comparison</span><h2 id="compare-title">建立人工比對群組</h2></div>
+        <button class="dialog-close" type="button" data-close-dialog aria-label="關閉">×</button>
+      </div>
+      <div class="dialog-body">
+        <p>選取的藏品只會加入審核佇列，不會立即上架、下架或刪除。</p>
+        <div class="form-field is-wide">
+          <label for="compare-reason">比對原因</label>
+          <textarea id="compare-reason" maxlength="500">Craig 人工選取的相似藏品，待並排覆核。</textarea>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="dialog-button" type="button" data-close-dialog>取消</button>
+        <button class="dialog-button is-primary" id="compare-submit" type="submit">建立比對群組</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="compare-tray" id="compare-tray" hidden>
+    <span id="compare-count">已選取 0 件</span>
+    <button type="button" id="compare-clear">清除</button>
+    <button type="button" id="compare-create">建立比對</button>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const ROLE_LABELS = {
+      keeper: "系統建議保留",
+      "duplicate-candidate": "候選重複",
+      "factual-conflict": "資料衝突",
+      "manual-review": "人工選取比對",
+    };
+    const ACTION_LABELS = {
+      publish: "保留並上架",
+      hold: "暫留覆核",
+      archive: "下架封存",
+      reject: "退件保留紀錄",
+    };
+    const DEMO_DATA = {
+      reviewer: "demo@jibaoxuan.local",
+      generatedAt: new Date().toISOString(),
+      validEras: ["史前與高古", "唐宋元(含之前)", "明朝", "清朝", "民國", "近現代", "外國骨董", "時代不詳", "其他"],
+      statuses: { PUBLISHED: "完成", PENDING: "待人工覆核", ARCHIVED: "已下架", REJECTED: "已退件" },
+      groups: [
+        {
+          groupId: "D-01",
+          reason: "同一帆船面照片；建議保留資料與標籤較完整者。",
+          items: [
+            demoItem("e2f3e47c", 137, "民國 孫中山像帆船壹圓銀幣", "民國", "雜項", "1G-fiLIkEmiloR6bOc8fAqkqMNx0y1xDL", "keeper"),
+            demoItem("472ef1d5", 178, "民國中央造幣廠孫像帆船壹圓銀幣", "民國", "雜項", "1klk4rI3txbQ6Is9-2gKlANh98dMf1ess", "duplicate-candidate"),
+          ],
+        },
+        {
+          groupId: "D-09",
+          reason: "同一銅爐照片，但明／清與器型互相衝突；不預選保留者。",
+          items: [
+            demoItem("ec82088e", 105, "清朝 銅灑金橋耳三足爐", "清朝", "銅器", "1ABf50tw_8rhj3X1scPpN56jg8bah99jB", "factual-conflict"),
+            demoItem("b0b719c7", 106, "明朝 銅灑金缽式爐", "明朝", "銅器", "1AXHGLrOF-MLdWSG_lYm9Hac_M5Ks2pUi", "factual-conflict"),
+          ],
+        },
+        {
+          groupId: "D-12",
+          reason: "同一鳳鳥爐照片；建議保留器型、年代範圍與展示建議較完整者。",
+          items: [
+            demoItem("b8810c2a", 2, "清末民初 銅鑄鳳鳥三足蓋爐", "時代不詳", "銅器、香爐", "1bKzQYHISzDGX4v4gw_bfudOYhxYkayTA", "keeper"),
+            demoItem("8a31bbaf", 3, "清代鳳鳥紋銅香爐", "清朝", "銅器、香爐", "1KK-_0-8xLR17IlIvYP5iM0jFktlHRoZC", "duplicate-candidate"),
+            demoItem("3e648af5", 4, "清代銅鳳鳥香爐", "清朝", "銅器", "1_1ajlkd22hlTQA5qYzRvo_NcfFPSeJiu", "duplicate-candidate"),
+          ],
+        },
+      ],
+    };
+
+    /* CHANGE RD-GAS-PARSER: GAS HtmlService 會用 document.write 注入頁面；避免 inline script
+       的 template literal 在該包裝層失去反引號而於第一個 https 字串直接 SyntaxError。 */
+    function demoItem(uuid, sourceRow, itemName, era, category, driveId, recommendedRole) {
+      return {
+        uuid, sourceRow, itemName, era, category, recommendedRole,
+        status: "完成", reviewStatus: "待審", reviewerNote: "",
+        uploadedAt: "2026-08-23", tags: "收藏品, 人工覆核",
+        story: "影像初步編目內容僅供整理線索；年代、材質與器型仍需以實物及文件覆核。",
+        refItem: "待人工核對參考資料", refPrice: "不作價格保證",
+        displayRecommendation: "以器物為主，採柔和側光與中性背景展示。",
+        thumbnailUrl: "https://drive.google.com/thumbnail?id=" + driveId + "&sz=w1200",
+      };
+    }
+
+    function driveThumbnail(imageUrl) {
+      const match = String(imageUrl || "").match(/\/file\/d\/([A-Za-z0-9_-]+)/)
+        || String(imageUrl || "").match(/[?&]id=([A-Za-z0-9_-]+)/);
+      return match ? "https://drive.google.com/thumbnail?id=" + match[1] + "&sz=w1000" : "";
+    }
+
+    async function getDemoData() {
+      const data = structuredClone(DEMO_DATA);
+      try {
+        const response = await fetch("/reports/duplicate_audit_2026-08-23/live_sheet_rows.json", { cache: "no-store" });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const rows = await response.json();
+        data.catalog = rows.filter((row) => !row.isSystemLog && row.uuid && row.itemName).map((row) => ({
+          ...row,
+          sourceRow: row.row,
+          thumbnailUrl: driveThumbnail(row.imageUrl),
+          reviewStatus: "",
+          reviewerNote: "",
+        }));
+      } catch (error) {
+        data.catalog = data.groups.flatMap((group) => group.items.map((item) => ({ ...item })));
+      }
+      return data;
+    }
+
+    /* CHANGE RD-GAS-BRIDGE: 示範模式只允許本機預覽；Apps Script 的 google 可能是
+       全域識別字而非 window 屬性，需使用 typeof google 檢測，否則正式頁不會呼叫後端。 */
+    function isLocalPreview() {
+      const host = window.location.hostname;
+      return window.location.protocol === "file:"
+        || host === "127.0.0.1"
+        || host === "localhost"
+        || host === "::1";
+    }
+
+    function getGasRunner() {
+      return typeof google !== "undefined" && google.script && google.script.run
+        ? google.script.run
+        : null;
+    }
+
+    function waitForGasRunner(timeoutMs = 5000) {
+      return new Promise((resolve, reject) => {
+        const startedAt = Date.now();
+        const probe = () => {
+          const runner = getGasRunner();
+          if (runner) return resolve(runner);
+          if (Date.now() - startedAt >= timeoutMs) {
+            return reject(new Error("正式 Review Desk 未偵測到 Google Apps Script 連線。請確認是以最新版本的 /exec 網址開啟。"));
+          }
+          window.setTimeout(probe, 80);
+        };
+        probe();
+      });
+    }
+
+    const state = {
+      data: null,
+      activeGroupId: null,
+      filter: "all",
+      mode: "review",
+      catalogSearch: "",
+      catalogStatus: "all",
+      catalogCategory: "all",
+      compareSelection: new Set(),
+      decision: null,
+      editing: null,
+      busy: false,
+      demo: isLocalPreview(),
+    };
+
+    const elements = {
+      summary: document.getElementById("summary"),
+      workspace: document.getElementById("workspace"),
+      modeSwitch: document.getElementById("mode-switch"),
+      groupList: document.getElementById("group-list"),
+      stage: document.getElementById("review-stage"),
+      filters: document.getElementById("filters"),
+      refresh: document.getElementById("refresh-button"),
+      decisionDialog: document.getElementById("decision-dialog"),
+      decisionForm: document.getElementById("decision-form"),
+      decisionDescription: document.getElementById("decision-description"),
+      decisionNote: document.getElementById("decision-note"),
+      decisionSubmit: document.getElementById("decision-submit"),
+      editDialog: document.getElementById("edit-dialog"),
+      editForm: document.getElementById("edit-form"),
+      editSubmit: document.getElementById("edit-submit"),
+      imageDialog: document.getElementById("image-dialog"),
+      imagePreview: document.getElementById("image-preview"),
+      imageTitle: document.getElementById("image-title"),
+      compareDialog: document.getElementById("compare-dialog"),
+      compareForm: document.getElementById("compare-form"),
+      compareSubmit: document.getElementById("compare-submit"),
+      compareTray: document.getElementById("compare-tray"),
+      compareCount: document.getElementById("compare-count"),
+      compareClear: document.getElementById("compare-clear"),
+      compareCreate: document.getElementById("compare-create"),
+      toast: document.getElementById("toast"),
+    };
+
+    async function callServer(method, payload) {
+      if (state.demo) {
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        if (method === "getBootstrapData") return getDemoData();
+        if (method === "createManualReviewGroup") return applyDemoReviewGroup(payload);
+        return applyDemoDecision(payload);
+      }
+      const gasRunner = await waitForGasRunner();
+      return new Promise((resolve, reject) => {
+        let runner = gasRunner
+          .withSuccessHandler(resolve)
+          .withFailureHandler((error) => reject(new Error(error && error.message ? error.message : String(error))));
+        if (typeof payload === "undefined") runner[method]();
+        else runner[method](payload);
+      });
+    }
+
+    function applyDemoDecision(payload) {
+      const item = findItem(payload.uuid);
+      if (!item) throw new Error("找不到示範藏品。");
+      Object.assign(item, payload.fields || {});
+      const statusMap = { publish: "完成", hold: "待人工覆核", archive: "已下架", reject: "已退件" };
+      if (statusMap[payload.action]) {
+        item.status = statusMap[payload.action];
+        item.reviewStatus = statusMap[payload.action];
+      }
+      return { ok: true, item: structuredClone(item), message: "示範模式：介面狀態已更新，未寫入 Google Sheet。" };
+    }
+
+    function applyDemoReviewGroup(payload) {
+      const groupId = "M-DEMO-" + String(Date.now()).slice(-6);
+      const items = payload.uuids.map((uuid) => findItem(uuid)).filter(Boolean).map((item) => ({
+        ...structuredClone(item),
+        recommendedRole: "manual-review",
+        reviewStatus: "待審",
+      }));
+      state.data.groups.push({ groupId, reason: payload.reason, items });
+      return { ok: true, groupId, message: "示範模式：已建立人工比對群組，未寫入 Sheet。" };
+    }
+
+    async function loadData() {
+      setLoading(true);
+      try {
+        state.data = await callServer("getBootstrapData");
+        if (!state.activeGroupId || !state.data.groups.some((group) => group.groupId === state.activeGroupId)) {
+          state.activeGroupId = state.data.groups[0] ? state.data.groups[0].groupId : null;
+        }
+        render();
+        if (state.demo) showToast("目前為本地示範模式；所有操作都不會寫入 Sheet。", false, 4800);
+      } catch (error) {
+        renderError(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function render() {
+      elements.workspace.classList.toggle("is-catalog", state.mode === "catalog");
+      elements.modeSwitch.querySelectorAll("[data-mode]").forEach((button) => {
+        button.classList.toggle("is-active", button.dataset.mode === state.mode);
+      });
+      renderSummary();
+      renderGroupList();
+      renderStage();
+      renderCompareTray();
+    }
+
+    function filteredGroups() {
+      if (!state.data) return [];
+      return state.data.groups.filter((group) => {
+        const pending = isGroupPending(group);
+        const conflict = group.items.some((item) => item.recommendedRole === "factual-conflict");
+        if (state.filter === "pending") return pending;
+        if (state.filter === "complete") return !pending;
+        if (state.filter === "conflict") return conflict;
+        return true;
+      });
+    }
+
+    function isGroupPending(group) {
+      return group.items.some((item) => !item.reviewStatus || item.reviewStatus === "待審");
+    }
+
+    function renderSummary() {
+      const groups = state.data ? state.data.groups : [];
+      const items = state.data && state.data.catalog ? state.data.catalog : groups.flatMap((group) => group.items);
+      const values = [
+        ["全部藏品", items.length],
+        ["比對群組", groups.length],
+        ["目前公開", items.filter((item) => item.status === "完成").length],
+        ["已下架", items.filter((item) => item.status === "已下架").length],
+        ["待覆核", items.filter((item) => item.status === "待人工覆核").length],
+      ];
+      elements.summary.replaceChildren(...values.map(([label, value]) => {
+        const card = el("div", "summary-card");
+        card.append(el("span", "", label), el("strong", "", String(value)));
+        return card;
+      }));
+    }
+
+    function renderGroupList() {
+      if (state.mode === "catalog") {
+        elements.groupList.replaceChildren();
+        return;
+      }
+      const groups = filteredGroups();
+      if (groups.length && !groups.some((group) => group.groupId === state.activeGroupId)) {
+        state.activeGroupId = groups[0].groupId;
+      }
+      elements.groupList.replaceChildren(...groups.map((group) => {
+        const button = el("button", "group-button" + (group.groupId === state.activeGroupId ? " is-active" : ""));
+        button.type = "button";
+        button.dataset.groupId = group.groupId;
+        const conflict = group.items.some((item) => item.recommendedRole === "factual-conflict");
+        const indicator = el("i", conflict ? "is-conflict" : (isGroupPending(group) ? "" : "is-complete"));
+        indicator.setAttribute("aria-label", conflict ? "資料衝突" : (isGroupPending(group) ? "待審" : "已處理"));
+        button.append(el("strong", "", group.groupId), el("span", "", group.items.length + " 件藏品"), indicator);
+        return button;
+      }));
+    }
+
+    function renderStage() {
+      if (state.mode === "catalog") {
+        renderCatalogStage();
+        return;
+      }
+      const group = state.data && state.data.groups.find((entry) => entry.groupId === state.activeGroupId);
+      if (!group) {
+        elements.stage.replaceChildren(emptyState("目前沒有符合條件的審核群組", "可切換篩選器或重新整理資料。"));
+        return;
+      }
+
+      const heading = el("header", "stage-heading");
+      const copy = el("div");
+      copy.append(el("span", "eyebrow", "Duplicate Review · " + group.groupId));
+      copy.append(el("h1", "", "相似藏品並排覆核"));
+      copy.append(el("p", "", group.reason));
+      heading.append(copy, el("div", "stage-counter", group.items.length + " OBJECTS · 影像編目非實物鑑定"));
+
+      const grid = el("div", "artifact-grid");
+      grid.style.setProperty("--card-count", Math.min(group.items.length, 3));
+      const differences = differenceMap(group.items);
+      group.items.forEach((item) => grid.append(renderArtifactCard(item, group, differences)));
+      elements.stage.replaceChildren(heading, grid);
+    }
+
+    function filteredCatalog() {
+      if (!state.data || !state.data.catalog) return [];
+      const query = state.catalogSearch.trim().toLowerCase();
+      return state.data.catalog.filter((item) => {
+        const searchable = [item.itemName, item.category, item.era, item.tags, item.uuid].join(" ").toLowerCase();
+        if (query && !searchable.includes(query)) return false;
+        if (state.catalogStatus !== "all" && item.status !== state.catalogStatus) return false;
+        if (state.catalogCategory !== "all" && item.category !== state.catalogCategory) return false;
+        return true;
+      });
+    }
+
+    function renderCatalogStage() {
+      const items = filteredCatalog();
+      const heading = el("header", "stage-heading");
+      const copy = el("div");
+      copy.append(el("span", "eyebrow", "Catalogue Control"));
+      copy.append(el("h1", "", "全部藏品管理"));
+      copy.append(el("p", "", "完整編輯藏品資料，控制上架、待覆核、下架與退件；亦可人工選取相似藏品建立並排比對。"));
+      heading.append(copy, el("div", "stage-counter", items.length + " / " + state.data.catalog.length + " OBJECTS"));
+
+      const toolbar = el("div", "catalog-toolbar");
+      const search = document.createElement("input");
+      search.type = "search";
+      search.placeholder = "搜尋品名、年代、分類、標籤或 UUID";
+      search.value = state.catalogSearch;
+      search.setAttribute("aria-label", "搜尋全部藏品");
+      const status = document.createElement("select");
+      status.setAttribute("aria-label", "依狀態篩選");
+      [["all", "全部狀態"], ["完成", "已上架"], ["待人工覆核", "待人工覆核"], ["已下架", "已下架"], ["已退件", "已退件"]].forEach(([value, label]) => {
+        const option = document.createElement("option"); option.value = value; option.textContent = label; status.append(option);
+      });
+      status.value = state.catalogStatus;
+      const category = document.createElement("select");
+      category.setAttribute("aria-label", "依分類篩選");
+      const allCategory = document.createElement("option"); allCategory.value = "all"; allCategory.textContent = "全部分類"; category.append(allCategory);
+      [...new Set(state.data.catalog.map((item) => item.category).filter(Boolean))].sort().forEach((value) => {
+        const option = document.createElement("option"); option.value = value; option.textContent = value; category.append(option);
+      });
+      category.value = state.catalogCategory;
+      search.addEventListener("input", () => { state.catalogSearch = search.value; renderCatalogResults(); });
+      status.addEventListener("change", () => { state.catalogStatus = status.value; renderCatalogResults(); });
+      category.addEventListener("change", () => { state.catalogCategory = category.value; renderCatalogResults(); });
+      toolbar.append(search, status, category);
+
+      const results = el("div", "catalog-results");
+      results.id = "catalog-results";
+      elements.stage.replaceChildren(heading, toolbar, results);
+      renderCatalogResults();
+    }
+
+    function renderCatalogResults() {
+      const results = document.getElementById("catalog-results");
+      if (!results) return;
+      const items = filteredCatalog();
+      const counter = elements.stage.querySelector(".stage-counter");
+      if (counter) counter.textContent = items.length + " / " + state.data.catalog.length + " OBJECTS";
+      if (!items.length) {
+        results.replaceChildren(emptyState("沒有符合條件的藏品", "請調整搜尋字詞或篩選條件。"));
+        return;
+      }
+      const grid = el("div", "catalog-grid");
+      items.forEach((item) => grid.append(renderCatalogCard(item)));
+      results.replaceChildren(grid);
+    }
+
+    function renderCatalogCard(item) {
+      const selected = state.compareSelection.has(item.uuid);
+      const card = el("article", "catalog-card" + (selected ? " is-selected" : ""));
+      const figure = el("figure", "artifact-figure");
+      const image = document.createElement("img");
+      image.src = item.thumbnailUrl || item.imageUrl || "";
+      image.alt = item.itemName + " 藏品照片";
+      image.loading = "lazy";
+      const zoom = el("button", "image-open"); zoom.type = "button"; zoom.dataset.imageUuid = item.uuid; zoom.setAttribute("aria-label", "放大檢視 " + item.itemName);
+      figure.append(image, zoom);
+      const body = el("div", "catalog-card-body");
+      const line = el("div", "artifact-meta-line");
+      line.append(el("span", "artifact-id", "Row " + item.sourceRow + " · " + String(item.uuid).slice(0,8)), el("span", "status-badge", item.status || "未設定"));
+      const facts = el("div", "catalog-facts");
+      facts.append(el("span", "", item.era || "年代未定"), el("span", "", item.category || "分類未定"));
+      const actions = el("div", "catalog-actions");
+      [["publish","上架"],["hold","待覆核"],["archive","下架"],["reject","退件"],["edit","完整編輯"]].forEach(([action,label]) => {
+        const button = el("button", "action-button", label); button.type="button"; button.dataset.action=action; button.dataset.uuid=item.uuid; button.dataset.groupId=""; actions.append(button);
+      });
+      const compare = el("button", "action-button compare-button", selected ? "已加入人工比對" : "加入人工比對");
+      compare.type = "button"; compare.dataset.compareUuid = item.uuid; actions.append(compare);
+      body.append(line, el("h2", "", item.itemName || "未命名藏品"), facts, actions);
+      card.append(figure, body);
+      return card;
+    }
+
+    function renderCompareTray() {
+      const count = state.compareSelection.size;
+      elements.compareTray.hidden = state.mode !== "catalog" || count === 0;
+      elements.compareCount.textContent = "已選取 " + count + " 件（最多 6 件）";
+      elements.compareCreate.disabled = count < 2;
+    }
+
+    function renderArtifactCard(item, group, differences) {
+      const card = el("article", "artifact-card");
+      card.dataset.role = item.recommendedRole;
+
+      const figure = el("figure", "artifact-figure");
+      const image = document.createElement("img");
+      image.src = item.thumbnailUrl || item.imageUrl || "";
+      image.alt = item.itemName ? item.itemName + " 藏品照片" : "藏品照片";
+      image.loading = "lazy";
+      image.decoding = "async";
+      const zoom = el("button", "image-open");
+      zoom.type = "button";
+      zoom.dataset.imageUuid = item.uuid;
+      zoom.setAttribute("aria-label", "放大檢視 " + item.itemName);
+      const role = el("span", "role-badge", ROLE_LABELS[item.recommendedRole] || "待人工覆核");
+      role.dataset.role = item.recommendedRole;
+      figure.append(image, zoom, role);
+
+      const body = el("div", "artifact-body");
+      const metaLine = el("div", "artifact-meta-line");
+      metaLine.append(el("span", "artifact-id", "Sheet row " + item.sourceRow + " · " + String(item.uuid).slice(0, 8)));
+      metaLine.append(el("span", "status-badge", item.status || "未設定"));
+      body.append(metaLine, el("h2", "", item.itemName || "未命名藏品"));
+
+      const metadata = el("dl", "metadata");
+      [
+        ["年代", "era"],
+        ["分類", "category"],
+        ["拍賣參考", "refItem"],
+        ["參考價格", "refPrice"],
+        ["標籤", "tags"],
+        ["目前狀態", "status"],
+      ].forEach(([label, key]) => {
+        const field = el("div", "field" + (differences[key] ? " is-different" : ""));
+        field.append(el("dt", "", label), el("dd", "", item[key] || "—"));
+        metadata.append(field);
+      });
+      body.append(metadata);
+
+      const story = el("p", "narrative");
+      story.append(el("strong", "", "編目故事"), el("span", "", item.story || "尚未提供。"));
+      body.append(story);
+
+      const actions = el("div", "card-actions");
+      ["publish", "hold", "archive", "reject", "edit"].forEach((action) => {
+        const button = el("button", "action-button", action === "edit" ? "編輯資料" : ACTION_LABELS[action]);
+        button.type = "button";
+        button.dataset.action = action;
+        button.dataset.uuid = item.uuid;
+        button.dataset.groupId = group.groupId;
+        actions.append(button);
+      });
+      body.append(actions);
+      card.append(figure, body);
+      return card;
+    }
+
+    function differenceMap(items) {
+      const map = {};
+      ["era", "category", "refItem", "refPrice", "tags", "status"].forEach((key) => {
+        map[key] = new Set(items.map((item) => String(item[key] || "").trim())).size > 1;
+      });
+      return map;
+    }
+
+    function openDecision(action, uuid, groupId) {
+      const item = findItem(uuid);
+      if (!item) return;
+      state.decision = { action, uuid, groupId };
+      const archiveSafety = action === "archive"
+        ? "此動作不會刪除 Sheet 列或 Drive 圖片，之後仍可重新上架。"
+        : "";
+      elements.decisionDescription.textContent = "「" + item.itemName + "」將執行：" + ACTION_LABELS[action] + "。這會更新 Google Sheet 狀態並留下稽核紀錄。" + archiveSafety;
+      elements.decisionNote.value = item.reviewerNote || "";
+      elements.decisionSubmit.textContent = ACTION_LABELS[action];
+      elements.decisionDialog.showModal();
+    }
+
+    function openEditor(uuid, groupId) {
+      const item = findItem(uuid);
+      if (!item) return;
+      state.editing = { uuid, groupId };
+      const fields = ["userCaption", "itemName", "category", "story", "refItem", "refPrice", "imageUrl", "tags", "displayRecommendation"];
+      fields.forEach((field) => { document.getElementById("edit-" + field).value = item[field] || ""; });
+      const eraSelect = document.getElementById("edit-era");
+      eraSelect.replaceChildren(...state.data.validEras.map((era) => {
+        const option = document.createElement("option");
+        option.value = era;
+        option.textContent = era;
+        return option;
+      }));
+      eraSelect.value = state.data.validEras.includes(item.era) ? item.era : "時代不詳";
+      document.getElementById("edit-note").value = "";
+      document.getElementById("edit-title").textContent = "編輯｜" + item.itemName;
+      elements.editDialog.showModal();
+    }
+
+    async function submitDecision(event) {
+      event.preventDefault();
+      if (!state.decision || state.busy) return;
+      setBusy(true, elements.decisionSubmit);
+      try {
+        const result = await callServer("saveReviewDecision", {
+          ...state.decision,
+          note: elements.decisionNote.value,
+          fields: {},
+        });
+        replaceItem(result.item);
+        elements.decisionDialog.close();
+        render();
+        showToast(result.message);
+      } catch (error) {
+        showToast(error.message || String(error), true);
+      } finally {
+        setBusy(false, elements.decisionSubmit);
+      }
+    }
+
+    async function submitEdit(event) {
+      event.preventDefault();
+      if (!state.editing || state.busy) return;
+      const fields = {};
+      new FormData(elements.editForm).forEach((value, key) => { fields[key] = String(value); });
+      setBusy(true, elements.editSubmit);
+      try {
+        const result = await callServer("saveReviewDecision", {
+          action: "edit",
+          uuid: state.editing.uuid,
+          groupId: state.editing.groupId,
+          note: document.getElementById("edit-note").value,
+          fields,
+        });
+        replaceItem(result.item);
+        elements.editDialog.close();
+        render();
+        showToast(result.message);
+      } catch (error) {
+        showToast(error.message || String(error), true);
+      } finally {
+        setBusy(false, elements.editSubmit);
+      }
+    }
+
+    function findItem(uuid) {
+      if (!state.data) return null;
+      if (state.data.catalog) {
+        const catalogItem = state.data.catalog.find((entry) => entry.uuid === uuid);
+        if (catalogItem) return catalogItem;
+      }
+      for (const group of state.data.groups) {
+        const item = group.items.find((entry) => entry.uuid === uuid);
+        if (item) return item;
+      }
+      return null;
+    }
+
+    function replaceItem(updated) {
+      const current = findItem(updated.uuid);
+      if (!current) return;
+      const queueFields = { recommendedRole: current.recommendedRole, reviewStatus: current.reviewStatus, reviewerNote: current.reviewerNote };
+      Object.assign(current, updated, queueFields);
+      if (state.decision && state.decision.action !== "edit") {
+        current.reviewStatus = updated.status;
+        current.reviewerNote = elements.decisionNote.value || current.reviewerNote;
+      }
+      state.data.groups.forEach((group) => group.items.forEach((item) => {
+        if (item.uuid === updated.uuid && item !== current) {
+          Object.assign(item, updated);
+          if (state.decision && state.decision.action !== "edit") {
+            item.reviewStatus = updated.status;
+            item.reviewerNote = elements.decisionNote.value || item.reviewerNote;
+          }
+        }
+      }));
+    }
+
+    function toggleCompare(uuid) {
+      if (state.compareSelection.has(uuid)) state.compareSelection.delete(uuid);
+      else if (state.compareSelection.size < 6) state.compareSelection.add(uuid);
+      else return showToast("單一比對群組最多 6 件藏品。", true);
+      renderCatalogResults();
+      renderCompareTray();
+    }
+
+    async function submitCompare(event) {
+      event.preventDefault();
+      if (state.compareSelection.size < 2 || state.busy) return;
+      setBusy(true, elements.compareSubmit);
+      try {
+        const result = await callServer("createManualReviewGroup", {
+          uuids: [...state.compareSelection],
+          reason: document.getElementById("compare-reason").value,
+        });
+        if (!state.demo) state.data = await callServer("getBootstrapData");
+        state.compareSelection.clear();
+        state.mode = "review";
+        state.activeGroupId = result.groupId;
+        elements.compareDialog.close();
+        render();
+        showToast(result.message);
+      } catch (error) {
+        showToast(error.message || String(error), true);
+      } finally {
+        setBusy(false, elements.compareSubmit);
+      }
+    }
+
+    function openImage(uuid) {
+      const item = findItem(uuid);
+      if (!item) return;
+      elements.imagePreview.src = item.thumbnailUrl || item.imageUrl || "";
+      elements.imagePreview.alt = item.itemName + " 放大照片";
+      elements.imageTitle.textContent = item.itemName;
+      elements.imageDialog.showModal();
+    }
+
+    function setBusy(busy, button) {
+      state.busy = busy;
+      if (!button) return;
+      button.disabled = busy;
+      if (!button.dataset.originalLabel) button.dataset.originalLabel = button.textContent;
+      button.textContent = busy ? "正在寫入…" : button.dataset.originalLabel;
+    }
+
+    function setLoading(loading) {
+      elements.refresh.disabled = loading;
+      elements.refresh.textContent = loading ? "讀取中…" : "重新整理";
+    }
+
+    function showToast(message, isError = false, duration = 3200) {
+      elements.toast.textContent = message;
+      elements.toast.classList.toggle("is-error", isError);
+      elements.toast.classList.add("is-visible");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => elements.toast.classList.remove("is-visible"), duration);
+    }
+
+    function renderError(error) {
+      elements.stage.replaceChildren(emptyState("無法載入審核台", error.message || String(error)));
+      showToast(error.message || String(error), true, 6000);
+    }
+
+    function emptyState(title, copy) {
+      const wrapper = el("div", "empty-state");
+      wrapper.append(el("span", "eyebrow", "Review Desk"), el("h2", "", title), el("p", "", copy));
+      return wrapper;
+    }
+
+    function el(tag, className = "", text = "") {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    elements.groupList.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-group-id]");
+      if (!button) return;
+      state.activeGroupId = button.dataset.groupId;
+      renderGroupList();
+      renderStage();
+      document.getElementById("review-stage").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    elements.modeSwitch.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-mode]");
+      if (!button) return;
+      state.mode = button.dataset.mode;
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    elements.filters.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-filter]");
+      if (!button) return;
+      state.filter = button.dataset.filter;
+      elements.filters.querySelectorAll("[data-filter]").forEach((entry) => entry.classList.toggle("is-active", entry === button));
+      renderGroupList();
+      renderStage();
+    });
+
+    elements.stage.addEventListener("click", (event) => {
+      const compareButton = event.target.closest("[data-compare-uuid]");
+      if (compareButton) {
+        toggleCompare(compareButton.dataset.compareUuid);
+        return;
+      }
+      const actionButton = event.target.closest("[data-action]");
+      if (actionButton) {
+        if (actionButton.dataset.action === "edit") openEditor(actionButton.dataset.uuid, actionButton.dataset.groupId);
+        else openDecision(actionButton.dataset.action, actionButton.dataset.uuid, actionButton.dataset.groupId);
+        return;
+      }
+      const imageButton = event.target.closest("[data-image-uuid]");
+      if (imageButton) openImage(imageButton.dataset.imageUuid);
+    });
+
+    document.querySelectorAll("[data-close-dialog]").forEach((button) => {
+      button.addEventListener("click", () => button.closest("dialog").close());
+    });
+    elements.refresh.addEventListener("click", loadData);
+    elements.decisionForm.addEventListener("submit", submitDecision);
+    elements.editForm.addEventListener("submit", submitEdit);
+    elements.compareClear.addEventListener("click", () => {
+      state.compareSelection.clear();
+      renderCatalogResults();
+      renderCompareTray();
+    });
+    elements.compareCreate.addEventListener("click", () => {
+      if (state.compareSelection.size >= 2) elements.compareDialog.showModal();
+    });
+    elements.compareForm.addEventListener("submit", submitCompare);
+    loadData();
+  </script>
+</body>
+</html>

@@ -1,7 +1,106 @@
 {
   "schema_version": 1,
-  "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs). Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. See AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
+  "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
+    {
+      "ts": "2026-08-30T03:30:00Z",
+      "category": "fix",
+      "scope": "review-desk.gas-html-parser",
+      "summary": "移除 Review Desk inline script 的 template literals 與 logical assignment，修正 GAS HtmlService document.write 解析到第一個 https 字串時發生 SyntaxError、導致啟動鏈完全未執行。",
+      "rationale": "Chrome Console 明確回報 VM52:63 Unexpected identifier 'https'；該位置對應第一段以反引號建立 Drive thumbnail URL 的程式。改用字串串接與傳統條件賦值，保留既有輸出與功能，同時避開 HtmlService 包裝層解析差異。",
+      "breaking": false,
+      "rollback": "git revert <this commit>",
+      "files": [
+        "scripts/GAS/review_desk/Index.html"
+      ],
+      "change_tags": [
+        "RD-GAS-PARSER"
+      ]
+    },
+    {
+      "ts": "2026-08-30T02:55:10Z",
+      "category": "feat",
+      "scope": "review-desk.initial-release+gas-bridge",
+      "summary": "納入可部署的藏品審核台，並修正正式 GAS Web App 被誤判為本機示範模式，避免 getBootstrapData 未發出而永遠停在讀取畫面。",
+      "rationale": "Review Desk 提供重複覆核、完整型錄管理、可復原下架與 audit log。部署後 doGet 正常完成但沒有任何 getBootstrapData 執行項目；根因是 Apps Script 的 google bridge 可能是全域識別字而非 window.google，舊判斷誤觸 demo 分支。",
+      "breaking": false,
+      "rollback": "git revert <this commit>",
+      "files": [
+        "scripts/GAS/review_desk/Index.html",
+        "scripts/GAS/review_desk/Code.gs",
+        "scripts/GAS/review_desk/appsscript.json",
+        "scripts/GAS/review_desk/README.md",
+        ".gitignore"
+      ]
+    },
+    {
+      "ts": "2026-08-27T00:00:00Z",
+      "category": "chore",
+      "scope": "design-backlog.landing + dod-protocol",
+      "version_from": "0776c94",
+      "version_to": "chore/land-design-backlog",
+      "summary": "落地 1429 行未提交前端工作（P2 / R5–R8 / Sol Slice 1–2）+ 補 GAS 金鑰 gitignore 缺口 + 建立完工協議（AGENTS.md §12 + 機器檢查）。",
+      "rationale": "設計檢視發現 Publish/index.html 有橫跨四個 session、從未提交的 1429 行改動，且 CHG_LOG 停在 2026-05-03、gpt_polish_log 停在 2026-06-11。追查後確認根因不是 agent 不守規矩，而是規則檔從來沒有規定「完工要記錄」——CHG_LOG.json 在 AGENTS.md 裡只出現一次，是目錄樹裡的一個標籤。同時發現 AGENTS.md 是 CLAUDE.md 的機械複製且 sed 改壞兩行，其中一行把 skill 路徑指向空的 .Codex/，導致 Codex/Sol 讀不到任何 skill。",
+      "breaking": false,
+      "rollback": "git reset --hard 0776c94（未 push 前）；已 push 則 git revert 各 commit",
+      "change_tags": [
+        "A4-HONEST"
+      ],
+      "blocks": [
+        {
+          "id": "L-SEC",
+          "name": "gitignore 補洞 — GAS 原始碼含明文金鑰",
+          "commit": "ed388a1",
+          "files": [
+            ".gitignore"
+          ],
+          "design": "scripts/GAS/AntiqueAnalysis_AI.md 內含明文 DISCORD_BOT_TOKEN 與 GEMINI_KEY，原規則只擋 memory/ 下的 GAS 檔。已確認金鑰從未進入 git 歷史，無需輪換。一併排除 reports/(42MB) 與 .claude/settings.json。"
+        },
+        {
+          "id": "L-FE",
+          "name": "落地 P2 / R5–R8 / Sol Slice 1–2",
+          "commit": "e82cb19",
+          "files": [
+            "Publish/index.html (+2597/-1168)"
+          ],
+          "design": "四個 session 的改動在同一檔內交錯，無法乾淨拆分，一次落地並在 commit message 列出全貌。Sol Slice 1（裝飾減法）完成；Slice 2（Hero art direction）大半完成，.bg-layer 由 fixed 全頁底圖改為 460px/330px Hero panel。"
+        },
+        {
+          "id": "L-CUR",
+          "name": "Curator 精確重複圖片改判衝突",
+          "commit": "7c0e580",
+          "files": [
+            "scripts/ap_org_bot/agents/_domain/ap/curator.py (+73)",
+            "tests/test_agents_curator.py (+54, 4 tests)"
+          ],
+          "design": "_exact_image_identity() 以 imageFingerprint 為主、Drive file ID 為備援；刻意不用影像相似度或標題比對。gross rejection 維持原判決。"
+        },
+        {
+          "id": "L-DOC",
+          "name": "落地設計 loop 文件、9 個 skill 與 Sol 設計包",
+          "commit": "12b81e5",
+          "files": [
+            "AGENTS.md",
+            "AP_Design_Loop_v3_Strategy.md",
+            "DESIGN_BRIEF_*.md",
+            "GPT56_SOL_*.md",
+            "HANDOFF_Codex_DesignLoop_R8.md",
+            "GPT Design/jibao_xuan_design_pack/",
+            ".claude/commands/*.md (9)"
+          ],
+          "design": "這批文件一直只存在於工作區，接手的 agent 無法從 repo 得知專案現況——本次設計檢視就是因此誤判了 Sol 的實際進度。"
+        },
+        {
+          "id": "L-A4",
+          "name": "contact 區誠實化",
+          "commit": "4eef503",
+          "files": [
+            "Publish/index.html"
+          ],
+          "design": "移除 disabled LINE 按鈕、「24 小時內回覆」承諾與已不可能命中的 [aria-disabled] CSS。依 Sol 提案 §3.5 與 AP_Design_Loop_v3_Strategy.md A4。保留 LINE_ID_PLACEHOLDER 還原指引。"
+        }
+      ]
+    },
     {
       "ts": "2026-05-03T22:00:00Z",
       "category": "feat",
@@ -16,14 +115,21 @@
         {
           "id": "S-F",
           "name": "MigrationsRunner — startup Notion schema audit",
-          "files": ["scripts/ap_org_bot/handlers/migrations_runner.py (+231)", "scripts/ap_org_bot/main.py (+14 wiring)", "tests/test_migrations_runner.py (+145, 6 tests)"],
+          "files": [
+            "scripts/ap_org_bot/handlers/migrations_runner.py (+231)",
+            "scripts/ap_org_bot/main.py (+14 wiring)",
+            "tests/test_migrations_runner.py (+145, 6 tests)"
+          ],
           "design": "Safe-by-default dry-run audit; AP_MIGRATIONS_AUTO_APPLY=1 才會真的 PATCH Notion. 重用 ap_notion_reconciler 的 _patch_add_properties / _compare_schema, 不 subprocess CLI",
           "merge_strategy": "no-ff merge — main.py wiring 純 additive, 跟 Session B/C 既有 wiring 不衝突"
         },
         {
           "id": "S-G",
           "name": "BudgetGovernor — full USD ledger + multi-window caps + attribution",
-          "files": ["scripts/ap_org_bot/infra/budget_governor.py (+228)", "tests/test_infra_budget_governor.py (+185, 12 tests)"],
+          "files": [
+            "scripts/ap_org_bot/infra/budget_governor.py (+228)",
+            "tests/test_infra_budget_governor.py (+185, 12 tests)"
+          ],
           "design": "EXTEND budget_gate (不 REPLACE): record_call() 內部仍 bump record_call_attempt() 維持 backward compat. 新 SQLite table budget_calls_v2 與 budget_gate 共用 DB. 三層 caps (daily/weekly/monthly USD)",
           "callsite_migration": "本 session 故意不改 RealAgentInvoker / catchup_protocol callsites — 留給 Sprint 5",
           "merge_strategy": "no-ff merge — 純新檔, 零衝突"
@@ -56,32 +162,53 @@
         {
           "id": "S-A",
           "name": "Emil UI audit P1+P2+P3 (10 items)",
-          "files": ["Publish/index.html (10 changes)", "reports/emil_audit_after/verification_report.md", "CHG_LOG.json"],
+          "files": [
+            "Publish/index.html (10 changes)",
+            "reports/emil_audit_after/verification_report.md",
+            "CHG_LOG.json"
+          ],
           "merge_strategy": "no-ff merge, 手動 reconcile CHG_LOG.json (兩個 ts=05-02 entry 共存)"
         },
         {
           "id": "S-E",
           "name": "Visual regression baseline + perf metrics",
-          "files": ["tests/visual/baseline/*.png (10 screenshots)", "reports/perf_baseline_2026-05-02.json", "reports/console_baseline_2026-05-02.json", "scripts/take_baseline.py", ".gitignore"],
+          "files": [
+            "tests/visual/baseline/*.png (10 screenshots)",
+            "reports/perf_baseline_2026-05-02.json",
+            "reports/console_baseline_2026-05-02.json",
+            "scripts/take_baseline.py",
+            ".gitignore"
+          ],
           "merge_strategy": "no-ff merge, .claude/launch.json.local-bak 備份 Craig 本地版"
         },
         {
           "id": "S-D",
           "name": "daemon-poll CLI subcommand",
-          "files": ["scripts/ap_council_runner.py (+37)", "tests/test_ap_council_runner_daemon.py (+94, 3 tests)"],
+          "files": [
+            "scripts/ap_council_runner.py (+37)",
+            "tests/test_ap_council_runner_daemon.py (+94, 3 tests)"
+          ],
           "merge_strategy": "cherry-pick CLI + test only, 拋棄 Session D 的 daemon.py 重寫 (Sprint 3 已有 290 LoC 完整版)",
           "note": "Session D CLI 是 duck-typed against to_dict(), 無痛接 Sprint 3 daemon"
         },
         {
           "id": "S-C",
           "name": "RealDiscordFetcher production wrapper",
-          "files": ["scripts/ap_org_bot/handlers/discord_fetcher_real.py (+109)", "tests/test_discord_fetcher_real.py (+184, 7 tests)"],
+          "files": [
+            "scripts/ap_org_bot/handlers/discord_fetcher_real.py (+109)",
+            "tests/test_discord_fetcher_real.py (+184, 7 tests)"
+          ],
           "merge_strategy": "重寫對齊 Sprint 3 的 DiscordFetcher base class (str channel_id + Optional[str] after_message_id + limit=200), 而非 Session C 自己定義的 Protocol (int + int + limit=100)"
         },
         {
           "id": "S-B",
           "name": "CouncilDaemon → 11:00/20:00 scheduler wiring",
-          "files": ["scripts/ap_org_bot/council/agent_invoker_real.py (+50)", "scripts/ap_org_bot/handlers/scheduler.py (+13)", "scripts/ap_org_bot/main.py (+5)", "tests/test_council_daemon_integration.py (+105, 3 pass + 2 skip)"],
+          "files": [
+            "scripts/ap_org_bot/council/agent_invoker_real.py (+50)",
+            "scripts/ap_org_bot/handlers/scheduler.py (+13)",
+            "scripts/ap_org_bot/main.py (+5)",
+            "tests/test_council_daemon_integration.py (+105, 3 pass + 2 skip)"
+          ],
           "merge_strategy": "拋棄 Session B 的 daemon.py 重寫 (57 LoC stub) + apscheduler 直接 import (測試環境沒裝); 改用 importlib.util.find_spec 偵測 + skipif 保護, agent_invoker_real 顯式 inherit AgentInvoker base class"
         }
       ],
@@ -95,7 +222,9 @@
         "migrations/ live on bot startup (notion_reconciler enforce)",
         "budget_governor full version (per-call USD ledger, weekly/daily caps)"
       ],
-      "files": ["multi-file integration commit"]
+      "files": [
+        "multi-file integration commit"
+      ]
     },
     {
       "ts": "2026-05-03T02:00:00Z",
@@ -178,28 +307,40 @@
         {
           "id": "B1",
           "name": "audit_runner AP-2/3/4/8 — 8-rule full set",
-          "files": ["scripts/ap_org_bot/audit/rules.py (+AP-2/3/4/8)", "tests/test_audit.py (24→47 tests)"],
+          "files": [
+            "scripts/ap_org_bot/audit/rules.py (+AP-2/3/4/8)",
+            "tests/test_audit.py (24→47 tests)"
+          ],
           "rules_added": "AP-2 效能啟發式 / AP-3 繁體中文一致性 / AP-4 GAS端點標籤 / AP-8 SEO meta+OG tags",
           "tests": "23 new"
         },
         {
           "id": "B2",
           "name": "notion_reconciler enforce mode",
-          "files": ["scripts/ap_notion_reconciler.py (+enforce subcommand, _patch_add_properties, _desired_spec_to_notion_body)", "tests/test_notion_reconciler.py (11→21 tests)"],
+          "files": [
+            "scripts/ap_notion_reconciler.py (+enforce subcommand, _patch_add_properties, _desired_spec_to_notion_body)",
+            "tests/test_notion_reconciler.py (11→21 tests)"
+          ],
           "safety": "additive only — never deletes/type-changes; requires --confirm; type_mismatch+option_diff flagged for human review",
           "tests": "10 new"
         },
         {
           "id": "B3",
           "name": "catchup_protocol active replay + Gemini quota reconcile",
-          "files": ["scripts/ap_org_bot/handlers/catchup_protocol.py (+ReplayResult, DiscordFetcher, replay_feedback_channel, reconcile_gemini_quota)", "tests/test_catchup_protocol.py (20→31 tests)"],
+          "files": [
+            "scripts/ap_org_bot/handlers/catchup_protocol.py (+ReplayResult, DiscordFetcher, replay_feedback_channel, reconcile_gemini_quota)",
+            "tests/test_catchup_protocol.py (20→31 tests)"
+          ],
           "components": "ReplayResult / DiscordFetcher (injectable) / replay_feedback_channel() / reconcile_gemini_quota()",
           "tests": "11 new"
         },
         {
           "id": "B4",
           "name": "Council 9-state daemon",
-          "files": ["scripts/ap_org_bot/council/daemon.py (new — 290 LoC)", "tests/test_council_daemon.py (new — 26 tests)"],
+          "files": [
+            "scripts/ap_org_bot/council/daemon.py (new — 290 LoC)",
+            "tests/test_council_daemon.py (new — 26 tests)"
+          ],
           "components": "AgentInvoker (injectable) / parse_stance / _detect_divergence / CouncilDaemon.poll_and_advance / _run_phase1/2/3 / DaemonRun",
           "tests": "26 new"
         }
@@ -228,41 +369,60 @@
         {
           "id": "B1",
           "name": "Curator --apply write-back to Notion",
-          "files": ["notion_writer.py: _patch + update_page_properties", "notion_client.py: re-export", "ap_curator_runner.py: --apply"],
+          "files": [
+            "notion_writer.py: _patch + update_page_properties",
+            "notion_client.py: re-export",
+            "ap_curator_runner.py: --apply"
+          ],
           "tests": "0 new (validated via existing 109 regression)"
         },
         {
           "id": "B2",
           "name": "Auth Log DB schema migration spec + CLI",
-          "files": ["config/migrations/2026-04-30_auth_log_v1_to_v2.yaml", "scripts/ap_authlog_schema_migrate.py"],
+          "files": [
+            "config/migrations/2026-04-30_auth_log_v1_to_v2.yaml",
+            "scripts/ap_authlog_schema_migrate.py"
+          ],
           "tests": "0 new (CLI smoke verified)",
           "schema_change": "Adds era (select 9-enum) + category (select 6 options) + isValid (checkbox) to Auth Log DB"
         },
         {
           "id": "B3",
           "name": "catchup_protocol skeleton",
-          "files": ["scripts/ap_org_bot/handlers/catchup_protocol.py", "memory/ap_catchup/{_schema.json, README.md}"],
+          "files": [
+            "scripts/ap_org_bot/handlers/catchup_protocol.py",
+            "memory/ap_catchup/{_schema.json, README.md}"
+          ],
           "tests": "20 new (test_catchup_protocol.py)",
           "components": "WatermarkStore + 5 SourceTypes + CatchupCoordinator.on_bot_startup() + heartbeat()"
         },
         {
           "id": "B4",
           "name": "audit_runner 4-rule MVP",
-          "files": ["scripts/ap_org_bot/audit/{__init__.py, context.py, rules.py, scoring.py}", "scripts/ap_audit_runner.py"],
+          "files": [
+            "scripts/ap_org_bot/audit/{__init__.py, context.py, rules.py, scoring.py}",
+            "scripts/ap_audit_runner.py"
+          ],
           "tests": "24 new (test_audit.py)",
           "rules": "AP-1 廣告腔 / AP-5 合規聲明 / AP-6 Schema.org / AP-7 alt 屬性"
         },
         {
           "id": "B5",
           "name": "Council 9-state extension",
-          "files": ["state_machine.py: ALLOWED_TRANSITIONS + add_phase1_response/add_phase2_debate_round/set_phase3_proposal/proposal_for_embed", "ap_council_runner.py: phase1-respond/phase2-debate/phase3-integrate CLI"],
+          "files": [
+            "state_machine.py: ALLOWED_TRANSITIONS + add_phase1_response/add_phase2_debate_round/set_phase3_proposal/proposal_for_embed",
+            "ap_council_runner.py: phase1-respond/phase2-debate/phase3-integrate CLI"
+          ],
           "tests": "19 new (test_council_9state.py) + 1 fix (test_council.py)",
           "compatibility": "Sprint 1 pilot path (STRUCTURED→AWAITING_SIGNOFF) preserved alongside full 9-state path"
         },
         {
           "id": "B6",
           "name": "notion_reconciler drift mode",
-          "files": ["scripts/ap_org_bot/reconciler/{__init__.py, notion_diff.py}", "scripts/ap_notion_reconciler.py"],
+          "files": [
+            "scripts/ap_org_bot/reconciler/{__init__.py, notion_diff.py}",
+            "scripts/ap_notion_reconciler.py"
+          ],
           "tests": "11 new (test_notion_reconciler.py)",
           "diff_kinds": "missing / extra / type_mismatch / option_diff",
           "scope": "drift mode only (read-only); enforce mode deferred to Sprint 3"

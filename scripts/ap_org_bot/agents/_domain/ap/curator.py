@@ -46,6 +46,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
+import re
 from typing import Any, Optional
 
 log = logging.getLogger("ap_org_bot.agents.curator")
@@ -222,8 +223,55 @@ class CuratorAgent:
         )
 
     def review_batch(self, entries: list[dict[str, Any]]) -> list[CuratorReview]:
-        """Classify a batch of entries. Stable order — preserves input order."""
-        return [self.classify(e) for e in entries]
+        """Classify a batch and hold exact-image duplicates for human review.
+
+        Stable order is preserved. ``imageFingerprint`` is preferred because it
+        can come from a controlled image-hash job. As a fallback, matching
+        Google Drive file IDs are also treated as the same uploaded image.
+        This deliberately does not use image similarity or title matching:
+        those require curator judgment and must not block publication here.
+        """
+        reviews = [self.classify(e) for e in entries]
+        groups: dict[str, list[int]] = {}
+
+        for index, entry in enumerate(entries):
+            identity = self._exact_image_identity(entry)
+            if identity:
+                groups.setdefault(identity, []).append(index)
+
+        for matching_indices in groups.values():
+            if len(matching_indices) < 2:
+                continue
+
+            for index in matching_indices:
+                review = reviews[index]
+                # A gross rejection is stronger and should keep its original
+                # verdict. The duplicate is still visible in the companion
+                # record(s) for a human to investigate.
+                if review.verdict == Verdict.REJECTED:
+                    continue
+
+                peer_ids = [
+                    reviews[peer_index].auth_log_id
+                    for peer_index in matching_indices
+                    if peer_index != index
+                ]
+                duplicate_reason = (
+                    "影像識別碼與另一筆資料重複: "
+                    f"{', '.join(peer_ids)}；請人工確認是否同件或重複上傳"
+                )
+                reviews[index] = CuratorReview(
+                    auth_log_id=review.auth_log_id,
+                    verdict=Verdict.CONFLICT,
+                    reasons=[*review.reasons, duplicate_reason],
+                    recommended_action=(
+                        "標 Notion curator_status=衝突；暫不公開，"
+                        "人工確認同件／重複上傳後再決定保留方式"
+                    ),
+                    promote_to_kb=False,
+                )
+
+        return reviews
 
     def summary(self, reviews: list[CuratorReview]) -> dict[str, int]:
         """Return verdict counts. Useful for Discord summary message + telemetry."""
@@ -244,6 +292,27 @@ class CuratorAgent:
             return float(raw)
         except (TypeError, ValueError):
             return 0.0
+
+    @staticmethod
+    def _exact_image_identity(entry: dict[str, Any]) -> str:
+        """Return a deterministic duplicate key, or an empty string.
+
+        ``imageFingerprint`` is intentionally opt-in: callers should provide
+        a cryptographic/content hash only after their image audit. Drive IDs
+        are a weaker fallback but still prove the same Drive file was supplied.
+        """
+        fingerprint = str(entry.get("imageFingerprint") or "").strip()
+        if fingerprint:
+            return f"fingerprint:{fingerprint.casefold()}"
+
+        image_url = str(entry.get("imageUrl") or "").strip()
+        if not image_url:
+            return ""
+
+        match = re.search(r"/file/d/([A-Za-z0-9_-]+)", image_url)
+        if not match:
+            match = re.search(r"[?&]id=([A-Za-z0-9_-]+)", image_url)
+        return f"drive:{match.group(1)}" if match else ""
 
     def _find_forbidden_words(self, entry: dict[str, Any]) -> set[str]:
         """Search itemName + story + tags + userCaption for ad-tone words."""
