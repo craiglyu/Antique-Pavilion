@@ -32,7 +32,7 @@ and craftsmanship. Aesthetic reference points: Sotheby's Asia, Christie's Hong K
 | Backend | **Google Apps Script (GAS) v9** | Runs free under Craig's Google account, no infra cost |
 | Storage | Google Sheets (catalog) + Google Drive (images) | Same — free, durable |
 <!-- CHANGE GAS-GEMINI-FALLBACK: Craig 於 2026-08-30 核准 AP GAS 多模型 fallback。 -->
-| AI judgment | **Gemini 3.7 Flash → 3.6 Flash → 3.5 Flash-Lite** via GAS `generateContent` | $30/month hard cap；3.7/3.6 medium，3.5 Lite minimal |
+| AI judgment | **Gemini 3.7 Flash → 3.6 Flash → 3.5 Flash → 3.5 Flash-Lite** via GAS `generateContent` | Free-tier first；3.7/3.6/3.5 medium，3.5 Lite minimal；technical-failure fallback only |
 | Discord I/O | **Python bot in WSL2** (`scripts/ap_org_bot.py`) | GAS IP is blocked by Discord (error 40333) |
 | Knowledge base | **Notion (8 DBs)**, opt-in via `NOTION_API_KEY` | Long-form, structured, queryable |
 | Skills | `.claude/commands/*.md` (9 skills) | Plain markdown — readable by ANY agent, not just Claude |
@@ -43,6 +43,8 @@ and craftsmanship. Aesthetic reference points: Sotheby's Asia, Christie's Hong K
 - No prompt text in `.py` files — all prompts live in `scripts/ap_org_bot/prompts/<layer>/<agent>.md`
 - No Discord bot may directly call Gemini API — that goes through GAS (so Gemini billing is
   centralized under one Google account)
+- GAS Script Properties hold `DISCORD_BOT_TOKEN` / `GEMINI_API_KEY`; the legacy HTTP intake
+  additionally requires `AP_INGEST_SECRET`. Missing secrets fail closed and none may enter Git.
 
 ---
 
@@ -73,6 +75,26 @@ Code is staged in `analyzeWithGemini()` but commented out — see
 
 **v9.1 added field** (already in schema, not yet wired to frontend):
 `highlightQuote` — 16-28 字金句 used in Discord embed and (future) card overlay.
+
+### DD-104 — 多圖片藏品媒體契約（Craig 2026-08-31 核准）
+
+同一則 Discord 訊息內的 1–8 張圖片視為同一件藏品的不同視角；LLM 只負責檢查
+圖片是否一致，不得靠時間接近把不同訊息自動合併。現有 Catalog 13 欄維持凍結，
+多圖改存同一 Spreadsheet 的 `AP_MEDIA` 關聯分頁，以 `artifactUuid` 對應 Catalog UUID。
+
+`AP_MEDIA` 欄位順序：
+
+```
+artifactUuid | mediaId | driveFileId | driveUrl | viewRole | sortOrder |
+isPrimary | status | sourceAttachmentId | sourceMessageId | mimeType |
+sizeBytes | createdAt
+```
+
+- `status` 僅允許 `pending / approved / rejected`；公開 `doGet()` 只回傳 `approved`。
+- 公開契約保留既有 `imageUrl`（封面）並新增向後相容的 `images[]`。
+- 新上傳原圖在人工 publish 前維持私人 Drive 權限；publish 才開啟連結檢視。
+- Inline Gemini payload 的 binary 安全預算為 12 MiB；超過改走 Gemini Files API。
+- 前端卡片仍只載封面；多圖只在 catalog lightbox 內 lazy-load，且不得自動輪播。
 
 ---
 

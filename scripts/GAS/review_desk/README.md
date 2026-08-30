@@ -7,6 +7,7 @@
 - 把 2026-08-23 已確認的 12 組／25 筆重複候選並排呈現。
 - `全部藏品` 模式讀取完整收藏品工作表，可依文字、狀態與分類搜尋。
 - 放大檢視 Google Drive 圖片，比較品名、年代、分類、參考資料、標籤與目前狀態。
+- 同一藏品的 1–8 張多角度影像可切換檢視；在完整編輯中可調整順序、角度角色與唯一封面。
 - 對單筆藏品執行：
   - `保留並上架` → Sheet 狀態 `完成`
   - `暫留覆核` → Sheet 狀態 `待人工覆核`
@@ -16,7 +17,8 @@
 - 每次寫入都在獨立的 `Review Audit` 工作表記錄操作者、前後狀態、變更欄位與備註。
 - 可在完整型錄中選取 2–6 件藏品，建立 Craig 自訂的人工比對群組。
 
-MVP 不提供永久刪除。公開 GAS API 仍只傳回 `完成`，所以其他三種狀態都不會出現在展示頁。
+MVP 不提供永久刪除。公開 GAS API 仍只傳回 `完成`，且 `AP_MEDIA` 只傳回 `approved` 影像，
+所以其他三種狀態與尚未核准的 Intake 原圖都不會出現在展示頁。
 
 ## 日常使用方式
 
@@ -48,11 +50,14 @@ MVP 不提供永久刪除。公開 GAS API 仍只傳回 `完成`，所以其他�
 
 1. 新建一個獨立 Apps Script 專案，例如 `AP Curator Review Desk`。不要覆蓋目前公開型錄 API 的專案。
 2. 將本資料夾的 `Code.gs`、`Index.html`、`appsscript.json` 複製到新專案。
+   v10 首次更新後需重新授權 Drive scope，供 Review Desk 在發布與撤回時切換檔案分享權限。
 3. 在 Apps Script「專案設定 → 指令碼屬性」加入：
    - `AP_SHEET_ID`：收藏品 Google Sheet ID。
    - `AP_REVIEW_OWNER_EMAIL`：Craig 用來審核的 Google 帳號。
-4. 在 Apps Script 編輯器執行一次 `setupReviewDesk()`，完成授權。此函式只新增／確認 `Review Queue`、`Review Audit` 兩個工作表並匯入 12 組審核佇列，不改收藏品工作表欄位。
-5. 回到 Google Sheet，確認新工作表共有 25 筆 queue records，且 `Review Audit` 只有標題列。
+4. 在 Apps Script 編輯器執行一次 `setupReviewDesk()`，完成授權。此函式只新增／確認
+   `Review Queue`、`Review Audit`、`AP_MEDIA` 三個工作表並匯入 12 組審核佇列，不改收藏品 A:M 欄位。
+5. 回到 Google Sheet，確認新工作表共有 25 筆 queue records、`Review Audit` 只有標題列，
+   `AP_MEDIA` 標題列與 DD-104 的 13 欄完全一致。
 6. 「部署 → 新部署 → 網頁應用程式」：
    - 執行身分：Craig／專案擁有者。
    - 存取權：僅自己。不要選擇匿名或所有人。
@@ -60,6 +65,7 @@ MVP 不提供永久刪除。公開 GAS API 仍只傳回 `完成`，所以其他�
    - 原收藏品工作表該筆狀態成為 `待人工覆核`。
    - `Review Queue` 留下決定與備註。
    - `Review Audit` 新增一筆 before/after 紀錄。
+   - 若該藏品有 `AP_MEDIA` 列，狀態成為 `pending` 且 Drive 原圖維持私人。
    - 公開型錄重新載入後不再顯示該筆。
 
 如果部署選單無法限制成「僅自己」，先停止部署，不要把寫入介面公開。
@@ -67,6 +73,9 @@ MVP 不提供永久刪除。公開 GAS API 仍只傳回 `完成`，所以其他�
 ## 資料契約與防護
 
 - 收藏品欄位維持既有 A:M，沒有新增、刪除或改名。
+- 多圖存在獨立 `AP_MEDIA` 工作表，以 `artifactUuid` 關聯 Catalog UUID；舊單圖資料不需搬遷。
+- `保留並上架` 才會把媒體標為 `approved` 並設定 Drive link-view；待覆核、下架與退件會撤回公開分享。
+- 多圖清單必須恰有一張封面，排序與角度角色由 Craig 在 Review Desk 覆核後儲存。
 - 以 UUID 尋找即時列位置，不依賴可能因排序而改變的 row number。
 - 年代編輯限既有九項 enum；上架前強制檢查品名、分類、年代。
 - UUID 與入庫時間不允許從 GUI 修改；原始描述與 Drive 圖片 URL 可編輯並留下 audit log。

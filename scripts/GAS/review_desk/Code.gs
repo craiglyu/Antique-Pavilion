@@ -5,15 +5,37 @@
  * catalogue API. Deploy it with access restricted to the owner. The catalogue
  * sheet remains the source of truth; this app only changes existing cells and
  * writes its own review/audit tabs.
+ *
+ * CHANGE GAS-MULTI-IMAGE: AP_MEDIA is the companion media table. Publishing
+ * atomically approves/shares its images; holding, archiving, or rejecting makes
+ * them private so intake originals never leak before Craig's review.
  */
 
 const REVIEW_DESK = Object.freeze({
   CATALOG_SHEET_INDEX: 0,
   QUEUE_SHEET: "Review Queue",
   AUDIT_SHEET: "Review Audit",
+  MEDIA_SHEET: "AP_MEDIA",
   PROP_SHEET_ID: "AP_SHEET_ID",
   PROP_OWNER_EMAIL: "AP_REVIEW_OWNER_EMAIL",
 });
+
+const MEDIA_HEADERS = Object.freeze([
+  "artifactUuid", "mediaId", "driveFileId", "driveUrl", "viewRole", "sortOrder",
+  "isPrimary", "status", "sourceAttachmentId", "sourceMessageId", "mimeType",
+  "sizeBytes", "createdAt",
+]);
+
+const MEDIA_STATUS = Object.freeze({
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+});
+
+const MEDIA_VIEW_ROLES = Object.freeze([
+  "front", "back", "side", "base", "mark", "detail", "interior",
+  "condition", "accessory", "unknown",
+]);
 
 const CATALOG_STATUS = Object.freeze({
   PUBLISHED: "完成",
@@ -195,9 +217,11 @@ function setupReviewDesk() {
     const spreadsheet = getSpreadsheet_();
     const queueSheet = ensureSheet_(spreadsheet, REVIEW_DESK.QUEUE_SHEET, QUEUE_HEADERS);
     const auditSheet = ensureSheet_(spreadsheet, REVIEW_DESK.AUDIT_SHEET, AUDIT_HEADERS);
+    const mediaSheet = ensureSheet_(spreadsheet, REVIEW_DESK.MEDIA_SHEET, MEDIA_HEADERS);
     seedQueue_(queueSheet);
     formatSupportSheet_(queueSheet, [120, 250, 120, 150, 420, 220, 130, 280, 170]);
     formatSupportSheet_(auditSheet, [170, 210, 120, 100, 250, 100, 120, 120, 220, 300]);
+    formatSupportSheet_(mediaSheet, [250, 250, 250, 340, 100, 90, 90, 100, 230, 230, 130, 110, 170]);
     return {
       ok: true,
       queueRows: Math.max(queueSheet.getLastRow() - 1, 0),
@@ -336,7 +360,10 @@ function saveReviewDecision(payload) {
     const afterStatus = request.action === "edit"
       ? beforeStatus
       : ACTION_STATUS[request.action];
-    if (request.action !== "edit") catalogSheet.getRange(row, 12).setValue(afterStatus);
+    if (request.action !== "edit") {
+      syncArtifactMediaStatus_(spreadsheet, request.uuid, request.action, before.imageUrl);
+      catalogSheet.getRange(row, 12).setValue(afterStatus);
+    }
 
     updateQueueDecision_(queueSheet, request, afterStatus);
     auditSheet.appendRow([
@@ -358,6 +385,105 @@ function saveReviewDecision(payload) {
       item: readCatalogItemAtRow_(catalogSheet, row),
       message: decisionMessage_(request.action),
     };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function setDriveFilePublic_(fileId, makePublic) {
+  if (!fileId) return;
+  const file = DriveApp.getFileById(fileId);
+  if (makePublic) {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } else {
+    file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  }
+}
+
+function syncArtifactMediaStatus_(spreadsheet, artifactUuid, action, legacyImageUrl) {
+  const mediaSheet = spreadsheet.getSheetByName(REVIEW_DESK.MEDIA_SHEET);
+  const targetStatus = action === "publish"
+    ? MEDIA_STATUS.APPROVED
+    : action === "reject" ? MEDIA_STATUS.REJECTED : MEDIA_STATUS.PENDING;
+  let matched = 0;
+  if (mediaSheet && mediaSheet.getLastRow() >= 2) {
+    const range = mediaSheet.getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length);
+    const rows = range.getValues();
+    const matchingIndexes = [];
+    rows.forEach((row, index) => {
+      if (String(row[0]) === artifactUuid) matchingIndexes.push(index);
+    });
+    const hasPrimary = matchingIndexes.some(index => rows[index][6] === true || String(rows[index][6]).toLowerCase() === "true");
+    matchingIndexes.forEach((index, order) => {
+      const row = rows[index];
+      row[6] = hasPrimary ? (row[6] === true || String(row[6]).toLowerCase() === "true") : order === 0;
+      row[7] = targetStatus;
+      setDriveFilePublic_(String(row[2] || getDriveFileId_(row[3])), action === "publish");
+      matched += 1;
+    });
+    if (matched) range.setValues(rows);
+  }
+  // Pre-DD-104 rows have no AP_MEDIA record; preserve their publication path.
+  if (!matched) setDriveFilePublic_(getDriveFileId_(legacyImageUrl), action === "publish");
+}
+
+function saveMediaArrangement(payload) {
+  assertAuthorized_();
+  const uuid = String((payload && payload.uuid) || "").trim();
+  const requested = (payload && Array.isArray(payload.images)) ? payload.images : [];
+  if (!uuid || !requested.length || requested.length > 8) throw new Error("媒體排序資料不完整。");
+  const ids = requested.map((item) => String(item.mediaId || "").trim());
+  if (new Set(ids).size !== ids.length || ids.some((id) => !id || id === "legacy-primary")) {
+    throw new Error("媒體 ID 無效或舊資料不支援多圖排序。");
+  }
+  const primaryIds = requested.filter((item) => item.isPrimary === true).map((item) => item.mediaId);
+  if (primaryIds.length !== 1) throw new Error("必須且只能指定一張封面圖。");
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const spreadsheet = getSpreadsheet_();
+    const mediaSheet = spreadsheet.getSheetByName(REVIEW_DESK.MEDIA_SHEET);
+    if (!mediaSheet || mediaSheet.getLastRow() < 2) throw new Error("找不到 AP_MEDIA 資料。");
+    const range = mediaSheet.getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length);
+    const rows = range.getValues();
+    const rowByMediaId = {};
+    rows.forEach((row, index) => {
+      if (String(row[0]) === uuid) rowByMediaId[String(row[1])] = index;
+    });
+    if (Object.keys(rowByMediaId).length !== requested.length || ids.some((id) => rowByMediaId[id] == null)) {
+      throw new Error("頁面媒體清單已過期，請重新載入後再試。");
+    }
+    requested.forEach((item, order) => {
+      const row = rows[rowByMediaId[item.mediaId]];
+      const role = String(item.viewRole || "unknown");
+      if (MEDIA_VIEW_ROLES.indexOf(role) < 0) throw new Error("不支援的影像角度角色。");
+      row[4] = role;
+      row[5] = order + 1;
+      row[6] = item.isPrimary === true;
+    });
+    range.setValues(rows);
+
+    const catalogSheet = spreadsheet.getSheets()[REVIEW_DESK.CATALOG_SHEET_INDEX];
+    const catalogRow = findCatalogRowByUuid_(catalogSheet, uuid);
+    const primary = requested.find((item) => item.isPrimary === true);
+    const primarySheetRow = rows[rowByMediaId[primary.mediaId]];
+    if (catalogRow && primarySheetRow[3]) {
+      catalogSheet.getRange(catalogRow, 10).setFormula(`=HYPERLINK("${primarySheetRow[3]}", "點擊查看")`);
+    }
+    const auditSheet = spreadsheet.getSheetByName(REVIEW_DESK.AUDIT_SHEET);
+    if (auditSheet) auditSheet.appendRow([
+      new Date(), getReviewerEmail_(), "media-arrange", "", uuid, catalogRow || "", "", "",
+      JSON.stringify(requested.map((item, index) => ({
+        mediaId: item.mediaId,
+        sortOrder: index + 1,
+        viewRole: item.viewRole || "unknown",
+        isPrimary: item.isPrimary === true,
+      }))),
+      "更新多圖順序、角度與封面",
+    ]);
+    SpreadsheetApp.flush();
+    return { ok: true, message: "多圖順序與封面已儲存。" };
   } finally {
     lock.releaseLock();
   }
@@ -452,9 +578,59 @@ function loadCatalogItems_(spreadsheet) {
   if (lastRow < 2) return [];
   const values = sheet.getRange(2, 1, lastRow - 1, 13).getDisplayValues();
   const formulas = sheet.getRange(2, 1, lastRow - 1, 13).getFormulas();
+  const mediaByArtifact = loadMediaByArtifact_(spreadsheet);
   return values
     .map((row, index) => mapCatalogRow_(row, formulas[index], index + 2))
-    .filter((item) => item.uuid && item.itemName && item.userCaption !== "系統日誌");
+    .filter((item) => item.uuid && item.itemName && item.userCaption !== "系統日誌")
+    .map((item) => {
+      const images = mediaByArtifact[item.uuid] || [];
+      if (!images.length && item.imageUrl) {
+        images.push({
+          mediaId: "legacy-primary",
+          driveFileId: getDriveFileId_(item.imageUrl),
+          driveUrl: item.imageUrl,
+          thumbnailUrl: item.thumbnailUrl,
+          viewRole: "unknown",
+          sortOrder: 1,
+          isPrimary: true,
+          status: item.status === CATALOG_STATUS.PUBLISHED ? MEDIA_STATUS.APPROVED : MEDIA_STATUS.PENDING,
+          legacy: true,
+        });
+      }
+      item.images = images;
+      return item;
+    });
+}
+
+function loadMediaByArtifact_(spreadsheet) {
+  const sheet = spreadsheet.getSheetByName(REVIEW_DESK.MEDIA_SHEET);
+  const byArtifact = {};
+  if (!sheet || sheet.getLastRow() < 2) return byArtifact;
+  const rows = sheet.getRange(1, 1, sheet.getLastRow(), MEDIA_HEADERS.length).getDisplayValues();
+  if (rows[0].join("|") !== MEDIA_HEADERS.join("|")) {
+    throw new Error("AP_MEDIA 欄位與 DD-104 不一致；Review Desk 拒絕讀取。");
+  }
+  rows.slice(1).forEach((row) => {
+    const uuid = row[0];
+    if (!uuid || !row[1] || !row[3]) return;
+    if (!byArtifact[uuid]) byArtifact[uuid] = [];
+    byArtifact[uuid].push({
+      mediaId: row[1],
+      driveFileId: row[2],
+      driveUrl: row[3],
+      thumbnailUrl: toDriveThumbnailUrl_(row[3], 1200),
+      viewRole: MEDIA_VIEW_ROLES.indexOf(row[4]) >= 0 ? row[4] : "unknown",
+      sortOrder: Math.max(1, Number(row[5]) || 1),
+      isPrimary: String(row[6]).toLowerCase() === "true",
+      status: row[7] || MEDIA_STATUS.PENDING,
+      mimeType: row[10] || "",
+      sizeBytes: Number(row[11]) || 0,
+    });
+  });
+  Object.keys(byArtifact).forEach((uuid) => {
+    byArtifact[uuid].sort((a, b) => a.sortOrder - b.sortOrder);
+  });
+  return byArtifact;
 }
 
 function readCatalogItemAtRow_(sheet, rowNumber) {

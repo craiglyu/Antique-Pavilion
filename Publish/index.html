@@ -859,6 +859,10 @@
             line-height: inherit;
             text-align: start;
             width: 100%;
+            /* CHANGE R10-MEDIA: browser QA at 375px found one-line catalogue title
+               buttons only 24px tall; keep the restrained typography but restore
+               the project-wide 44px keyboard/touch target contract. */
+            min-height: 44px;
             cursor: pointer;
         }
         .item-name-btn:focus-visible {
@@ -1474,6 +1478,50 @@
             box-shadow: 0 24px 60px rgba(0, 0, 0, 0.26);
             position: relative;
         }
+        /* CHANGE R10-MEDIA: 藏品多角度影像採手動縮圖列與明確前後鍵；不自動輪播，
+           避免搶走器物本身的觀看節奏，並保留 44px 觸控目標。 */
+        .modal-media-nav {
+            position: absolute;
+            top: 50%;
+            z-index: 7;
+            width: 44px;
+            height: 44px;
+            border: 1px solid rgba(247, 244, 237, 0.42);
+            border-radius: 2px;
+            color: var(--paper-100);
+            background: rgba(16, 16, 16, 0.58);
+            cursor: pointer;
+            transform: translateY(-50%);
+        }
+        .modal-media-nav.prev { left: 10px; }
+        .modal-media-nav.next { right: 10px; }
+        .modal-media-nav[hidden] { display: none; }
+        .modal-media-rail {
+            position: absolute;
+            z-index: 7;
+            left: 50%;
+            bottom: 20px;
+            display: flex;
+            width: min(82%, 580px);
+            gap: 8px;
+            padding: 6px;
+            overflow-x: auto;
+            background: rgba(16, 16, 16, 0.72);
+            transform: translateX(-50%);
+            scrollbar-width: thin;
+        }
+        .modal-media-rail[hidden] { display: none; }
+        .modal-media-thumb {
+            flex: 0 0 52px;
+            width: 52px;
+            height: 52px;
+            padding: 2px;
+            border: 1px solid rgba(247, 244, 237, 0.28);
+            background: transparent;
+            cursor: pointer;
+        }
+        .modal-media-thumb[aria-current="true"] { border-color: var(--gold-300); }
+        .modal-media-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
         .modal-stage-index {
             position: absolute;
             top: 20px;
@@ -2265,6 +2313,7 @@
                 height: calc(100% - 34px);
                 max-width: none;
             }
+            .modal-media-rail { bottom: 8px; width: min(74%, 420px); }
             .modal-stage-index {
                 top: 12px;
                 right: 14px;
@@ -3391,10 +3440,15 @@
                     <span id="modalStageCategory">PRIVATE VIEW</span>
                 </div>
                 <div class="modal-image-plate">
+                    <button class="modal-media-nav prev" id="modalMediaPrev" type="button" hidden
+                            aria-label="上一張角度" onclick="navigateModalImage(-1)">‹</button>
                     <!-- CHANGE D3: 放大圖鍵盤可達 — role=button + tabindex + aria-pressed（狀態由 JS 同步；aria-label 於 openModal 動態帶入品名） -->
                     <img src="" alt="典藏詳情圖" class="modal-img" id="modalImg" referrerpolicy="no-referrer" decoding="async"
                          role="button" tabindex="0" aria-pressed="false">
+                    <button class="modal-media-nav next" id="modalMediaNext" type="button" hidden
+                            aria-label="下一張角度" onclick="navigateModalImage(1)">›</button>
                 </div>
+                <div class="modal-media-rail" id="modalMediaRail" aria-label="藏品角度縮圖" hidden></div>
                 <!-- CHANGE P2-ZOOM: 可見細看提示 — 純視覺；aria-hidden 避免與 modalImg 的 aria-label 重複朗讀 -->
                 <div class="modal-zoom-hint" id="modalZoomHint" aria-hidden="true">＋ 點按細看</div>
             </div>
@@ -3798,8 +3852,9 @@
                 const isOpen = document.getElementById('artifactModal').classList.contains('active');
                 if (e.key === 'Escape') { closeModal(); return; }
                 if (!isOpen) return;
-                if (e.key === 'ArrowLeft')  { e.preventDefault(); navigateModal(-1); }
-                if (e.key === 'ArrowRight') { e.preventDefault(); navigateModal(1); }
+                const inMediaStage = e.target instanceof Element && Boolean(e.target.closest('.modal-left'));
+                if (e.key === 'ArrowLeft')  { e.preventDefault(); inMediaStage && currentModalImages.length > 1 ? navigateModalImage(-1) : navigateModal(-1); }
+                if (e.key === 'ArrowRight') { e.preventDefault(); inMediaStage && currentModalImages.length > 1 ? navigateModalImage(1) : navigateModal(1); }
             });
 
             const header = document.getElementById('main-header');
@@ -4136,6 +4191,13 @@
         /* ============ Modal ============ */
         /* CHANGE B2: track index for prev/next nav */
         let currentModalIndex = -1;
+        let currentModalImages = [];
+        let currentModalImageIndex = 0;
+        let currentModalCategoryLabel = '藏品';
+        const MODAL_VIEW_LABELS = {
+            front: '正面', back: '背面', side: '側面', base: '底部', mark: '款識',
+            detail: '細節', interior: '內部', condition: '狀況', accessory: '附件', unknown: '角度'
+        };
         /* CHANGE B3: modal focus trap state — track trigger element + bound handler */
         let modalTriggerElement = null;
         let modalFocusTrapHandler = null;
@@ -4160,6 +4222,78 @@
                 if (catMatches(splitCategoryCell(item.category), activeCategory)) out.push(i);
             });
             return out;
+        }
+
+        function normalizedArtifactImages(item) {
+            const source = Array.isArray(item && item.images) ? item.images : [];
+            const output = [];
+            const seen = new Set();
+            source.slice().sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0)).forEach((entry, index) => {
+                const url = String((entry && (entry.url || entry.imageUrl)) || '').trim();
+                if (!url || seen.has(url)) return;
+                seen.add(url);
+                const role = MODAL_VIEW_LABELS[entry.role] ? entry.role : 'unknown';
+                output.push({ url, role, isPrimary: entry.isPrimary === true, sortOrder: Number(entry.sortOrder) || index + 1 });
+            });
+            if (!output.length && item && item.imageUrl) {
+                output.push({ url: item.imageUrl, role: 'unknown', isPrimary: true, sortOrder: 1 });
+            }
+            return output;
+        }
+
+        function modalHighResUrl(url) {
+            const value = String(url || '');
+            const idMatch = value.match(/id=([a-zA-Z0-9_-]+)/) || value.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            return idMatch ? `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w2000` : (value || IMG_PLACEHOLDER_LG);
+        }
+
+        function renderModalImage() {
+            const entry = currentModalImages[currentModalImageIndex];
+            if (!entry) return;
+            const img = _modalImg();
+            img.onerror = () => { img.onerror = null; img.src = IMG_PLACEHOLDER_LG; };
+            img.src = modalHighResUrl(entry.url);
+            img.alt = `${modalZoomLabelBase}，${MODAL_VIEW_LABELS[entry.role] || '角度'}照片`;
+            const multiple = currentModalImages.length > 1;
+            const prev = document.getElementById('modalMediaPrev');
+            const next = document.getElementById('modalMediaNext');
+            const rail = document.getElementById('modalMediaRail');
+            if (prev) { prev.hidden = !multiple; prev.disabled = !multiple; }
+            if (next) { next.hidden = !multiple; next.disabled = !multiple; }
+            if (rail) {
+                rail.hidden = !multiple;
+                rail.replaceChildren(...currentModalImages.map((image, index) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'modal-media-thumb';
+                    button.setAttribute('aria-current', index === currentModalImageIndex ? 'true' : 'false');
+                    button.setAttribute('aria-label', `檢視第 ${index + 1} 張，${MODAL_VIEW_LABELS[image.role] || '角度'}`);
+                    button.addEventListener('click', () => {
+                        currentModalImageIndex = index;
+                        resetModalZoom();
+                        renderModalImage();
+                    });
+                    const thumb = document.createElement('img');
+                    thumb.src = image.url;
+                    thumb.alt = '';
+                    thumb.loading = 'lazy';
+                    button.appendChild(thumb);
+                    return button;
+                }));
+            }
+            const stage = document.getElementById('modalStageCategory');
+            if (stage) stage.textContent = multiple
+                ? `${currentModalCategoryLabel} · ${currentModalImageIndex + 1} / ${currentModalImages.length}`
+                : currentModalCategoryLabel;
+        }
+
+        function navigateModalImage(direction) {
+            const count = currentModalImages.length;
+            if (count < 2) return;
+            currentModalImageIndex = (currentModalImageIndex + direction + count) % count;
+            resetModalZoom();
+            renderModalImage();
+            announce(`${modalZoomLabelBase}，第 ${currentModalImageIndex + 1} 張，${MODAL_VIEW_LABELS[currentModalImages[currentModalImageIndex].role] || '角度'}`);
         }
 
         /* ============ CHANGE D3 + D6: modal 圖縮放 + 平移 + 觸控手勢 ============ */
@@ -4259,15 +4393,19 @@
 
             /* 觸控：未放大時於 modal 水平滑動切換藏品（左滑→下一件） */
             if (content) {
-                let sx = 0, sy = 0, sZoom = false;
+                let sx = 0, sy = 0, sZoom = false, sInImageStage = false;
                 content.addEventListener('touchstart', (e) => {
                     const t = e.touches[0]; sx = t.clientX; sy = t.clientY; sZoom = modalZoom.on;
+                    sInImageStage = Boolean(e.target.closest('.modal-left'));
                 }, { passive: true });
                 content.addEventListener('touchend', (e) => {
                     if (sZoom || modalZoom.on) return;   /* 放大態不切件 */
                     const t = e.changedTouches[0];
                     const dx = t.clientX - sx, dy = t.clientY - sy;
-                    if (Math.abs(dx) > 40 && Math.abs(dy) < 30) navigateModal(dx < 0 ? 1 : -1);
+                    if (Math.abs(dx) > 40 && Math.abs(dy) < 30) {
+                        if (sInImageStage && currentModalImages.length > 1) navigateModalImage(dx < 0 ? 1 : -1);
+                        else navigateModal(dx < 0 ? 1 : -1);
+                    }
                 }, { passive: true });
             }
         }
@@ -4323,17 +4461,8 @@
             if (prevBtn) prevBtn.disabled = navPos <= 0;
             if (nextBtn) nextBtn.disabled = navPos === -1 || navPos >= (navList.length - 1);
 
-            let highResUrl = item.imageUrl || IMG_PLACEHOLDER_LG;
-            if (item.imageUrl) {
-                const idMatch = item.imageUrl.match(/id=([a-zA-Z0-9_-]+)/) || item.imageUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
-                if (idMatch) highResUrl = `https://drive.google.com/thumbnail?id=${idMatch[1]}&sz=w2000`;
-            }
-
-            /* CHANGE QW1: modal 高解圖 404/限流時回退品牌佔位圖（onerror 先於 src 設定） */
-            const modalImgElInit = document.getElementById('modalImg');
-            modalImgElInit.onerror = () => { modalImgElInit.onerror = null; modalImgElInit.src = IMG_PLACEHOLDER_LG; };
-            modalImgElInit.src = highResUrl;
-            modalImgElInit.alt = item.itemName || '';
+            currentModalImages = normalizedArtifactImages(item);
+            currentModalImageIndex = Math.max(0, currentModalImages.findIndex(image => image.isPrimary));
             document.getElementById('modalTitle').textContent = item.itemName || '';
             const categoryLabel = item.category || '藏品';
             const eraLabel = item.era || '年代待考';
@@ -4343,7 +4472,7 @@
             modalEraEl.textContent = `${categoryLabel} · ${eraLabel}`;
 
             const materials = extractMaterialsAll(item);
-            document.getElementById('modalStageCategory').textContent = categoryLabel;
+            currentModalCategoryLabel = categoryLabel;
             document.getElementById('modalFactEra').textContent = eraLabel;
             document.getElementById('modalFactCategory').textContent = categoryLabel;
             document.getElementById('modalFactMaterial').textContent = materials.length
@@ -4390,6 +4519,7 @@
             /* CHANGE P2-ZOOM: 品名帶入報讀器標籤基底；aria-pressed / aria-label / 可見提示由 resetModalZoom() → syncModalZoomAffordance() 一次寫入 */
             modalZoomLabelBase = item.itemName || '典藏';
             resetModalZoom();
+            renderModalImage();
 
             document.getElementById('artifactModal').classList.add('active');
 

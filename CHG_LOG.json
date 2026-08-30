@@ -3,6 +3,33 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-08-31T00:00:00Z",
+      "category": "feat",
+      "scope": "antique-gas.multi-image-intake-and-publication",
+      "version_from": "9.5",
+      "version_to": "10.0",
+      "summary": "將同一則 Discord 訊息的 1–8 張照片歸為單一藏品，加入同物件一致性判讀、12 MiB inline／Gemini Files API 自動分流、AP_MEDIA 關聯媒體表、Review Desk 封面排序與發布權限、前台手動多角度瀏覽，以及舊 doPost 入口的 AP_INGEST_SECRET 防濫用；Catalog A:M 與既有 imageUrl 保持相容。",
+      "rationale": "多角度影像能提高器形、底足、款識與局部工藝的可觀察性，但原流程只取首圖且 Intake 即公開 Drive 檔案。DD-104 將媒體生命週期拆為私人收件、人工覆核與核准發布，並以 Files API 避免多張手機原圖撞上 generateContent 20 MB inline request 限制。",
+      "breaking": false,
+      "rollback": "git revert <this commit>",
+      "files": [
+        "AGENTS.md",
+        "Publish/index.html",
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "scripts/GAS/review_desk/Code.gs",
+        "scripts/GAS/review_desk/Index.html",
+        "scripts/GAS/review_desk/README.md",
+        "scripts/GAS/review_desk/appsscript.json",
+        "tests/test_antique_gas_gemini_fallback.py",
+        "tests/test_antique_gas_multi_image.py",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "R10-MEDIA",
+        "GAS-MULTI-IMAGE"
+      ]
+    },
+    {
       "ts": "2026-08-30T12:01:45Z",
       "category": "feat",
       "scope": "antique-gas.gemini-model-fallback",

@@ -296,13 +296,40 @@
       background: #fffefb;
     }
     .form-field textarea { min-height: 120px; resize: vertical; font-family: var(--serif); line-height: 1.7; }
+    .media-editor { display: grid; gap: 10px; grid-column: 1 / -1; }
+    .media-editor-head { display: flex; justify-content: space-between; gap: 12px; align-items: end; }
+    .media-editor-head p { margin: 0; font-size: 12px; }
+    .media-editor-list { display: grid; gap: 8px; }
+    .media-editor-item {
+      display: grid;
+      grid-template-columns: 92px minmax(150px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 8px;
+      border: 1px solid var(--line);
+      background: #fffefb;
+    }
+    .media-editor-item img { width: 92px; height: 74px; object-fit: contain; background: var(--paper-deep); }
+    .media-editor-controls { display: grid; gap: 7px; }
+    .media-editor-controls select { min-height: 38px; border: 1px solid var(--line); background: white; }
+    .media-editor-order { display: flex; gap: 5px; }
+    .media-editor-order button { min-width: 44px; min-height: 44px; border: 1px solid var(--line); background: transparent; cursor: pointer; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 18px 26px 24px; }
     .dialog-button { padding: 9px 18px; }
     .dialog-button.is-primary { color: var(--paper-bright); border-color: var(--seal); background: var(--seal); }
     .image-dialog { width: min(1100px, calc(100vw - 32px)); background: #181713; }
     .image-dialog .dialog-head { color: var(--paper); border-color: rgba(255, 255, 255, .16); }
     .image-dialog .dialog-close { color: var(--paper); border-color: rgba(255, 255, 255, .22); }
-    .image-dialog img { display: block; width: 100%; max-height: calc(100vh - 150px); object-fit: contain; }
+    .image-stage { position: relative; }
+    .image-dialog #image-preview { display: block; width: 100%; max-height: calc(100vh - 250px); object-fit: contain; }
+    .image-nav { position: absolute; top: 50%; width: 48px; height: 48px; border: 1px solid rgba(255,255,255,.35); color: white; background: rgba(24,23,19,.66); cursor: pointer; transform: translateY(-50%); }
+    .image-nav.prev { left: 14px; }
+    .image-nav.next { right: 14px; }
+    .image-nav[hidden] { display: none; }
+    .image-rail { display: flex; gap: 8px; padding: 12px; overflow-x: auto; background: #181713; }
+    .image-rail button { flex: 0 0 70px; width: 70px; height: 58px; padding: 2px; border: 1px solid rgba(255,255,255,.22); background: transparent; cursor: pointer; }
+    .image-rail button.is-active { border-color: var(--gold); }
+    .image-rail img { width: 100%; height: 100%; object-fit: cover; }
     .toast {
       position: fixed;
       z-index: 80;
@@ -419,6 +446,10 @@
       .card-actions { grid-template-columns: 1fr 1fr; }
       .form-grid { grid-template-columns: 1fr; }
       .form-field.is-wide { grid-column: auto; }
+      .media-editor { grid-column: auto; }
+      .media-editor-item { grid-template-columns: 76px 1fr; }
+      .media-editor-item img { width: 76px; height: 64px; }
+      .media-editor-order { grid-column: 1 / -1; justify-content: flex-end; }
       .dialog-body, .dialog-head { padding: 20px; }
       .dialog-actions { padding: 15px 20px 20px; }
     }
@@ -506,6 +537,12 @@
           <div class="form-field"><label for="edit-refItem">拍賣參考品</label><textarea id="edit-refItem" name="refItem" maxlength="600"></textarea></div>
           <div class="form-field"><label for="edit-refPrice">參考價格</label><textarea id="edit-refPrice" name="refPrice" maxlength="300"></textarea></div>
           <div class="form-field is-wide"><label for="edit-imageUrl">Drive 圖片 URL</label><input id="edit-imageUrl" name="imageUrl" type="url" maxlength="500" placeholder="https://drive.google.com/file/d/…/view"></div>
+          <section class="media-editor" id="media-editor" aria-labelledby="media-editor-title">
+            <div class="media-editor-head">
+              <div><label id="media-editor-title">藏品多角度影像</label><p>排序、角度與封面會在上架時套用；原圖在此之前保持私人。</p></div>
+            </div>
+            <div class="media-editor-list" id="media-editor-list"></div>
+          </section>
           <div class="form-field is-wide"><label for="edit-tags">標籤</label><input id="edit-tags" name="tags" maxlength="500"></div>
           <div class="form-field is-wide"><label for="edit-displayRecommendation">展示建議</label><textarea id="edit-displayRecommendation" name="displayRecommendation" maxlength="1500"></textarea></div>
           <div class="form-field is-wide"><label for="edit-note">變更原因</label><input id="edit-note" maxlength="1000" placeholder="供 Review Audit 留存"></div>
@@ -523,7 +560,12 @@
       <div><span class="eyebrow">Object Inspection</span><h2 id="image-title">藏品影像</h2></div>
       <button class="dialog-close" type="button" data-close-dialog aria-label="關閉">×</button>
     </div>
-    <img id="image-preview" alt="">
+    <div class="image-stage">
+      <button class="image-nav prev" id="image-prev" type="button" aria-label="上一張角度">‹</button>
+      <img id="image-preview" alt="">
+      <button class="image-nav next" id="image-next" type="button" aria-label="下一張角度">›</button>
+    </div>
+    <div class="image-rail" id="image-rail" aria-label="藏品角度縮圖"></div>
   </dialog>
 
   <dialog id="compare-dialog" aria-labelledby="compare-title">
@@ -567,6 +609,10 @@
       archive: "下架封存",
       reject: "退件保留紀錄",
     };
+    const MEDIA_ROLE_LABELS = {
+      front: "正面", back: "背面", side: "側面", base: "底部", mark: "款識",
+      detail: "細節", interior: "內部", condition: "狀況", accessory: "附件", unknown: "未標示",
+    };
     const DEMO_DATA = {
       reviewer: "demo@jibaoxuan.local",
       generatedAt: new Date().toISOString(),
@@ -604,6 +650,7 @@
     /* CHANGE RD-GAS-PARSER: GAS HtmlService 會用 document.write 注入頁面；避免 inline script
        的 template literal 在該包裝層失去反引號而於第一個 https 字串直接 SyntaxError。 */
     function demoItem(uuid, sourceRow, itemName, era, category, driveId, recommendedRole) {
+      const thumbnailUrl = "https://drive.google.com/thumbnail?id=" + driveId + "&sz=w1200";
       return {
         uuid, sourceRow, itemName, era, category, recommendedRole,
         status: "完成", reviewStatus: "待審", reviewerNote: "",
@@ -611,7 +658,9 @@
         story: "影像初步編目內容僅供整理線索；年代、材質與器型仍需以實物及文件覆核。",
         refItem: "待人工核對參考資料", refPrice: "不作價格保證",
         displayRecommendation: "以器物為主，採柔和側光與中性背景展示。",
-        thumbnailUrl: "https://drive.google.com/thumbnail?id=" + driveId + "&sz=w1200",
+        imageUrl: "https://drive.google.com/file/d/" + driveId + "/view",
+        thumbnailUrl,
+        images: [{ mediaId: "legacy-primary", thumbnailUrl, driveUrl: "https://drive.google.com/file/d/" + driveId + "/view", viewRole: "unknown", sortOrder: 1, isPrimary: true, status: "approved", legacy: true }],
       };
     }
 
@@ -682,6 +731,7 @@
       compareSelection: new Set(),
       decision: null,
       editing: null,
+      imageViewer: { images: [], index: 0, itemName: "" },
       busy: false,
       demo: isLocalPreview(),
     };
@@ -702,9 +752,14 @@
       editDialog: document.getElementById("edit-dialog"),
       editForm: document.getElementById("edit-form"),
       editSubmit: document.getElementById("edit-submit"),
+      mediaEditor: document.getElementById("media-editor"),
+      mediaEditorList: document.getElementById("media-editor-list"),
       imageDialog: document.getElementById("image-dialog"),
       imagePreview: document.getElementById("image-preview"),
       imageTitle: document.getElementById("image-title"),
+      imagePrev: document.getElementById("image-prev"),
+      imageNext: document.getElementById("image-next"),
+      imageRail: document.getElementById("image-rail"),
       compareDialog: document.getElementById("compare-dialog"),
       compareForm: document.getElementById("compare-form"),
       compareSubmit: document.getElementById("compare-submit"),
@@ -720,6 +775,7 @@
         await new Promise((resolve) => setTimeout(resolve, 180));
         if (method === "getBootstrapData") return getDemoData();
         if (method === "createManualReviewGroup") return applyDemoReviewGroup(payload);
+        if (method === "saveMediaArrangement") return applyDemoMediaArrangement(payload);
         return applyDemoDecision(payload);
       }
       const gasRunner = await waitForGasRunner();
@@ -753,6 +809,13 @@
       }));
       state.data.groups.push({ groupId, reason: payload.reason, items });
       return { ok: true, groupId, message: "示範模式：已建立人工比對群組，未寫入 Sheet。" };
+    }
+
+    function applyDemoMediaArrangement(payload) {
+      const item = findItem(payload.uuid);
+      if (!item) throw new Error("找不到示範藏品。");
+      item.images = structuredClone(payload.images);
+      return { ok: true, message: "示範模式：多圖排序已更新，未寫入 Sheet。" };
     }
 
     async function loadData() {
@@ -1041,9 +1104,12 @@
     function openEditor(uuid, groupId) {
       const item = findItem(uuid);
       if (!item) return;
-      state.editing = { uuid, groupId };
+      state.editing = { uuid, groupId, images: structuredClone(item.images || []) };
       const fields = ["userCaption", "itemName", "category", "story", "refItem", "refPrice", "imageUrl", "tags", "displayRecommendation"];
       fields.forEach((field) => { document.getElementById("edit-" + field).value = item[field] || ""; });
+      const imageUrlInput = document.getElementById("edit-imageUrl");
+      imageUrlInput.readOnly = state.editing.images.some((image) => !image.legacy);
+      imageUrlInput.title = imageUrlInput.readOnly ? "多圖藏品的封面 URL 由下方封面選擇自動管理" : "";
       const eraSelect = document.getElementById("edit-era");
       eraSelect.replaceChildren(...state.data.validEras.map((era) => {
         const option = document.createElement("option");
@@ -1054,7 +1120,59 @@
       eraSelect.value = state.data.validEras.includes(item.era) ? item.era : "時代不詳";
       document.getElementById("edit-note").value = "";
       document.getElementById("edit-title").textContent = "編輯｜" + item.itemName;
+      renderMediaEditor();
       elements.editDialog.showModal();
+    }
+
+    function renderMediaEditor() {
+      const images = state.editing ? state.editing.images : [];
+      elements.mediaEditor.hidden = images.length === 0;
+      elements.mediaEditorList.replaceChildren();
+      images.forEach((image, index) => {
+        const row = el("div", "media-editor-item");
+        const preview = document.createElement("img");
+        preview.src = image.thumbnailUrl || driveThumbnail(image.driveUrl) || "";
+        preview.alt = "第 " + (index + 1) + " 張藏品角度";
+        const controls = el("div", "media-editor-controls");
+        const coverLabel = document.createElement("label");
+        const cover = document.createElement("input");
+        cover.type = "radio";
+        cover.name = "media-primary";
+        cover.checked = image.isPrimary === true;
+        cover.disabled = image.legacy === true;
+        cover.addEventListener("change", () => {
+          images.forEach((entry, entryIndex) => { entry.isPrimary = entryIndex === index; });
+          renderMediaEditor();
+        });
+        coverLabel.append(cover, document.createTextNode(" 設為封面"));
+        const role = document.createElement("select");
+        role.setAttribute("aria-label", "第 " + (index + 1) + " 張影像角度");
+        Object.keys(MEDIA_ROLE_LABELS).forEach((value) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = MEDIA_ROLE_LABELS[value];
+          role.append(option);
+        });
+        role.value = MEDIA_ROLE_LABELS[image.viewRole] ? image.viewRole : "unknown";
+        role.disabled = image.legacy === true;
+        role.addEventListener("change", () => { image.viewRole = role.value; });
+        controls.append(coverLabel, role, el("small", "", "第 " + (index + 1) + " 張 · " + (image.status || "pending")));
+        const order = el("div", "media-editor-order");
+        [[-1, "↑", "往前"], [1, "↓", "往後"]].forEach(([delta, text, label]) => {
+          const button = el("button", "", text);
+          button.type = "button";
+          button.disabled = image.legacy === true || index + delta < 0 || index + delta >= images.length;
+          button.setAttribute("aria-label", "第 " + (index + 1) + " 張" + label);
+          button.addEventListener("click", () => {
+            const moved = images.splice(index, 1)[0];
+            images.splice(index + delta, 0, moved);
+            renderMediaEditor();
+          });
+          order.append(button);
+        });
+        row.append(preview, controls, order);
+        elements.mediaEditorList.append(row);
+      });
     }
 
     async function submitDecision(event) {
@@ -1068,6 +1186,7 @@
           fields: {},
         });
         replaceItem(result.item);
+        if (!state.demo) state.data = await callServer("getBootstrapData");
         elements.decisionDialog.close();
         render();
         showToast(result.message);
@@ -1085,6 +1204,17 @@
       new FormData(elements.editForm).forEach((value, key) => { fields[key] = String(value); });
       setBusy(true, elements.editSubmit);
       try {
+        if (state.editing.images.length > 0 && !state.editing.images.some((image) => image.legacy)) {
+          await callServer("saveMediaArrangement", {
+            uuid: state.editing.uuid,
+            images: state.editing.images.map((image, index) => ({
+              mediaId: image.mediaId,
+              viewRole: image.viewRole || "unknown",
+              sortOrder: index + 1,
+              isPrimary: image.isPrimary === true,
+            })),
+          });
+        }
         const result = await callServer("saveReviewDecision", {
           action: "edit",
           uuid: state.editing.uuid,
@@ -1093,6 +1223,7 @@
           fields,
         });
         replaceItem(result.item);
+        if (!state.demo) state.data = await callServer("getBootstrapData");
         elements.editDialog.close();
         render();
         showToast(result.message);
@@ -1170,10 +1301,43 @@
     function openImage(uuid) {
       const item = findItem(uuid);
       if (!item) return;
-      elements.imagePreview.src = item.thumbnailUrl || item.imageUrl || "";
-      elements.imagePreview.alt = item.itemName + " 放大照片";
+      const images = (item.images && item.images.length)
+        ? item.images
+        : [{ thumbnailUrl: item.thumbnailUrl || item.imageUrl || "", viewRole: "unknown" }];
+      state.imageViewer = { images, index: 0, itemName: item.itemName };
       elements.imageTitle.textContent = item.itemName;
+      renderImageViewer();
       elements.imageDialog.showModal();
+    }
+
+    function renderImageViewer() {
+      const viewer = state.imageViewer;
+      const image = viewer.images[viewer.index];
+      if (!image) return;
+      elements.imagePreview.src = image.thumbnailUrl || driveThumbnail(image.driveUrl) || "";
+      elements.imagePreview.alt = viewer.itemName + "，" + (MEDIA_ROLE_LABELS[image.viewRole] || "角度") + "照片";
+      const multiple = viewer.images.length > 1;
+      elements.imagePrev.hidden = !multiple;
+      elements.imageNext.hidden = !multiple;
+      elements.imageRail.hidden = !multiple;
+      elements.imageRail.replaceChildren(...viewer.images.map((entry, index) => {
+        const button = el("button", index === viewer.index ? "is-active" : "");
+        button.type = "button";
+        button.dataset.viewerIndex = String(index);
+        button.setAttribute("aria-label", "檢視第 " + (index + 1) + " 張，" + (MEDIA_ROLE_LABELS[entry.viewRole] || "未標示"));
+        const thumbnail = document.createElement("img");
+        thumbnail.src = entry.thumbnailUrl || driveThumbnail(entry.driveUrl) || "";
+        thumbnail.alt = "";
+        button.append(thumbnail);
+        return button;
+      }));
+    }
+
+    function moveImageViewer(delta) {
+      const count = state.imageViewer.images.length;
+      if (count < 2) return;
+      state.imageViewer.index = (state.imageViewer.index + delta + count) % count;
+      renderImageViewer();
     }
 
     function setBusy(busy, button) {
@@ -1272,6 +1436,14 @@
       if (state.compareSelection.size >= 2) elements.compareDialog.showModal();
     });
     elements.compareForm.addEventListener("submit", submitCompare);
+    elements.imagePrev.addEventListener("click", () => moveImageViewer(-1));
+    elements.imageNext.addEventListener("click", () => moveImageViewer(1));
+    elements.imageRail.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-viewer-index]");
+      if (!button) return;
+      state.imageViewer.index = Number(button.dataset.viewerIndex) || 0;
+      renderImageViewer();
+    });
     loadData();
   </script>
 </body>

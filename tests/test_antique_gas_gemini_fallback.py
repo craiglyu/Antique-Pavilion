@@ -29,8 +29,13 @@ def _run_node(script: str) -> subprocess.CompletedProcess[str]:
 def test_gas_source_is_valid_javascript_and_has_no_embedded_credentials():
     source = GAS_SOURCE.read_text(encoding="utf-8")
     assert "gemini-3.1-flash-lite-preview" not in source
+    assert "gemini-3-flash-preview" not in source
+    assert source.index('model: "gemini-3.7-flash"') < source.index('model: "gemini-3.6-flash"')
+    assert source.index('model: "gemini-3.6-flash"') < source.index('model: "gemini-3.5-flash"')
+    assert source.index('model: "gemini-3.5-flash"') < source.index('model: "gemini-3.5-flash-lite"')
     assert 'getProperty("GEMINI_API_KEY")' in source
     assert 'getProperty("DISCORD_BOT_TOKEN")' in source
+    assert 'getProperty("AP_INGEST_SECRET")' in source
     assert "AIza" not in source
 
     result = _run_node(
@@ -119,6 +124,18 @@ routed = context.fetchGeminiWithFallback_(payload, validator);
 assert.strictEqual(routed.receipt.selectedModel, 'gemini-3.6-flash');
 assert.strictEqual(routed.receipt.attempts[0].status, 'cooldown_skip');
 assert.deepStrictEqual(fetchModels, ['gemini-3.6-flash']);
+
+// Free-tier quota exhaustion falls through immediately; it is not retried on
+// the same model and therefore cannot double-spend a scarce route quota.
+cacheValues.clear();
+fetchModels = [];
+responseQueue = [
+  {code: 429, body: '{}'},
+  {code: 200, body: successBody}
+];
+routed = context.fetchGeminiWithFallback_(payload, validator, {bypassCooldown: true});
+assert.strictEqual(routed.receipt.selectedModel, 'gemini-3.6-flash');
+assert.deepStrictEqual(fetchModels, ['gemini-3.7-flash', 'gemini-3.6-flash']);
 
 // Shared-key authentication errors fail closed instead of wasting calls on every model.
 cacheValues.clear();
