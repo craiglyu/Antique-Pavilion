@@ -3,6 +3,27 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-08-30T12:01:45Z",
+      "category": "feat",
+      "scope": "antique-gas.gemini-model-fallback",
+      "version_from": "9.4",
+      "version_to": "9.5",
+      "summary": "將古文物編目 GAS 升級為 Gemini 3.7 Flash → 3.6 Flash → 3.5 Flash-Lite 多模型 fallback，加入 429/5xx 短重試、模型 cooldown、認證錯誤 fail-closed 與 route receipt；Discord 輪詢、Sheet schema、era enum 不變。",
+      "rationale": "2026-08-30 以現有 AP API key 對 generateContent + structured output 做極小 canary：3.7 Flash 回 HTTP 503，3.6 Flash 與 3.5 Flash-Lite 回 HTTP 200。現行固定模型 gemini-3.1-flash-lite-preview 已下線，單模型路由會直接中斷整條編目流程。",
+      "breaking": false,
+      "rollback": "git revert <this commit>",
+      "files": [
+        "AGENTS.md",
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "tests/test_antique_gas_gemini_fallback.py",
+        ".gitignore",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "GAS-GEMINI-FALLBACK"
+      ]
+    },
+    {
       "ts": "2026-08-30T03:30:00Z",
       "category": "fix",
       "scope": "review-desk.gas-html-parser",

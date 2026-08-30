@@ -31,7 +31,8 @@ and craftsmanship. Aesthetic reference points: Sotheby's Asia, Christie's Hong K
 | Frontend | **Pure HTML / CSS / vanilla JS** — NO React/Vue/Tailwind/etc. | GitHub Pages compatibility, simplicity, longevity |
 | Backend | **Google Apps Script (GAS) v9** | Runs free under Craig's Google account, no infra cost |
 | Storage | Google Sheets (catalog) + Google Drive (images) | Same — free, durable |
-| AI judgment | **Gemini 2.5 Flash** via GAS | $30/month hard cap |
+<!-- CHANGE GAS-GEMINI-FALLBACK: Craig 於 2026-08-30 核准 AP GAS 多模型 fallback。 -->
+| AI judgment | **Gemini 3.7 Flash → 3.6 Flash → 3.5 Flash-Lite** via GAS `generateContent` | $30/month hard cap；3.7/3.6 medium，3.5 Lite minimal |
 | Discord I/O | **Python bot in WSL2** (`scripts/ap_org_bot.py`) | GAS IP is blocked by Discord (error 40333) |
 | Knowledge base | **Notion (8 DBs)**, opt-in via `NOTION_API_KEY` | Long-form, structured, queryable |
 | Skills | `.claude/commands/*.md` (9 skills) | Plain markdown — readable by ANY agent, not just Claude |
