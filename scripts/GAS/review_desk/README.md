@@ -54,14 +54,19 @@ MVP 不提供永久刪除。公開 GAS API 仍只傳回 `完成`，且 `AP_MEDIA
 3. 在 Apps Script「專案設定 → 指令碼屬性」加入：
    - `AP_SHEET_ID`：收藏品 Google Sheet ID。
    - `AP_REVIEW_OWNER_EMAIL`：Craig 用來審核的 Google 帳號。
-4. 在 Apps Script 編輯器執行一次 `setupReviewDesk()`，完成授權。此函式只新增／確認
+4. 在 Apps Script 編輯器先執行 `diagReviewDeskPreflight()`。若支援分頁尚未建立，第一次出現
+   `FAIL` 是預期結果；先閱讀 report，確認失敗原因只有缺少 `Review Queue`、`Review Audit` 或
+   `AP_MEDIA`，且 Catalog A:M 顯示 `PASS`。
+5. 執行一次 `setupReviewDesk()`，完成授權。此函式只新增／確認
    `Review Queue`、`Review Audit`、`AP_MEDIA` 三個工作表並匯入 12 組審核佇列，不改收藏品 A:M 欄位。
-5. 回到 Google Sheet，確認新工作表共有 25 筆 queue records、`Review Audit` 只有標題列，
+6. 再執行 `diagReviewDeskPreflight()`；必須為 `PASS` 才繼續部署。它是唯讀檢查，不會建立分頁、
+   寫入 queue、改 Drive 權限，也不會回傳 Script Property 的值。
+7. 回到 Google Sheet，確認新工作表共有 25 筆 queue records、`Review Audit` 只有標題列，
    `AP_MEDIA` 標題列與 DD-104 的 13 欄完全一致。
-6. 「部署 → 新部署 → 網頁應用程式」：
+8. 「部署 → 新部署 → 網頁應用程式」：
    - 執行身分：Craig／專案擁有者。
    - 存取權：僅自己。不要選擇匿名或所有人。
-7. 開啟部署網址，先用一筆候選重複執行 `暫留覆核`，確認：
+9. 開啟部署網址，先用一筆候選重複執行 `暫留覆核`，確認：
    - 原收藏品工作表該筆狀態成為 `待人工覆核`。
    - `Review Queue` 留下決定與備註。
    - `Review Audit` 新增一筆 before/after 紀錄。
@@ -69,6 +74,9 @@ MVP 不提供永久刪除。公開 GAS API 仍只傳回 `完成`，且 `AP_MEDIA
    - 公開型錄重新載入後不再顯示該筆。
 
 如果部署選單無法限制成「僅自己」，先停止部署，不要把寫入介面公開。
+
+主 AP GAS 的完整部署前／部署後順序、零 Gemini 額度 canary 與異常停手條件，見
+[`../DEPLOYMENT.md`](../DEPLOYMENT.md)。
 
 ## 資料契約與防護
 

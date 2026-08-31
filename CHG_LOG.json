@@ -3,6 +3,29 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-08-31T01:00:30Z",
+      "category": "feat",
+      "scope": "antique-gas.predeploy-integrity",
+      "version_from": "10.0",
+      "version_to": "10.1",
+      "summary": "加入主 AP GAS 與 owner-only Review Desk 的部署前 fail-closed preflight、Catalog/AP_MEDIA 完整性稽核、唯讀 reconcile plan，以及不消耗 Gemini 額度的部署後 Discord／公開 JSON canary；另提供可逐項執行的部署與回復手冊。",
+      "rationale": "多圖片、Files API 與人工發布權限提高了資料契約的重要性。部署前先攔截欄位漂移、重複 UUID、孤兒媒體、封面與排序錯誤及媒體隱私狀態不一致，可避免排程啟動後才發現部分寫入或公開資料缺漏；Gemini 健康測試保持獨立，讓免費額度階段不因一般部署驗收而產生模型呼叫。",
+      "breaking": false,
+      "rollback": "git revert <this commit>",
+      "files": [
+        ".gitignore",
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "scripts/GAS/DEPLOYMENT.md",
+        "scripts/GAS/review_desk/Code.gs",
+        "scripts/GAS/review_desk/README.md",
+        "tests/test_antique_gas_preflight.py",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "GAS-PREFLIGHT"
+      ]
+    },
+    {
       "ts": "2026-08-31T00:00:00Z",
       "category": "feat",
       "scope": "antique-gas.multi-image-intake-and-publication",

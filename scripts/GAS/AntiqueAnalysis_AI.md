@@ -22,6 +22,8 @@
  * 模型 cooldown 與可觀測 receipt。
  * CHANGE GAS-MULTI-IMAGE: 同一 Discord 訊息 1–8 張視為同一藏品；12 MiB inline 預算以上
  * 改走 Gemini Files API，原圖寫入 Drive，媒體寫入 AP_MEDIA，不變更現有 Catalog 13 欄。
+ * CHANGE GAS-PREFLIGHT: 部署前以唯讀 audit 驗證 Script Properties、Catalog/AP_MEDIA、
+ * Drive、trigger 與多圖一致性；另提供零 Gemini 額度的部署後 canary 與 reconcile plan。
  */
 
 // ============================================================
@@ -52,10 +54,19 @@ const INLINE_BINARY_BUDGET_BYTES = 12 * 1024 * 1024;
 const MEDIA_SHEET_NAME = "AP_MEDIA";
 const MEDIA_STATUS_PENDING = "pending";
 const MEDIA_STATUS_APPROVED = "approved";
+const MEDIA_STATUS_REJECTED = "rejected";
 const MEDIA_HEADERS = Object.freeze([
   "artifactUuid", "mediaId", "driveFileId", "driveUrl", "viewRole", "sortOrder",
   "isPrimary", "status", "sourceAttachmentId", "sourceMessageId", "mimeType",
   "sizeBytes", "createdAt"
+]);
+const CATALOG_HEADERS = Object.freeze([
+  "UUID", "入庫時間", "用戶描述", "品名", "分類", "年代", "故事",
+  "拍賣參考品", "參考價格", "Drive URL", "標籤", "狀態", "展示建議"
+]);
+const MEDIA_VIEW_ROLES = Object.freeze([
+  "front", "back", "side", "base", "mark", "detail", "interior",
+  "condition", "accessory", "unknown"
 ]);
 
 // `isValid` only means an image can enter research. Publication is a separate
@@ -63,6 +74,9 @@ const MEDIA_HEADERS = Object.freeze([
 const STATUS_PUBLISHED      = "完成";
 const STATUS_PENDING_REVIEW = "待人工覆核";
 const STATUS_REJECTED       = "已退件";
+const CATALOG_ALLOWED_STATUSES = Object.freeze([
+  STATUS_PUBLISHED, STATUS_PENDING_REVIEW, "已下架", STATUS_REJECTED
+]);
 
 // ============================================================
 // ⏰ mainTick：每分鐘計時觸發器的統一入口
@@ -583,9 +597,8 @@ function ensureMediaSheet_(spreadsheet) {
 }
 
 function normalizeViewRole_(value) {
-  const allowed = ["front", "back", "side", "base", "mark", "detail", "interior", "condition", "accessory", "unknown"];
   const normalized = String(value || "unknown").toLowerCase();
-  return allowed.includes(normalized) ? normalized : "unknown";
+  return MEDIA_VIEW_ROLES.includes(normalized) ? normalized : "unknown";
 }
 
 function writeMediaRows_(artifactUuid, media, analyzedViews, sourceMessageId) {
@@ -1606,6 +1619,407 @@ function diagTestGeminiFallbackCanary() {
 
   console.log("[Gemini Canary] " + JSON.stringify(routed.receipt));
   return routed.receipt;
+}
+
+// ============================================================
+// 🩺 v10.1 deployment preflight / integrity diagnostics
+// ============================================================
+function diagnosticIssue_(severity, code, detail, rowNumber, artifactUuid, remediation) {
+  return {
+    severity: severity,
+    code: code,
+    detail: String(detail || ""),
+    rowNumber: Number(rowNumber) || 0,
+    artifactUuid: String(artifactUuid || ""),
+    remediation: String(remediation || "")
+  };
+}
+
+function isCatalogDataRow_(row) {
+  if (!Array.isArray(row)) return false;
+  if (String(row[2] || "") === "系統日誌") return false;
+  return row.some(value => String(value || "").trim() !== "");
+}
+
+/** Pure catalogue audit used by both GAS diagnostics and no-network tests. */
+function auditCatalogRows_(rows, firstSheetRow) {
+  const startRow = Number(firstSheetRow) || 2;
+  const issues = [];
+  const uuidCounts = {};
+  const statusByUuid = {};
+  let catalogCount = 0;
+
+  (Array.isArray(rows) ? rows : []).forEach((row, index) => {
+    if (!isCatalogDataRow_(row)) return;
+    const sheetRow = startRow + index;
+    const uuid = String(row[0] || "").trim();
+    const status = String(row[11] || "").trim();
+    catalogCount += 1;
+    if (!uuid) {
+      issues.push(diagnosticIssue_("FAIL", "CATALOG_UUID_MISSING", "藏品列缺少 UUID", sheetRow));
+      return;
+    }
+    uuidCounts[uuid] = (uuidCounts[uuid] || 0) + 1;
+    statusByUuid[uuid] = status;
+    if (!CATALOG_ALLOWED_STATUSES.includes(status)) {
+      issues.push(diagnosticIssue_(
+        "FAIL", "CATALOG_STATUS_INVALID", `不支援的狀態：${status || "（空白）"}`,
+        sheetRow, uuid, "改為 完成／待人工覆核／已下架／已退件 之一"
+      ));
+    }
+  });
+
+  Object.keys(uuidCounts).forEach(uuid => {
+    if (uuidCounts[uuid] > 1) {
+      issues.push(diagnosticIssue_(
+        "FAIL", "CATALOG_UUID_DUPLICATE", `UUID 重複 ${uuidCounts[uuid]} 次`, 0, uuid,
+        "由 Craig 在 Review Desk 比對後保留一筆，其餘下架；不可自動刪列"
+      ));
+    }
+  });
+  return { issues: issues, uuidCounts: uuidCounts, statusByUuid: statusByUuid, catalogCount: catalogCount };
+}
+
+/** Pure AP_MEDIA audit. It returns a plan only and never mutates Sheet or Drive. */
+function auditMediaRows_(catalogAudit, rows, firstSheetRow) {
+  const startRow = Number(firstSheetRow) || 2;
+  const issues = [];
+  const byArtifact = {};
+  const mediaIds = {};
+  const catalogStatuses = (catalogAudit && catalogAudit.statusByUuid) || {};
+
+  (Array.isArray(rows) ? rows : []).forEach((row, index) => {
+    if (!Array.isArray(row) || !row.some(value => String(value || "").trim() !== "")) return;
+    const sheetRow = startRow + index;
+    const artifactUuid = String(row[0] || "").trim();
+    const mediaId = String(row[1] || "").trim();
+    const driveFileId = String(row[2] || "").trim();
+    const driveUrl = String(row[3] || "").trim();
+    const viewRole = String(row[4] || "unknown").trim().toLowerCase();
+    const sortOrder = Number(row[5]);
+    const isPrimary = row[6] === true || String(row[6]).toLowerCase() === "true";
+    const status = String(row[7] || "").trim();
+
+    if (!artifactUuid) issues.push(diagnosticIssue_("FAIL", "MEDIA_ARTIFACT_UUID_MISSING", "媒體列缺少 artifactUuid", sheetRow));
+    if (!mediaId) issues.push(diagnosticIssue_("FAIL", "MEDIA_ID_MISSING", "媒體列缺少 mediaId", sheetRow, artifactUuid));
+    if (!driveFileId || !driveUrl) {
+      issues.push(diagnosticIssue_("FAIL", "MEDIA_DRIVE_REFERENCE_MISSING", "driveFileId 或 driveUrl 缺漏", sheetRow, artifactUuid));
+    }
+    if (!MEDIA_VIEW_ROLES.includes(viewRole)) {
+      issues.push(diagnosticIssue_("FAIL", "MEDIA_VIEW_ROLE_INVALID", `不支援的 viewRole：${viewRole}`, sheetRow, artifactUuid));
+    }
+    if (![MEDIA_STATUS_PENDING, MEDIA_STATUS_APPROVED, MEDIA_STATUS_REJECTED].includes(status)) {
+      issues.push(diagnosticIssue_("FAIL", "MEDIA_STATUS_INVALID", `不支援的 media status：${status || "（空白）"}`, sheetRow, artifactUuid));
+    }
+    if (!Number.isInteger(sortOrder) || sortOrder < 1 || sortOrder > MAX_IMAGES_PER_ARTIFACT) {
+      issues.push(diagnosticIssue_("FAIL", "MEDIA_SORT_ORDER_INVALID", `sortOrder 超出 1–${MAX_IMAGES_PER_ARTIFACT}：${row[5]}`, sheetRow, artifactUuid));
+    }
+    if (artifactUuid && !Object.prototype.hasOwnProperty.call(catalogStatuses, artifactUuid)) {
+      issues.push(diagnosticIssue_(
+        "FAIL", "MEDIA_ORPHAN", "AP_MEDIA 找不到對應 Catalog UUID", sheetRow, artifactUuid,
+        "保留原圖為私人，先查明部分寫入原因；不可直接刪除"
+      ));
+    }
+    if (mediaId) {
+      if (mediaIds[mediaId]) {
+        issues.push(diagnosticIssue_("FAIL", "MEDIA_ID_DUPLICATE", `mediaId 已出現在第 ${mediaIds[mediaId]} 列`, sheetRow, artifactUuid));
+      } else {
+        mediaIds[mediaId] = sheetRow;
+      }
+    }
+    if (!byArtifact[artifactUuid]) byArtifact[artifactUuid] = [];
+    byArtifact[artifactUuid].push({
+      rowNumber: sheetRow,
+      mediaId: mediaId,
+      sortOrder: sortOrder,
+      isPrimary: isPrimary,
+      status: status
+    });
+  });
+
+  Object.keys(byArtifact).filter(Boolean).forEach(artifactUuid => {
+    const media = byArtifact[artifactUuid];
+    const primaryCount = media.filter(item => item.isPrimary).length;
+    const orders = {};
+    media.forEach(item => {
+      if (Number.isInteger(item.sortOrder)) orders[item.sortOrder] = (orders[item.sortOrder] || 0) + 1;
+    });
+    if (media.length > MAX_IMAGES_PER_ARTIFACT) {
+      issues.push(diagnosticIssue_("FAIL", "MEDIA_TOO_MANY", `同一藏品共有 ${media.length} 張，超過上限`, 0, artifactUuid));
+    }
+    if (primaryCount !== 1) {
+      issues.push(diagnosticIssue_("FAIL", "MEDIA_PRIMARY_COUNT", `封面數量應為 1，目前為 ${primaryCount}`, 0, artifactUuid));
+    }
+    Object.keys(orders).forEach(order => {
+      if (orders[order] > 1) {
+        issues.push(diagnosticIssue_("FAIL", "MEDIA_SORT_ORDER_DUPLICATE", `sortOrder ${order} 重複 ${orders[order]} 次`, 0, artifactUuid));
+      }
+    });
+    const approvedCount = media.filter(item => item.status === MEDIA_STATUS_APPROVED).length;
+    const catalogStatus = catalogStatuses[artifactUuid];
+    if (approvedCount > 0 && catalogStatus !== STATUS_PUBLISHED) {
+      issues.push(diagnosticIssue_(
+        "FAIL", "MEDIA_PRIVACY_STATE_MISMATCH",
+        `Catalog 狀態為 ${catalogStatus || "不存在"}，卻有 ${approvedCount} 張 approved 媒體`, 0, artifactUuid,
+        "先由 Review Desk 執行待覆核／下架以撤回分享權限"
+      ));
+    }
+    if (catalogStatus === STATUS_PUBLISHED && approvedCount === 0) {
+      issues.push(diagnosticIssue_(
+        "FAIL", "PUBLISHED_WITHOUT_APPROVED_MEDIA", "Catalog 已完成但沒有 approved 媒體", 0, artifactUuid,
+        "在 Review Desk 選定封面並重新執行上架"
+      ));
+    }
+  });
+  return { issues: issues, byArtifact: byArtifact, mediaCount: Object.keys(mediaIds).length };
+}
+
+function addPreflightCheck_(checks, id, status, detail, remediation) {
+  checks.push({
+    id: id,
+    status: status,
+    detail: String(detail || ""),
+    remediation: String(remediation || "")
+  });
+}
+
+function finalizePreflightReport_(checks, integrityIssues) {
+  const issues = Array.isArray(integrityIssues) ? integrityIssues : [];
+  const failCount = checks.filter(check => check.status === "FAIL").length
+    + issues.filter(issue => issue.severity === "FAIL").length;
+  const warnCount = checks.filter(check => check.status === "WARN").length
+    + issues.filter(issue => issue.severity === "WARN").length;
+  return {
+    version: "AP-GAS-v10.1-preflight",
+    generatedAt: new Date().toISOString(),
+    status: failCount === 0 ? "PASS" : "FAIL",
+    summary: { fail: failCount, warn: warnCount, checks: checks.length, integrityIssues: issues.length },
+    checks: checks,
+    integrityIssues: issues.slice(0, 200)
+  };
+}
+
+/**
+ * Read-only and zero-Gemini-cost. Run this before setup/deploy and keep the
+ * returned JSON in the Apps Script execution log for Craig's go/no-go review.
+ */
+function diagPredeployAudit() {
+  const checks = [];
+  const integrityIssues = [];
+  const props = PropertiesService.getScriptProperties();
+  const propertyState = {
+    DISCORD_BOT_TOKEN: Boolean(String(props.getProperty("DISCORD_BOT_TOKEN") || "")),
+    GEMINI_API_KEY: Boolean(String(props.getProperty("GEMINI_API_KEY") || "")),
+    AP_INGEST_SECRET: Boolean(String(props.getProperty("AP_INGEST_SECRET") || ""))
+  };
+  ["DISCORD_BOT_TOKEN", "GEMINI_API_KEY"].forEach(key => {
+    addPreflightCheck_(checks, `property.${key}`, propertyState[key] ? "PASS" : "FAIL",
+      propertyState[key] ? "已設定（值不回傳）" : "缺少必要 Script Property",
+      propertyState[key] ? "" : `在 Apps Script 專案設定新增 ${key}`);
+  });
+  addPreflightCheck_(checks, "property.AP_INGEST_SECRET", propertyState.AP_INGEST_SECRET ? "PASS" : "WARN",
+    propertyState.AP_INGEST_SECRET ? "已設定（值不回傳）" : "未啟用舊 doPost 相容入口",
+    propertyState.AP_INGEST_SECRET ? "" : "只有仍需使用 HTTP doPost 時才設定；Discord polling 不需要");
+
+  try {
+    const folder = DriveApp.getFolderById(ROOT_FOLDER_ID);
+    addPreflightCheck_(checks, "drive.root", "PASS", `Root folder 可讀：${folder.getName()}`);
+  } catch (err) {
+    addPreflightCheck_(checks, "drive.root", "FAIL", err.message, "確認 ROOT_FOLDER_ID 與部署帳號權限");
+  }
+
+  let spreadsheet = null;
+  let catalogAudit = { issues: [], statusByUuid: {}, catalogCount: 0 };
+  try {
+    spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    addPreflightCheck_(checks, "sheet.open", "PASS", `Spreadsheet 可讀：${spreadsheet.getName()}`);
+    const catalogSheet = spreadsheet.getSheets()[0];
+    const header = catalogSheet.getRange(1, 1, 1, CATALOG_HEADERS.length).getDisplayValues()[0];
+    const headerMatches = header.join("|") === CATALOG_HEADERS.join("|");
+    addPreflightCheck_(checks, "catalog.headers", headerMatches ? "PASS" : "FAIL",
+      headerMatches ? "Catalog A:M 與凍結契約一致" : `實際：${header.join(" | ")}`,
+      headerMatches ? "" : "停止部署；依 DD-XXX 同步 Sheet、writeToSheet、doGet 與前端後再重跑");
+    const lastRow = catalogSheet.getLastRow();
+    const rows = lastRow >= 2
+      ? catalogSheet.getRange(2, 1, lastRow - 1, CATALOG_HEADERS.length).getDisplayValues()
+      : [];
+    catalogAudit = auditCatalogRows_(rows, 2);
+    integrityIssues.push.apply(integrityIssues, catalogAudit.issues);
+    addPreflightCheck_(checks, "catalog.rows", catalogAudit.issues.length ? "FAIL" : "PASS",
+      `${catalogAudit.catalogCount} 筆藏品資料；${catalogAudit.issues.length} 個問題`);
+
+    const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
+    if (!mediaSheet) {
+      addPreflightCheck_(checks, "media.sheet", "FAIL", "找不到 AP_MEDIA", "先執行 setupAntiquePipeline() 建立契約分頁");
+    } else {
+      const mediaHeader = mediaSheet.getRange(1, 1, 1, MEDIA_HEADERS.length).getDisplayValues()[0];
+      const mediaHeaderMatches = mediaHeader.join("|") === MEDIA_HEADERS.join("|");
+      addPreflightCheck_(checks, "media.headers", mediaHeaderMatches ? "PASS" : "FAIL",
+        mediaHeaderMatches ? "AP_MEDIA 欄位一致" : `實際：${mediaHeader.join(" | ")}`,
+        mediaHeaderMatches ? "" : "停止部署；不可自動覆寫既有媒體欄位");
+      if (mediaHeaderMatches) {
+        const mediaLastRow = mediaSheet.getLastRow();
+        const mediaRows = mediaLastRow >= 2
+          ? mediaSheet.getRange(2, 1, mediaLastRow - 1, MEDIA_HEADERS.length).getValues()
+          : [];
+        const mediaAudit = auditMediaRows_(catalogAudit, mediaRows, 2);
+        integrityIssues.push.apply(integrityIssues, mediaAudit.issues);
+        addPreflightCheck_(checks, "media.rows", mediaAudit.issues.length ? "FAIL" : "PASS",
+          `${mediaAudit.mediaCount} 筆媒體；${mediaAudit.issues.length} 個問題`);
+      }
+    }
+  } catch (err) {
+    addPreflightCheck_(checks, "sheet.open", "FAIL", err.message, "確認 SHEET_ID、授權與 Catalog 第一分頁");
+  }
+
+  try {
+    const triggerNames = ScriptApp.getProjectTriggers().map(trigger => trigger.getHandlerFunction());
+    const mainCount = triggerNames.filter(name => name === "mainTick").length;
+    const legacyCount = triggerNames.filter(name => name === "processJobAsync").length;
+    const healthy = mainCount === 1 && legacyCount === 0;
+    addPreflightCheck_(checks, "trigger.mainTick", healthy ? "PASS" : "WARN",
+      `mainTick=${mainCount}；legacy processJobAsync=${legacyCount}`,
+      healthy ? "" : "部署程式後執行 setupAntiquePipeline() 重建唯一 mainTick trigger");
+  } catch (err) {
+    addPreflightCheck_(checks, "trigger.mainTick", "WARN", err.message, "完成 Apps Script 授權後重跑");
+  }
+
+  try {
+    const queueRaw = String(props.getProperty("pending_jobs") || "[]");
+    const queue = JSON.parse(queueRaw);
+    if (!Array.isArray(queue)) throw new Error("pending_jobs 不是 JSON array");
+    addPreflightCheck_(checks, "queue.pending_jobs", queue.length > 20 ? "WARN" : "PASS", `待處理 ${queue.length} 筆`,
+      queue.length > 20 ? "先暫停部署並確認 worker 是否持續消費" : "");
+  } catch (err) {
+    addPreflightCheck_(checks, "queue.pending_jobs", "FAIL", err.message, "由 Craig 確認後才可清空損壞佇列");
+  }
+
+  const report = finalizePreflightReport_(checks, integrityIssues);
+  console.log("[AP Preflight] " + JSON.stringify(report));
+  return report;
+}
+
+/** Controlled setup. It creates AP_MEDIA only when missing and rebuilds the trigger. */
+function setupAntiquePipeline() {
+  if (!DISCORD_BOT_TOKEN) throw new Error("缺少 Script Property: DISCORD_BOT_TOKEN");
+  if (!GEMINI_KEY) throw new Error("缺少 Script Property: GEMINI_API_KEY");
+  DriveApp.getFolderById(ROOT_FOLDER_ID).getName();
+  const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+  const catalogSheet = spreadsheet.getSheets()[0];
+  const header = catalogSheet.getRange(1, 1, 1, CATALOG_HEADERS.length).getDisplayValues()[0];
+  if (header.join("|") !== CATALOG_HEADERS.join("|")) {
+    throw new Error("Catalog A:M 與凍結契約不一致；停止 setup，不重建 trigger");
+  }
+  ensureMediaSheet_(spreadsheet);
+  const beforeTrigger = diagPredeployAudit();
+  if (beforeTrigger.status !== "PASS") {
+    throw new Error("Preflight FAIL；先修正資料契約或完整性問題，再建立 trigger");
+  }
+  setupTrigger();
+  const report = diagPredeployAudit();
+  console.log("[AP Setup] " + JSON.stringify(report));
+  return report;
+}
+
+/** Read-only reconcile plan for partial Sheet writes. No rows or Drive files are changed. */
+function diagMediaReconcilePlan() {
+  const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+  const catalogSheet = spreadsheet.getSheets()[0];
+  const catalogRows = catalogSheet.getLastRow() >= 2
+    ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+    : [];
+  const catalogAudit = auditCatalogRows_(catalogRows, 2);
+  const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
+  if (!mediaSheet) throw new Error("找不到 AP_MEDIA；沒有可建立的 reconcile plan");
+  const mediaRows = mediaSheet.getLastRow() >= 2
+    ? mediaSheet.getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length).getValues()
+    : [];
+  const mediaAudit = auditMediaRows_(catalogAudit, mediaRows, 2);
+  const plan = {
+    generatedAt: new Date().toISOString(),
+    mode: "READ_ONLY_PLAN",
+    status: catalogAudit.issues.length || mediaAudit.issues.length ? "ACTION_REQUIRED" : "CLEAN",
+    issues: catalogAudit.issues.concat(mediaAudit.issues)
+  };
+  console.log("[AP Media Reconcile Plan] " + JSON.stringify(plan));
+  return plan;
+}
+
+function discordReadOnlyCanary_() {
+  const headers = {
+    "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
+    "User-Agent": "DiscordBot (https://antique-pavilion, 1.0)"
+  };
+  const endpoints = [
+    { id: "bot", url: DISCORD_API + "/users/@me" },
+    { id: "channel", url: DISCORD_API + "/channels/" + DISCORD_CHANNEL_ID }
+  ];
+  return endpoints.map(endpoint => {
+    const response = UrlFetchApp.fetch(endpoint.url, { headers: headers, muteHttpExceptions: true });
+    return { id: endpoint.id, httpCode: Number(response.getResponseCode()), ok: response.getResponseCode() === 200 };
+  });
+}
+
+/** Zero Gemini cost. Run after deployment; run Gemini canary separately only when needed. */
+function diagPostdeployCanary() {
+  const preflight = diagPredeployAudit();
+  const checks = [];
+  const triggers = ScriptApp.getProjectTriggers().map(trigger => trigger.getHandlerFunction());
+  const mainCount = triggers.filter(name => name === "mainTick").length;
+  addPreflightCheck_(checks, "post.trigger", mainCount === 1 ? "PASS" : "FAIL", `mainTick=${mainCount}`,
+    mainCount === 1 ? "" : "執行 setupAntiquePipeline()");
+
+  let discord = [];
+  try {
+    discord = discordReadOnlyCanary_();
+    discord.forEach(result => addPreflightCheck_(checks, `post.discord.${result.id}`, result.ok ? "PASS" : "FAIL",
+      `HTTP ${result.httpCode}`, result.ok ? "" : "確認 Discord token、channel 權限與 GAS 出站存取"));
+  } catch (err) {
+    addPreflightCheck_(checks, "post.discord", "FAIL", err.message, "確認 Discord token 與 GAS 網路存取");
+  }
+
+  try {
+    const service = ScriptApp.getService();
+    const serviceUrl = service.getUrl();
+    if (!service.isEnabled() || !serviceUrl) throw new Error("此專案尚未啟用 Web App deployment");
+    const separator = serviceUrl.includes("?") ? "&" : "?";
+    const response = UrlFetchApp.fetch(serviceUrl + separator + "apCanary=" + Date.now(), {
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    const httpCode = Number(response.getResponseCode());
+    if (httpCode !== 200) throw new Error(`正式 Web App 回傳 HTTP ${httpCode}`);
+    const payload = JSON.parse(response.getContentText());
+    const catalogSheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
+    const catalogValues = catalogSheet.getLastRow() >= 2
+      ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+      : [];
+    const expectedPublished = catalogValues.filter(row => isCatalogDataRow_(row) && row[11] === STATUS_PUBLISHED).length;
+    const valid = payload.success === true && Array.isArray(payload.data)
+      && Number(payload.publishedCount) === payload.data.length
+      && payload.data.length === expectedPublished
+      && payload.data.every(item => item.imageUrl && Array.isArray(item.images) && item.images.length >= 1);
+    addPreflightCheck_(checks, "post.public_json", valid ? "PASS" : "FAIL",
+      valid
+        ? `正式 Web App HTTP ${httpCode}；${payload.data.length} 件公開藏品，imageUrl + images[] 契約正常`
+        : `公開 JSON 契約不完整：Catalog 完成=${expectedPublished}，API 回傳=${Array.isArray(payload.data) ? payload.data.length : "非陣列"}`,
+      valid ? "" : "停止切換前台；確認已建立新 deployment version，並檢查 doGet 與 AP_MEDIA approved 狀態");
+  } catch (err) {
+    addPreflightCheck_(checks, "post.public_json", "FAIL", err.message,
+      "確認 Web App 已部署且 guest 可讀，再檢查 doGet 執行權限與資料契約");
+  }
+
+  const post = finalizePreflightReport_(checks, []);
+  const report = {
+    generatedAt: new Date().toISOString(),
+    status: preflight.status === "PASS" && post.status === "PASS" ? "PASS" : "FAIL",
+    geminiCalls: 0,
+    preflight: preflight,
+    postdeploy: post,
+    discord: discord
+  };
+  console.log("[AP Postdeploy Canary] " + JSON.stringify(report));
+  return report;
 }
 
 // ============================================================

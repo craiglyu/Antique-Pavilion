@@ -84,6 +84,8 @@ memory/design_review_log.md
 # 可作為正式可追蹤 GAS source；其他本機 GAS 匯出/資料檔維持忽略。
 scripts/GAS/*
 !scripts/GAS/AntiqueAnalysis_AI.md
+# CHANGE GAS-PREFLIGHT: track the secret-free deployment gate runbook.
+!scripts/GAS/DEPLOYMENT.md
 !scripts/GAS/review_desk/
 !scripts/GAS/review_desk/**
 

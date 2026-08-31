@@ -9,6 +9,9 @@
  * CHANGE GAS-MULTI-IMAGE: AP_MEDIA is the companion media table. Publishing
  * atomically approves/shares its images; holding, archiving, or rejecting makes
  * them private so intake originals never leak before Craig's review.
+ * CHANGE GAS-PREFLIGHT: owner-only, read-only preflight verifies Script
+ * Properties and the frozen Catalog / Review Queue / Review Audit / AP_MEDIA
+ * contracts before a Review Desk deployment is promoted.
  */
 
 const REVIEW_DESK = Object.freeze({
@@ -24,6 +27,11 @@ const MEDIA_HEADERS = Object.freeze([
   "artifactUuid", "mediaId", "driveFileId", "driveUrl", "viewRole", "sortOrder",
   "isPrimary", "status", "sourceAttachmentId", "sourceMessageId", "mimeType",
   "sizeBytes", "createdAt",
+]);
+
+const CATALOG_HEADERS = Object.freeze([
+  "UUID", "入庫時間", "用戶描述", "品名", "分類", "年代", "故事",
+  "拍賣參考品", "參考價格", "Drive URL", "標籤", "狀態", "展示建議",
 ]);
 
 const MEDIA_STATUS = Object.freeze({
@@ -215,6 +223,13 @@ function setupReviewDesk() {
   lock.waitLock(15000);
   try {
     const spreadsheet = getSpreadsheet_();
+    const catalogSheet = spreadsheet.getSheets()[REVIEW_DESK.CATALOG_SHEET_INDEX];
+    const catalogHeaders = catalogSheet
+      .getRange(1, 1, 1, CATALOG_HEADERS.length)
+      .getDisplayValues()[0];
+    if (catalogHeaders.join("|") !== CATALOG_HEADERS.join("|")) {
+      throw new Error("Catalog A:M 與凍結契約不一致；停止 setup，不建立支援分頁。");
+    }
     const queueSheet = ensureSheet_(spreadsheet, REVIEW_DESK.QUEUE_SHEET, QUEUE_HEADERS);
     const auditSheet = ensureSheet_(spreadsheet, REVIEW_DESK.AUDIT_SHEET, AUDIT_HEADERS);
     const mediaSheet = ensureSheet_(spreadsheet, REVIEW_DESK.MEDIA_SHEET, MEDIA_HEADERS);
@@ -230,6 +245,80 @@ function setupReviewDesk() {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Read-only deployment gate. It never creates sheets, seeds the queue, changes
+ * Drive permissions, or returns Script Property values.
+ */
+function diagReviewDeskPreflight() {
+  assertAuthorized_();
+  const checks = [];
+  const addCheck = (id, status, detail, remediation) => checks.push({
+    id,
+    status,
+    detail: String(detail || ""),
+    remediation: String(remediation || ""),
+  });
+  const properties = PropertiesService.getScriptProperties();
+  [REVIEW_DESK.PROP_SHEET_ID, REVIEW_DESK.PROP_OWNER_EMAIL].forEach((key) => {
+    const configured = Boolean(String(properties.getProperty(key) || "").trim());
+    addCheck(
+      `property.${key}`,
+      configured ? "PASS" : "FAIL",
+      configured ? "已設定（值不回傳）" : "缺少必要 Script Property",
+      configured ? "" : `在 Review Desk 專案設定新增 ${key}`,
+    );
+  });
+
+  try {
+    const spreadsheet = getSpreadsheet_();
+    addCheck("sheet.open", "PASS", `Spreadsheet 可讀：${spreadsheet.getName()}`);
+    const catalogSheet = spreadsheet.getSheets()[REVIEW_DESK.CATALOG_SHEET_INDEX];
+    const catalogHeaders = catalogSheet
+      .getRange(1, 1, 1, CATALOG_HEADERS.length)
+      .getDisplayValues()[0];
+    const catalogMatches = catalogHeaders.join("|") === CATALOG_HEADERS.join("|");
+    addCheck(
+      "catalog.headers",
+      catalogMatches ? "PASS" : "FAIL",
+      catalogMatches ? "Catalog A:M 與凍結契約一致" : `實際：${catalogHeaders.join(" | ")}`,
+      catalogMatches ? "" : "停止部署；不可由 Review Desk 自動改名或搬移 Catalog 欄位",
+    );
+
+    [
+      [REVIEW_DESK.QUEUE_SHEET, QUEUE_HEADERS],
+      [REVIEW_DESK.AUDIT_SHEET, AUDIT_HEADERS],
+      [REVIEW_DESK.MEDIA_SHEET, MEDIA_HEADERS],
+    ].forEach(([name, expectedHeaders]) => {
+      const sheet = spreadsheet.getSheetByName(name);
+      if (!sheet) {
+        addCheck(`support.${name}`, "FAIL", `找不到 ${name}`, "先執行 setupReviewDesk()，再重跑 preflight");
+        return;
+      }
+      const actual = sheet.getRange(1, 1, 1, expectedHeaders.length).getDisplayValues()[0];
+      const matches = actual.join("|") === expectedHeaders.join("|");
+      addCheck(
+        `support.${name}`,
+        matches ? "PASS" : "FAIL",
+        matches ? `${name} 欄位一致` : `實際：${actual.join(" | ")}`,
+        matches ? "" : "停止部署；不可自動覆寫既有支援分頁",
+      );
+    });
+  } catch (error) {
+    addCheck("sheet.open", "FAIL", error.message, "確認 AP_SHEET_ID、Google 帳號與 Sheet 權限");
+  }
+
+  const failCount = checks.filter((check) => check.status === "FAIL").length;
+  const report = {
+    version: "AP-REVIEW-DESK-v10.1-preflight",
+    generatedAt: new Date().toISOString(),
+    status: failCount === 0 ? "PASS" : "FAIL",
+    summary: { fail: failCount, checks: checks.length },
+    checks,
+  };
+  console.log("[AP Review Desk Preflight] " + JSON.stringify(report));
+  return report;
 }
 
 function getBootstrapData() {
