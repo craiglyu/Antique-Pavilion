@@ -1,8 +1,9 @@
 <!-- CHANGE GAS-PREFLIGHT: AP GAS deployment gate and zero-cost canary runbook. -->
 <!-- CHANGE GAS-QUEUE-SAFETY: v10.2 locked queue, durable payload, retry and dead-letter runbook. -->
 <!-- CHANGE GAS-CATALOG-PREVIEW: read-only redacted Catalog contract diagnosis before migration. -->
+<!-- CHANGE GAS-DD105-HEADERS: Craig-approved guarded A1:M1 header-only migration. -->
 
-# AP GAS v10.2.1 部署與驗收手冊
+# AP GAS v10.2.2 部署與驗收手冊
 
 這份手冊適用於 `AntiqueAnalysis_AI.md` 主資料管線與 `review_desk/` 人工覆核台。
 所有診斷預設唯讀；本地提交不代表線上已部署。
@@ -53,6 +54,24 @@ J:M 的公式／URL／狀態等結構計數；不回傳任何儲存格原文、U
 - `CURRENT_CONTRACT`：Catalog 已符合凍結契約，可重新執行 `diagPredeployAudit()`。
 
 請保留完整 `[AP Catalog Contract Preview]` JSON 執行紀錄供 migration go/no-go 判讀。
+
+### DD-105 已核准的 header-only migration
+
+Craig 於 2026-08-31 核准 DD-105。只有 preview 同時回傳以下四個條件時，才可在 Apps Script
+手動執行一次 `applyDd105CatalogHeaderMigration()`：
+
+- `classification = STALE_LEGACY_HEADERS_CURRENT_POSITIONAL_DATA`
+- `confidence = high`
+- `currentPosition = currentMaximum`
+- `legacyPosition = 0`
+
+函式會取得 Script Lock，確認 A1:M1 仍是精確舊標題，只把該標題列改為凍結契約；第 2 列
+以後不會寫入。成功 receipt 必須為 `status: APPLIED`、`range: A1:M1`、
+`headerRowsTouched: 1`、`dataRowsTouched: 0`。如果已套用，回傳 `ALREADY_APPLIED` 且不再寫入；
+若寫入後驗證失敗，函式會嘗試回復舊標題並以 `FAILED` 結束。
+
+執行後先貼回完整 `[AP DD-105 Migration]` receipt，接著只重跑 `diagPredeployAudit()`。
+此階段仍不要執行 `setupAntiquePipeline()`、不要建立 trigger，也不要更新 deployment。
 
 ## v10.2 Queue 升級注意事項
 

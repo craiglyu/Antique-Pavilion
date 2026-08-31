@@ -96,6 +96,20 @@ sizeBytes | createdAt
 - Inline Gemini payload 的 binary 安全預算為 12 MiB；超過改走 Gemini Files API。
 - 前端卡片仍只載封面；多圖只在 catalog lightbox 內 lazy-load，且不得自動輪播。
 
+<!-- CHANGE GAS-DD105-HEADERS: Craig 核准 Catalog A1:M1 header-only migration。 -->
+### DD-105 — Catalog 標題契約正規化（Craig 2026-08-31 核准）
+
+2026-08-31 線上 `diagCatalogContractPreview()` 對 179 個物理資料範圍列完成去內容化檢查：
+129 筆有效藏品的 J 欄全為 Drive 公式、L 欄全為合法狀態，位置分數為新版 `9/9`、舊版
+`0/10`。因此只准將 Catalog `A1:M1` 從精確舊標題改為本節上方的凍結 13 欄標題；第 2 列
+以後資料不得移動、改寫或重算。
+
+- 只可執行 `applyDd105CatalogHeaderMigration()`；函式必須先重跑相同位置證據並取得 high confidence。
+- 實際標題若不是精確舊契約或現行凍結契約，必須 fail closed。
+- 寫入後只驗證 A1:M1；若驗證失敗，立即回復精確舊標題並輸出 receipt。
+- 本 DD 不授權建立 `AP_MEDIA`、trigger、deployment，也不授權任何資料列或 Drive 變更。
+- header-only migration 完成後，必須重新執行 `diagPredeployAudit()`，再另行進入部署步驟。
+
 ---
 
 ## 4. era enum — DO NOT extend silently

@@ -1,5 +1,5 @@
 /**
- * 🏺 骨董影像編目代理人 v10.2.1 — Discord 多圖耐久佇列版
+ * 🏺 骨董影像編目代理人 v10.2.2 — Discord 多圖耐久佇列版
  *
  * [v9.0] 架構革新：Telegram Webhook 推播 → Discord REST 輪詢
  *  - 移除 doPost，根治 Webhook 超時 / 重送暴風問題
@@ -28,6 +28,8 @@
  * 寫入前暫時性錯誤最多重試 2 次，寫入開始後一律進 dead-letter，避免重跑造成重複藏品。
  * CHANGE GAS-CATALOG-PREVIEW: 提供零寫入、去內容化的 Catalog 契約診斷，辨識僅標題過期、
  * 舊資料位置或證據不足三種狀態，供 DD 遷移決策使用。
+ * CHANGE GAS-DD105-HEADERS: Craig 核准的 DD-105 受控 header-only migration；僅在舊標題
+ * 與新版位置證據完全吻合時寫入 A1:M1，驗證失敗即回復舊標題。
  */
 
 // ============================================================
@@ -2171,6 +2173,129 @@ function diagCatalogContractPreview() {
 }
 
 /**
+ * DD-105 (Craig approved 2026-08-31): rename Catalog A1:M1 only.
+ * No data row, AP_MEDIA, trigger, Drive file, queue, or deployment is changed.
+ */
+function applyDd105CatalogHeaderMigration() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  let writeAttempted = false;
+  let previousHeaders = [];
+  let catalogSheet = null;
+  let headerRange = null;
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    catalogSheet = spreadsheet.getSheets()[0];
+    headerRange = catalogSheet.getRange(1, 1, 1, CATALOG_HEADERS.length);
+    const actualHeaders = headerRange.getDisplayValues()[0].map(value => String(value || "").trim());
+    const currentHeader = actualHeaders.join("|") === CATALOG_HEADERS.join("|");
+    if (currentHeader) {
+      const alreadyApplied = {
+        version: "AP-GAS-v10.2.2-dd105",
+        ddId: "DD-105",
+        status: "ALREADY_APPLIED",
+        mode: "HEADER_ONLY",
+        generatedAt: new Date().toISOString(),
+        sheetName: catalogSheet.getName(),
+        range: "A1:M1",
+        headerRowsTouched: 0,
+        dataRowsTouched: 0,
+        currentHeaders: actualHeaders
+      };
+      console.log("[AP DD-105 Migration] " + JSON.stringify(alreadyApplied));
+      return alreadyApplied;
+    }
+    if (actualHeaders.join("|") !== LEGACY_CATALOG_HEADERS.join("|")) {
+      throw new Error("Catalog 標題既非 DD-105 精確舊契約，也非目前凍結契約；拒絕寫入");
+    }
+
+    const lastRow = catalogSheet.getLastRow();
+    const rowCount = Math.max(0, lastRow - 1);
+    const displayRows = rowCount
+      ? catalogSheet.getRange(2, 1, rowCount, CATALOG_HEADERS.length).getDisplayValues()
+      : [];
+    const formulaRows = rowCount
+      ? catalogSheet.getRange(2, 1, rowCount, CATALOG_HEADERS.length).getFormulas()
+      : [];
+    const preview = buildCatalogContractPreview_(actualHeaders, displayRows, formulaRows);
+    const evidenceMatches = preview.classification === "STALE_LEGACY_HEADERS_CURRENT_POSITIONAL_DATA"
+      && preview.confidence === "high"
+      && preview.scores.currentPosition === preview.scores.currentMaximum
+      && preview.scores.legacyPosition === 0;
+    if (!evidenceMatches) {
+      throw new Error(
+        `Catalog 位置證據不再符合 DD-105；classification=${preview.classification}，`
+        + `current=${preview.scores.currentPosition}/${preview.scores.currentMaximum}，`
+        + `legacy=${preview.scores.legacyPosition}/${preview.scores.legacyMaximum}`
+      );
+    }
+
+    previousHeaders = actualHeaders.slice();
+    writeAttempted = true;
+    headerRange.setValues([CATALOG_HEADERS.slice()]);
+    SpreadsheetApp.flush();
+    const verifiedHeaders = headerRange.getDisplayValues()[0].map(value => String(value || "").trim());
+    if (verifiedHeaders.join("|") !== CATALOG_HEADERS.join("|")) {
+      throw new Error("A1:M1 寫入後驗證失敗");
+    }
+
+    const receipt = {
+      version: "AP-GAS-v10.2.2-dd105",
+      ddId: "DD-105",
+      status: "APPLIED",
+      mode: "HEADER_ONLY",
+      appliedAt: new Date().toISOString(),
+      sheetName: catalogSheet.getName(),
+      range: "A1:M1",
+      headerRowsTouched: 1,
+      dataRowsTouched: 0,
+      physicalDataRowsObserved: rowCount,
+      previousHeaders: previousHeaders,
+      currentHeaders: verifiedHeaders,
+      evidence: {
+        classification: preview.classification,
+        confidence: preview.confidence,
+        currentPosition: preview.scores.currentPosition,
+        currentMaximum: preview.scores.currentMaximum,
+        legacyPosition: preview.scores.legacyPosition,
+        legacyMaximum: preview.scores.legacyMaximum
+      },
+      nextStep: "重新執行 diagPredeployAudit()；尚未建立 AP_MEDIA、trigger 或 deployment"
+    };
+    console.log("[AP DD-105 Migration] " + JSON.stringify(receipt));
+    return receipt;
+  } catch (err) {
+    let rollback = writeAttempted ? "NOT_CONFIRMED" : "NOT_NEEDED";
+    if (writeAttempted && headerRange
+        && previousHeaders.join("|") === LEGACY_CATALOG_HEADERS.join("|")) {
+      try {
+        headerRange.setValues([previousHeaders]);
+        SpreadsheetApp.flush();
+        const restored = headerRange.getDisplayValues()[0].map(value => String(value || "").trim());
+        rollback = restored.join("|") === LEGACY_CATALOG_HEADERS.join("|")
+          ? "RESTORED_LEGACY_HEADERS"
+          : "RESTORE_VERIFICATION_FAILED";
+      } catch (rollbackErr) {
+        rollback = "RESTORE_ERROR: " + rollbackErr.message;
+      }
+    }
+    const failure = {
+      version: "AP-GAS-v10.2.2-dd105",
+      ddId: "DD-105",
+      status: "FAILED",
+      mode: "HEADER_ONLY",
+      error: err.message,
+      rollback: rollback,
+      dataRowsTouched: 0
+    };
+    console.error("[AP DD-105 Migration] " + JSON.stringify(failure));
+    throw new Error(`[DD-105] ${err.message}; rollback=${rollback}`);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
  * Read-only and zero-Gemini-cost. Run this before setup/deploy and keep the
  * returned JSON in the Apps Script execution log for Craig's go/no-go review.
  */
@@ -2209,7 +2334,7 @@ function diagPredeployAudit() {
     const headerMatches = header.join("|") === CATALOG_HEADERS.join("|");
     addPreflightCheck_(checks, "catalog.headers", headerMatches ? "PASS" : "FAIL",
       headerMatches ? "Catalog A:M 與凍結契約一致" : `實際：${header.join(" | ")}`,
-      headerMatches ? "" : "停止部署；依 DD-XXX 同步 Sheet、writeToSheet、doGet 與前端後再重跑");
+      headerMatches ? "" : "停止部署；先跑 diagCatalogContractPreview()，僅符合 DD-105 時才執行 applyDd105CatalogHeaderMigration()");
     const lastRow = catalogSheet.getLastRow();
     const rows = lastRow >= 2
       ? catalogSheet.getRange(2, 1, lastRow - 1, CATALOG_HEADERS.length).getDisplayValues()

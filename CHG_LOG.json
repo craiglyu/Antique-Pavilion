@@ -3,6 +3,27 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-08-31T05:44:13Z",
+      "category": "fix",
+      "scope": "antique-gas.dd105-catalog-header-migration",
+      "version_from": "10.2.1",
+      "version_to": "10.2.2",
+      "summary": "依 Craig 核准的 DD-105 加入受控 Catalog header-only migration：只有精確舊標題與新版位置 9/9、舊版位置 0/10 的 high-confidence 證據同時成立時，才將 A1:M1 改為凍結契約；成功與重複執行皆輸出 receipt，驗證失敗則回復舊標題。",
+      "rationale": "線上去內容化 preview 證實 129 筆有效藏品資料已使用新欄位位置，只有第一列仍是舊標題。受控函式將授權限制為單一標題列，拒絕標題或資料訊號漂移，且明確不觸及資料列、AP_MEDIA、Drive、queue、trigger 或 deployment。",
+      "breaking": false,
+      "rollback": "git revert <this commit>；線上尚未執行時不影響 Sheet，若執行後需回復須另經 Craig 核准",
+      "files": [
+        "AGENTS.md",
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "scripts/GAS/DEPLOYMENT.md",
+        "tests/test_antique_gas_preflight.py",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "GAS-DD105-HEADERS"
+      ]
+    },
+    {
       "ts": "2026-08-31T05:24:35Z",
       "category": "feat",
       "scope": "antique-gas.catalog-contract-preview",
