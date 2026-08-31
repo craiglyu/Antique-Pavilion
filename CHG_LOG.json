@@ -3,6 +3,27 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-08-31T01:29:13Z",
+      "category": "fix",
+      "scope": "antique-gas.discord-queue-reliability",
+      "version_from": "10.1",
+      "version_to": "10.2",
+      "summary": "將 Discord job 入隊改為 LockService 保護且 fail-closed，payload 同步持久化至 Script Properties；僅在 Drive／Sheet 寫入前對暫時性錯誤有限重試，寫入開始後或重試耗盡則保留 payload 進 dead-letter，並新增不洩漏 CDN payload 的唯讀 queue health 診斷。",
+      "rationale": "舊 worker 在 dequeue 後只依賴 6 小時 Cache，且任何錯誤都直接標為 done；重疊 trigger 也可能讓無鎖入隊互相覆寫。新版保留可復原 payload，同時以 persistence boundary 禁止可能造成重複藏品的自動重跑，並停用 Discord reset_queue、讓 resetBot 在仍有 queue 資料時拒絕執行。",
+      "breaking": false,
+      "rollback": "git revert <this commit>",
+      "files": [
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "scripts/GAS/DEPLOYMENT.md",
+        "tests/test_antique_gas_preflight.py",
+        "tests/test_antique_gas_queue_reliability.py",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "GAS-QUEUE-SAFETY"
+      ]
+    },
+    {
       "ts": "2026-08-31T01:00:30Z",
       "category": "feat",
       "scope": "antique-gas.predeploy-integrity",

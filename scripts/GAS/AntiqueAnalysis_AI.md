@@ -1,5 +1,5 @@
 /**
- * 🏺 骨董影像編目代理人 v10.0 — Discord 多圖輪詢版
+ * 🏺 骨董影像編目代理人 v10.2 — Discord 多圖耐久佇列版
  *
  * [v9.0] 架構革新：Telegram Webhook 推播 → Discord REST 輪詢
  *  - 移除 doPost，根治 Webhook 超時 / 重送暴風問題
@@ -24,6 +24,8 @@
  * 改走 Gemini Files API，原圖寫入 Drive，媒體寫入 AP_MEDIA，不變更現有 Catalog 13 欄。
  * CHANGE GAS-PREFLIGHT: 部署前以唯讀 audit 驗證 Script Properties、Catalog/AP_MEDIA、
  * Drive、trigger 與多圖一致性；另提供零 Gemini 額度的部署後 canary 與 reconcile plan。
+ * CHANGE GAS-QUEUE-SAFETY: Discord job payload 同步持久化至 Script Properties；入隊統一加鎖，
+ * 寫入前暫時性錯誤最多重試 2 次，寫入開始後一律進 dead-letter，避免重跑造成重複藏品。
  */
 
 // ============================================================
@@ -77,6 +79,13 @@ const STATUS_REJECTED       = "已退件";
 const CATALOG_ALLOWED_STATUSES = Object.freeze([
   STATUS_PUBLISHED, STATUS_PENDING_REVIEW, "已下架", STATUS_REJECTED
 ]);
+const PENDING_JOBS_PROPERTY = "pending_jobs";
+const JOB_PAYLOAD_PREFIX = "job_payload_";
+const JOB_ATTEMPT_PREFIX = "job_attempt_";
+const JOB_DEAD_PREFIX = "job_dead_";
+const JOB_CACHE_SECONDS = 21600;
+const JOB_MAX_ATTEMPTS = 3; // 初次 + 最多 2 次寫入前重試
+const JOB_PAYLOAD_MAX_CHARS = 8000; // Script Property 單值保守上限
 
 // ============================================================
 // ⏰ mainTick：每分鐘計時觸發器的統一入口
@@ -168,8 +177,13 @@ function pollDiscordChannel() {
         sendDiscordMessage(DISCORD_CHANNEL_ID,
           `通訊正常，系統待命中。\n模型路由：${GEMINI_MODEL_ROUTES.map(r => r.model).join(" → ")}`, msg.id);
       } else if (text === "reset_queue") {
-        PropertiesService.getScriptProperties().deleteProperty("pending_jobs");
-        sendDiscordMessage(DISCORD_CHANNEL_ID, "佇列已強制清空，計時觸發持續運行。", msg.id);
+        sendDiscordMessage(DISCORD_CHANNEL_ID,
+          "為避免遺失 durable job，Discord reset_queue 已停用。請在 Apps Script 執行 diagQueueHealth() 後再人工處理。", msg.id);
+      } else if (text === "queue_status") {
+        const health = diagQueueHealth();
+        sendDiscordMessage(DISCORD_CHANNEL_ID,
+          `Queue：pending ${health.pendingCount}｜dead-letter ${health.deadCount}｜orphan payload ${health.orphanPayloadJobIds.length}｜status ${health.status}`,
+          msg.id);
       }
       newLastId = msg.id;
       continue;
@@ -210,14 +224,14 @@ function pollDiscordChannel() {
         size:        Number(attachment.size || 0),
         width:       Number(attachment.width || 0),
         height:      Number(attachment.height || 0),
-        description: String(attachment.description || "")
+        description: String(attachment.description || "").substring(0, 160)
       })),
-      caption:    msg.content || "無描述",
+      caption:    String(msg.content || "無描述").substring(0, 800),
       source:     "discord"
     });
 
-    cache.put("job_" + jobId, jobPayload, 21600);
-    fastEnqueue(jobId);
+    persistJobPayload_(jobId, jobPayload, cache);
+    enqueueJob_(jobId);
     newLastId = msg.id;
     enqueued++;
     console.log(`[Poll] 新任務入隊：${jobId}，圖片 ${imageAttachments.length} 張，caption：${msg.content || "無"}`);
@@ -266,25 +280,210 @@ const res = UrlFetchApp.fetch(url, {
 }
 
 // ============================================================
-// 🚀 fastEnqueue：無鎖快速入隊（與 v8.0 相同，保留）
+// 🧱 v10.2 durable queue helpers
 // ============================================================
-function fastEnqueue(jobId) {
+function parseJobIdList_(raw, propertyName) {
+  let parsed;
   try {
+    parsed = JSON.parse(String(raw || "[]"));
+  } catch (error) {
+    throw new Error(`${propertyName} 不是有效 JSON array；拒絕自動清空`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${propertyName} 不是 JSON array；拒絕自動清空`);
+  }
+  const seen = new Set();
+  return parsed
+    .map(value => String(value || "").trim())
+    .filter(value => {
+      if (!value || seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    });
+}
+
+function persistJobPayload_(jobId, jobPayload, cache) {
+  const payload = String(jobPayload || "");
+  if (!jobId || !payload) throw new Error("Job payload 不完整，拒絕入隊");
+  if (payload.length > JOB_PAYLOAD_MAX_CHARS) {
+    throw new Error(`Job payload ${payload.length} 字元，超過持久化安全上限 ${JOB_PAYLOAD_MAX_CHARS}`);
+  }
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty(JOB_PAYLOAD_PREFIX + jobId, payload);
+  if (!props.getProperty(JOB_ATTEMPT_PREFIX + jobId)) {
+    props.setProperty(JOB_ATTEMPT_PREFIX + jobId, "1");
+  }
+  (cache || CacheService.getScriptCache()).put("job_" + jobId, payload, JOB_CACHE_SECONDS);
+}
+
+function loadJobPayload_(jobId, cache) {
+  const activeCache = cache || CacheService.getScriptCache();
+  const cached = activeCache.get("job_" + jobId);
+  if (cached) return cached;
+  const durable = PropertiesService.getScriptProperties().getProperty(JOB_PAYLOAD_PREFIX + jobId);
+  if (durable) activeCache.put("job_" + jobId, durable, JOB_CACHE_SECONDS);
+  return durable || "";
+}
+
+/** Locked, idempotent enqueue. Corrupt queue data fails closed and is never reset. */
+function enqueueJob_(jobId, attemptNumber) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(5000);
     const props = PropertiesService.getScriptProperties();
-    const raw   = props.getProperty("pending_jobs") || "[]";
-    let   jobs  = [];
-    try { jobs = JSON.parse(raw); } catch (_) { jobs = []; }
-    if (!jobs.includes(jobId)) {
-      jobs.push(jobId);
-      props.setProperty("pending_jobs", JSON.stringify(jobs));
+    const jobs = parseJobIdList_(props.getProperty(PENDING_JOBS_PROPERTY) || "[]", PENDING_JOBS_PROPERTY);
+    if (!jobs.includes(jobId)) jobs.push(jobId);
+    if (Number.isInteger(Number(attemptNumber)) && Number(attemptNumber) >= 1) {
+      props.setProperty(JOB_ATTEMPT_PREFIX + jobId, String(Number(attemptNumber)));
     }
-  } catch (e) {
-    console.error("fastEnqueue 失敗: " + e.message);
+    props.setProperty(PENDING_JOBS_PROPERTY, JSON.stringify(jobs));
+    return true;
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
   }
 }
 
+function getJobAttempt_(jobId) {
+  const raw = PropertiesService.getScriptProperties().getProperty(JOB_ATTEMPT_PREFIX + jobId);
+  const attempt = Math.floor(Number(raw) || 1);
+  return Math.max(1, attempt);
+}
+
+function redactJobError_(value) {
+  return String(value || "未知錯誤")
+    .replace(/https?:\/\/[^\s]+/gi, "[URL_REDACTED]")
+    .substring(0, 500);
+}
+
+function classifyJobFailure_(error) {
+  const message = String(error && error.message ? error.message : error || "未知錯誤");
+  const retryable = /(?:HTTP\s*5\d\d|\b429\b|rate.?limit|quota|timeout|timed out|temporar|unavailable|internal error|service invoked too many times|服務異常|額度限制)/i.test(message);
+  let code = "PERMANENT_OR_UNKNOWN";
+  if (retryable) code = "TRANSIENT";
+  else if (/(?:401|403|未授權|permission|權限|缺少 Script Property|契約不一致)/i.test(message)) code = "AUTH_OR_CONTRACT";
+  else if (/(?:JSON|Unexpected token|格式錯誤|400 Bad Request)/i.test(message)) code = "INVALID_DATA";
+  else if (/(?:Discord 圖片獲取失敗 HTTP 4\d\d|附件|payload)/i.test(message)) code = "SOURCE_UNRECOVERABLE";
+  return { retryable: retryable, code: code, message: redactJobError_(message) };
+}
+
+function decideJobFailureDisposition_(error, attempt, persistenceStarted) {
+  const classification = classifyJobFailure_(error);
+  const currentAttempt = Math.max(1, Math.floor(Number(attempt) || 1));
+  if (!persistenceStarted && classification.retryable && currentAttempt < JOB_MAX_ATTEMPTS) {
+    return {
+      action: "RETRY",
+      nextAttempt: currentAttempt + 1,
+      classification: classification
+    };
+  }
+  return {
+    action: "DEAD_LETTER",
+    nextAttempt: currentAttempt,
+    classification: classification,
+    reason: persistenceStarted ? "PERSISTENCE_MAY_HAVE_STARTED" : "RETRY_NOT_ALLOWED_OR_EXHAUSTED"
+  };
+}
+
+function markJobDone_(jobId, cache, outcome) {
+  const props = PropertiesService.getScriptProperties();
+  props.deleteProperty(JOB_PAYLOAD_PREFIX + jobId);
+  props.deleteProperty(JOB_ATTEMPT_PREFIX + jobId);
+  props.deleteProperty(JOB_DEAD_PREFIX + jobId);
+  try {
+    (cache || CacheService.getScriptCache()).put("done_" + jobId, String(outcome || "done"), JOB_CACHE_SECONDS);
+  } catch (error) {
+    console.warn(`[Queue] done cache 寫入失敗 ${jobId}: ${error.message}`);
+  }
+}
+
+function deadLetterJob_(jobId, attempt, phase, disposition, cache) {
+  const props = PropertiesService.getScriptProperties();
+  const record = {
+    jobId: String(jobId || ""),
+    attempt: Math.max(1, Math.floor(Number(attempt) || 1)),
+    phase: String(phase || "unknown"),
+    code: disposition && disposition.classification ? disposition.classification.code : "UNKNOWN",
+    reason: disposition && disposition.reason ? disposition.reason : "UNKNOWN",
+    error: disposition && disposition.classification
+      ? disposition.classification.message.substring(0, 300)
+      : "未知錯誤",
+    failedAt: new Date().toISOString()
+  };
+  // Payload intentionally remains in Script Properties for manual recovery.
+  try {
+    props.setProperty(JOB_DEAD_PREFIX + jobId, JSON.stringify(record));
+  } catch (error) {
+    console.error(`[Queue] dead-letter record 寫入失敗 ${jobId}: ${error.message}`);
+  }
+  try {
+    (cache || CacheService.getScriptCache()).put("done_" + jobId, "dead", JOB_CACHE_SECONDS);
+  } catch (error) {
+    console.warn(`[Queue] dead cache 寫入失敗 ${jobId}: ${error.message}`);
+  }
+  return record;
+}
+
+function buildQueueHealthReport_(allProperties) {
+  const properties = allProperties || {};
+  const pendingJobs = parseJobIdList_(properties[PENDING_JOBS_PROPERTY] || "[]", PENDING_JOBS_PROPERTY);
+  const payloadJobIds = Object.keys(properties)
+    .filter(key => key.startsWith(JOB_PAYLOAD_PREFIX))
+    .map(key => key.substring(JOB_PAYLOAD_PREFIX.length));
+  const deadJobs = Object.keys(properties)
+    .filter(key => key.startsWith(JOB_DEAD_PREFIX))
+    .map(key => {
+      try {
+        const parsed = JSON.parse(properties[key]);
+        return {
+          jobId: String(parsed.jobId || key.substring(JOB_DEAD_PREFIX.length)),
+          attempt: Math.max(1, Math.floor(Number(parsed.attempt) || 1)),
+          phase: String(parsed.phase || "unknown"),
+          code: String(parsed.code || "UNKNOWN"),
+          reason: String(parsed.reason || "UNKNOWN"),
+          error: redactJobError_(parsed.error || "").substring(0, 300),
+          failedAt: String(parsed.failedAt || "")
+        };
+      } catch (error) {
+        return {
+          jobId: key.substring(JOB_DEAD_PREFIX.length),
+          attempt: 1,
+          phase: "dead_record_parse",
+          code: "INVALID_DEAD_RECORD",
+          reason: "MANUAL_REVIEW_REQUIRED",
+          error: error.message.substring(0, 300),
+          failedAt: ""
+        };
+      }
+    })
+    .sort((a, b) => String(b.failedAt).localeCompare(String(a.failedAt)));
+  const deadIds = new Set(deadJobs.map(item => item.jobId));
+  const pendingIds = new Set(pendingJobs);
+  const payloadIds = new Set(payloadJobIds);
+  const missingPayloadJobIds = pendingJobs.filter(jobId => !payloadIds.has(jobId));
+  const orphanPayloadJobIds = payloadJobIds.filter(jobId => !pendingIds.has(jobId) && !deadIds.has(jobId));
+  return {
+    status: missingPayloadJobIds.length ? "FAIL" : (deadJobs.length || orphanPayloadJobIds.length ? "WARN" : "PASS"),
+    pendingCount: pendingJobs.length,
+    durablePayloadCount: payloadJobIds.length,
+    deadCount: deadJobs.length,
+    missingPayloadJobIds: missingPayloadJobIds,
+    orphanPayloadJobIds: orphanPayloadJobIds,
+    deadJobs: deadJobs.slice(0, 50)
+  };
+}
+
+/** Read-only, zero-network queue/dead-letter diagnostic. Payload contents stay private. */
+function diagQueueHealth() {
+  const properties = PropertiesService.getScriptProperties().getProperties();
+  const report = buildQueueHealthReport_(properties);
+  report.generatedAt = new Date().toISOString();
+  report.mode = "READ_ONLY";
+  console.log("[AP Queue Health] " + JSON.stringify(report));
+  return report;
+}
+
 // ============================================================
-// 🔄 processJobAsync v9.0：消費者 Worker
+// 🔄 processJobAsync v10.2：有限重試 + dead-letter 消費者 Worker
 //    架構與 v8.0 完全相同（Lock → 取件 → 讀 Cache → 處理）
 //    I/O 來源從 Telegram API → Discord CDN URL
 // ============================================================
@@ -297,20 +496,13 @@ function processJobAsync() {
   // ══ Phase 1：帶鎖安全取件（finally 確保 Lock 永遠釋放）══
   try {
     lock.waitLock(5000);
-    const pendingRaw  = props.getProperty("pending_jobs") || "[]";
-    let   pendingJobs = [];
-    try {
-      const parsed = JSON.parse(pendingRaw);
-      if (Array.isArray(parsed)) pendingJobs = parsed;
-    } catch (_) {
-      pendingJobs = [];
-      props.setProperty("pending_jobs", "[]");
-    }
+    const pendingRaw = props.getProperty(PENDING_JOBS_PROPERTY) || "[]";
+    const pendingJobs = parseJobIdList_(pendingRaw, PENDING_JOBS_PROPERTY);
 
     if (pendingJobs.length === 0) return;
 
     jobId = pendingJobs.shift();
-    props.setProperty("pending_jobs", JSON.stringify(pendingJobs));
+    props.setProperty(PENDING_JOBS_PROPERTY, JSON.stringify(pendingJobs));
     console.log(`[Worker] 取出任務 ${jobId}，佇列剩餘 ${pendingJobs.length} 個`);
 
   } catch (lockErr) {
@@ -323,10 +515,14 @@ function processJobAsync() {
   if (!jobId) return;
 
   // ══ Phase 2：讀取 Job Payload ══
-  const jobRaw = cache.get("job_" + jobId);
+  const jobAttempt = getJobAttempt_(jobId);
+  const jobRaw = loadJobPayload_(jobId, cache);
   if (!jobRaw) {
-    logToSheet("9_處理失敗", `JobID: ${jobId}, Cache 過期遺失（超過 6 小時未處理）`, jobId);
-    console.warn("[Worker] 任務 Cache 過期: " + jobId);
+    const error = new Error("Job payload 在 Cache 與 Script Properties 均不存在");
+    const disposition = decideJobFailureDisposition_(error, jobAttempt, false);
+    deadLetterJob_(jobId, jobAttempt, "load_payload", disposition, cache);
+    logToSheet("9_處理失敗", `JobID: ${jobId}, durable payload 遺失，已進 dead-letter`, jobId);
+    console.warn("[Worker] 任務 durable payload 遺失: " + jobId);
     return;
   }
 
@@ -334,7 +530,9 @@ function processJobAsync() {
   try {
     job = JSON.parse(jobRaw);
   } catch (e) {
-    logToSheet("9_處理失敗", `JobID: ${jobId}, JSON 解析失敗: ${e.message}`, jobId);
+    const disposition = decideJobFailureDisposition_(e, jobAttempt, false);
+    deadLetterJob_(jobId, jobAttempt, "parse_payload", disposition, cache);
+    logToSheet("9_處理失敗", `JobID: ${jobId}, JSON 解析失敗，已進 dead-letter: ${e.message}`, jobId);
     return;
   }
 
@@ -345,7 +543,10 @@ function processJobAsync() {
     attachments.push({ id: messageId + "_legacy", url: job.imageUrl, filename: "legacy.jpg" });
   }
   if (attachments.length === 0) {
-    logToSheet("9_處理失敗", `JobID: ${jobId}, 無圖片附件`, jobId);
+    const error = new Error("Job payload 無圖片附件");
+    const disposition = decideJobFailureDisposition_(error, jobAttempt, false);
+    deadLetterJob_(jobId, jobAttempt, "validate_payload", disposition, cache);
+    logToSheet("9_處理失敗", `JobID: ${jobId}, 無圖片附件，已進 dead-letter`, jobId);
     return;
   }
 
@@ -368,6 +569,8 @@ function processJobAsync() {
   logToSheet("6_照片派工", `JobID: ${jobId}, 開始呼叫 Gemini, images: ${attachments.length}`, jobId);
 
   // ══ Phase 5：主編目流程 ══
+  let persistenceStarted = false;
+  let processingPhase = "download_and_analysis";
   try {
     const imageBlobs = attachments.map((attachment, index) => {
       const blob = getDiscordFile(attachment.url || attachment.proxyUrl);
@@ -376,53 +579,56 @@ function processJobAsync() {
     });
     const analysis = analyzeWithGemini(imageBlobs, caption);
 
-    if (!analysis) {
-      sendDiscordMessage(channelId, "AI 分析回傳空值，請稍後重試。", messageId);
-      logToSheet("9_處理失敗", `JobID: ${jobId}, AI 回傳空值`, jobId);
-      cache.put("done_" + jobId, "1", 21600);
-      return;
-    }
+    if (!analysis) throw new Error("Gemini API 服務異常：分析回傳空值");
 
     const category = analysis.isValid ? (analysis.category || "未分類") : "退回件";
     const era      = analysis.isValid ? (analysis.era      || "時代不詳") : "無";
     const artifactUuid = Utilities.getUuid();
+    processingPhase = "drive_and_sheet_persistence";
+    persistenceStarted = true;
     const savedMedia = saveArtifactMedia_(imageBlobs, attachments, category, era, artifactUuid);
     const primaryMedia = savedMedia[0];
     const fileUrl = primaryMedia.driveUrl;
     writeMediaRows_(artifactUuid, savedMedia, analysis.views || [], messageId);
     writeToSheet(caption, analysis, fileUrl, artifactUuid);
 
-    if (!analysis.isValid) {
-      sendDiscordMessage(channelId,
-        `**影像資料待補**\n\n${analysis.rejectionReason || "目前圖片不足以進入編目"}\n\n已保留 ${savedMedia.length} 張原圖，尚未公開。`,
-        messageId
-      );
-    } else {
-      // Discord Embed 格式：比 MarkdownV2 更穩定，不需要逃逸地獄
-      const reportFields = [
-        { name: "分類",              value: analysis.category              || "不詳", inline: true  },
-        { name: "年代初判（待覆核）", value: analysis.era                   || "不詳", inline: true  },
-        { name: "影像觀察",          value: analysis.features              || "不詳", inline: false },
-        { name: "陳設建議",          value: analysis.displayRecommendation || "不詳", inline: false }
-      ];
-      if (analysis.refItem || analysis.refPrice) {
-        const referenceText = [analysis.refItem, analysis.refPrice]
-          .filter(Boolean)
-          .join("｜");
-        reportFields.splice(3, 0, {
-          name: "已提供參考資料",
-          value: referenceText,
-          inline: false
-        });
+    processingPhase = "discord_notification";
+    try {
+      if (!analysis.isValid) {
+        sendDiscordMessage(channelId,
+          `**影像資料待補**\n\n${analysis.rejectionReason || "目前圖片不足以進入編目"}\n\n已保留 ${savedMedia.length} 張原圖，尚未公開。`,
+          messageId
+        );
+      } else {
+        // Discord Embed 格式：比 MarkdownV2 更穩定，不需要逃逸地獄
+        const reportFields = [
+          { name: "分類",              value: analysis.category              || "不詳", inline: true  },
+          { name: "年代初判（待覆核）", value: analysis.era                   || "不詳", inline: true  },
+          { name: "影像觀察",          value: analysis.features              || "不詳", inline: false },
+          { name: "陳設建議",          value: analysis.displayRecommendation || "不詳", inline: false }
+        ];
+        if (analysis.refItem || analysis.refPrice) {
+          const referenceText = [analysis.refItem, analysis.refPrice]
+            .filter(Boolean)
+            .join("｜");
+          reportFields.splice(3, 0, {
+            name: "已提供參考資料",
+            value: referenceText,
+            inline: false
+          });
+        }
+        sendDiscordEmbed(channelId, {
+          title:       `【器物影像編目初稿】${analysis.itemName || "器物"}`,
+          color:       0xB8960C, // 骨董金
+          description: analysis.story || "",
+          fields: reportFields,
+          footer:  { text: `影像初步編目，仍須實物與文件覆核｜已送人工覆核，核准後才公開｜${new Date().toLocaleString("zh-TW")}` },
+          url:     fileUrl
+        }, messageId);
       }
-      sendDiscordEmbed(channelId, {
-        title:       `【器物影像編目初稿】${analysis.itemName || "器物"}`,
-        color:       0xB8960C, // 骨董金
-        description: analysis.story || "",
-        fields: reportFields,
-        footer:  { text: `影像初步編目，仍須實物與文件覆核｜已送人工覆核，核准後才公開｜${new Date().toLocaleString("zh-TW")}` },
-        url:     fileUrl
-      }, messageId);
+    } catch (notifyError) {
+      console.warn(`[Worker] 已完成編目，但 Discord 通知失敗 ${jobId}: ${notifyError.message}`);
+      logToSheet("7_通知失敗", `JobID: ${jobId}, 完成通知失敗: ${notifyError.message}`, jobId);
     }
 
     const receipt = analysis._geminiReceipt || {};
@@ -431,7 +637,7 @@ function processJobAsync() {
       `JobID: ${jobId}, 品名: ${analysis.itemName || "未知"}, images: ${savedMedia.length}, input: ${receipt.inputMode || "unknown"}, model: ${receipt.selectedModel || "unknown"}, fallback: ${receipt.fallbackUsed === true}`,
       jobId
     );
-    cache.put("done_" + jobId, "1", 21600);
+    markJobDone_(jobId, cache, "completed");
 
   } catch (err) {
     const errMsg = err.message || JSON.stringify(err);
@@ -445,15 +651,40 @@ function processJobAsync() {
     else if (errMsg.includes("Discord"))          diagnosis = "Discord API 錯誤";
     else if (errMsg.includes("Unexpected token")) diagnosis = "JSON 解析錯誤（AI 回傳非預期格式）";
 
+    let disposition = decideJobFailureDisposition_(err, jobAttempt, persistenceStarted);
+    if (disposition.action === "RETRY") {
+      try {
+        enqueueJob_(jobId, disposition.nextAttempt);
+        logToSheet(
+          "5_等待重試",
+          `JobID: ${jobId}, attempt ${jobAttempt}/${JOB_MAX_ATTEMPTS}, phase: ${processingPhase}, code: ${disposition.classification.code}, 錯誤: ${errMsg}`,
+          jobId
+        );
+        console.warn(`[Worker] 暫時性錯誤，已排入第 ${disposition.nextAttempt} 次嘗試：${jobId}`);
+        return;
+      } catch (retryError) {
+        disposition = {
+          action: "DEAD_LETTER",
+          nextAttempt: jobAttempt,
+          classification: classifyJobFailure_(retryError),
+          reason: "RETRY_SCHEDULE_FAILED"
+        };
+      }
+    }
+
+    const deadRecord = deadLetterJob_(jobId, jobAttempt, processingPhase, disposition, cache);
     try {
       sendDiscordMessage(channelId,
-        `**編目失敗通知**\n任務 ID：${jobId}\n可能原因：${diagnosis}\n技術細節：${errMsg.substring(0, 300)}`,
+        `**編目失敗，已停止自動重試**\n任務 ID：${jobId}\n可能原因：${diagnosis}\n階段：${processingPhase}\n技術細節：${deadRecord.error}`,
         messageId
       );
     } catch (_) {}
 
-    logToSheet("9_處理失敗", `JobID: ${jobId}, 錯誤: ${errMsg}`, jobId);
-    cache.put("done_" + jobId, "1", 21600);
+    logToSheet(
+      "9_處理失敗",
+      `JobID: ${jobId}, 已進 dead-letter, attempt: ${jobAttempt}, phase: ${processingPhase}, reason: ${deadRecord.reason}, 錯誤: ${deadRecord.error}`,
+      jobId
+    );
   }
 }
 
@@ -1622,7 +1853,7 @@ function diagTestGeminiFallbackCanary() {
 }
 
 // ============================================================
-// 🩺 v10.1 deployment preflight / integrity diagnostics
+// 🩺 v10.2 deployment preflight / integrity diagnostics
 // ============================================================
 function diagnosticIssue_(severity, code, detail, rowNumber, artifactUuid, remediation) {
   return {
@@ -1790,7 +2021,7 @@ function finalizePreflightReport_(checks, integrityIssues) {
   const warnCount = checks.filter(check => check.status === "WARN").length
     + issues.filter(issue => issue.severity === "WARN").length;
   return {
-    version: "AP-GAS-v10.1-preflight",
+    version: "AP-GAS-v10.2-preflight",
     generatedAt: new Date().toISOString(),
     status: failCount === 0 ? "PASS" : "FAIL",
     summary: { fail: failCount, warn: warnCount, checks: checks.length, integrityIssues: issues.length },
@@ -1885,11 +2116,21 @@ function diagPredeployAudit() {
   }
 
   try {
-    const queueRaw = String(props.getProperty("pending_jobs") || "[]");
-    const queue = JSON.parse(queueRaw);
-    if (!Array.isArray(queue)) throw new Error("pending_jobs 不是 JSON array");
-    addPreflightCheck_(checks, "queue.pending_jobs", queue.length > 20 ? "WARN" : "PASS", `待處理 ${queue.length} 筆`,
-      queue.length > 20 ? "先暫停部署並確認 worker 是否持續消費" : "");
+    const queueHealth = buildQueueHealthReport_(props.getProperties());
+    addPreflightCheck_(checks, "queue.pending_jobs", queueHealth.pendingCount > 20 ? "WARN" : "PASS",
+      `待處理 ${queueHealth.pendingCount} 筆；durable payload ${queueHealth.durablePayloadCount} 筆`,
+      queueHealth.pendingCount > 20 ? "先暫停部署並確認 worker 是否持續消費" : "");
+    addPreflightCheck_(checks, "queue.payload_integrity", queueHealth.missingPayloadJobIds.length ? "FAIL" : "PASS",
+      queueHealth.missingPayloadJobIds.length
+        ? `有 ${queueHealth.missingPayloadJobIds.length} 筆 pending job 缺少 durable payload`
+        : "每筆 pending job 都有 durable payload",
+      queueHealth.missingPayloadJobIds.length ? "停止 worker；執行 diagQueueHealth() 後人工處理" : "");
+    addPreflightCheck_(checks, "queue.dead_letter", queueHealth.deadCount ? "WARN" : "PASS",
+      `dead-letter ${queueHealth.deadCount} 筆`,
+      queueHealth.deadCount ? "執行 diagQueueHealth()；不可直接清空或自動重跑" : "");
+    addPreflightCheck_(checks, "queue.orphan_payload", queueHealth.orphanPayloadJobIds.length ? "WARN" : "PASS",
+      `未入隊且未進 dead-letter 的 durable payload ${queueHealth.orphanPayloadJobIds.length} 筆`,
+      queueHealth.orphanPayloadJobIds.length ? "執行 diagQueueHealth() 比對後再決定是否重排" : "");
   } catch (err) {
     addPreflightCheck_(checks, "queue.pending_jobs", "FAIL", err.message, "由 Craig 確認後才可清空損壞佇列");
   }
@@ -2044,29 +2285,28 @@ function setupTrigger() {
 }
 
 // ============================================================
-// 🔁 safeEnqueue：帶鎖安全入隊（保留供手動診斷使用）
+// 🔁 safeEnqueue：受控的 dead-letter 人工重排入口
 // ============================================================
 function safeEnqueue(jobId) {
-  const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(3000);
-    const props      = PropertiesService.getScriptProperties();
-    const pendingRaw = props.getProperty("pending_jobs") || "[]";
-    let   pendingJobs = [];
-    try {
-      const parsed = JSON.parse(pendingRaw);
-      if (Array.isArray(parsed)) pendingJobs = parsed;
-    } catch (_) { pendingJobs = []; }
-    if (!pendingJobs.includes(jobId)) {
-      pendingJobs.push(jobId);
-      props.setProperty("pending_jobs", JSON.stringify(pendingJobs));
+    const props = PropertiesService.getScriptProperties();
+    const payload = props.getProperty(JOB_PAYLOAD_PREFIX + jobId);
+    if (!payload) throw new Error(`找不到 ${jobId} 的 durable payload，拒絕手動入隊`);
+    const pending = parseJobIdList_(props.getProperty(PENDING_JOBS_PROPERTY) || "[]", PENDING_JOBS_PROPERTY);
+    if (pending.includes(jobId)) return true;
+    const deadRaw = props.getProperty(JOB_DEAD_PREFIX + jobId);
+    if (!deadRaw) throw new Error(`${jobId} 不是 pending 或 dead-letter，拒絕重排不明 orphan payload`);
+    const deadRecord = JSON.parse(deadRaw);
+    if (deadRecord.reason === "PERSISTENCE_MAY_HAVE_STARTED") {
+      throw new Error(`${jobId} 可能已部分寫入 Drive/Sheet；必須先人工 reconcile，不可直接重跑`);
     }
+    enqueueJob_(jobId, 1);
+    props.deleteProperty(JOB_DEAD_PREFIX + jobId);
+    try { CacheService.getScriptCache().remove("done_" + jobId); } catch (_) {}
     return true;
   } catch (e) {
     console.error("safeEnqueue 失敗: " + e.message);
     return false;
-  } finally {
-    try { lock.releaseLock(); } catch (_) {}
   }
 }
 
@@ -2075,15 +2315,21 @@ function safeEnqueue(jobId) {
 // ============================================================
 
 /**
- * 完整重置：清空佇列 + 重置 Discord lastId + 重建 Trigger
- * 在 GAS 編輯器手動執行一次即可啟動系統
+ * 安全重置：僅在 queue / durable payload / dead-letter 全空時，
+ * 重置 Discord lastId 並重建 Trigger；有資料時 fail closed。
  */
 function resetBot() {
   const props = PropertiesService.getScriptProperties();
-  props.deleteProperty("pending_jobs");
+  const health = buildQueueHealthReport_(props.getProperties());
+  if (health.pendingCount || health.durablePayloadCount || health.deadCount) {
+    throw new Error(
+      `Queue 尚有資料，拒絕 resetBot：pending=${health.pendingCount}, payload=${health.durablePayloadCount}, dead=${health.deadCount}`
+    );
+  }
+  props.deleteProperty(PENDING_JOBS_PROPERTY);
   props.deleteProperty("discord_last_message_id");
   setupTrigger();
-  console.log("✅ resetBot 完成：佇列清空、Discord lastId 重置、mainTick Trigger 重建");
+  console.log("✅ resetBot 完成：確認空佇列、Discord lastId 重置、mainTick Trigger 重建");
   console.log("   系統將在下一個整分鐘自動開始輪詢 Discord Channel");
 }
 

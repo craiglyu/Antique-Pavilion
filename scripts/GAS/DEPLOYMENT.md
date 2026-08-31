@@ -1,6 +1,7 @@
-<!-- CHANGE GAS-PREFLIGHT: AP GAS v10.1 deployment gate and zero-cost canary runbook. -->
+<!-- CHANGE GAS-PREFLIGHT: AP GAS deployment gate and zero-cost canary runbook. -->
+<!-- CHANGE GAS-QUEUE-SAFETY: v10.2 locked queue, durable payload, retry and dead-letter runbook. -->
 
-# AP GAS v10.1 部署與驗收手冊
+# AP GAS v10.2 部署與驗收手冊
 
 這份手冊適用於 `AntiqueAnalysis_AI.md` 主資料管線與 `review_desk/` 人工覆核台。
 所有診斷預設唯讀；本地提交不代表線上已部署。
@@ -17,7 +18,7 @@
 4. 原則上只有 `status: PASS` 才繼續。首次升級若唯一的 `FAIL` 是 `media.sheet` 找不到
    `AP_MEDIA`，而 Catalog、Drive、Properties 與 queue 均通過，可進入下一步由受控 setup 建立；
    其餘 `FAIL` 必須先處理。Trigger 缺少或重複是 `WARN`，也由下一步重建。
-5. 首次升級到 v10.1、缺少 `AP_MEDIA`，或 trigger 不健康時，執行 `setupAntiquePipeline()`。
+5. 首次升級到 v10.2、缺少 `AP_MEDIA`，或 trigger 不健康時，執行 `setupAntiquePipeline()`。
    它只會在缺少時建立 `AP_MEDIA`、驗證凍結契約，再重建唯一的每分鐘 `mainTick` trigger。
 6. 再跑一次 `diagPredeployAudit()`，確認 `mainTick=1`、legacy `processJobAsync=0`。
 
@@ -33,6 +34,21 @@
 - `queue.pending_jobs` 無法解析：不要直接清空，先保存 Script Property 原始值並查明原因。
 
 `diagMediaReconcilePlan()` 只產生 `READ_ONLY_PLAN`，不修資料、不刪 Drive 檔案、不改分享權限。
+
+## v10.2 Queue 升級注意事項
+
+- 貼新版程式前，先讓舊版 `pending_jobs` 消費至 0。舊 job payload 只有 Cache，無法安全枚舉並
+  自動搬入 Script Properties；若 preflight 顯示 pending job 缺少 durable payload，停止部署。
+- 新訊息的 job payload 同時放入 6 小時 Cache 與 Script Properties；成功完成後才清除 durable copy。
+- 只有在 Drive／Sheet 寫入尚未開始前，429、HTTP 5xx、timeout 等暫時性錯誤才會自動重試，
+  最多共 3 次。寫入開始後不自動重跑，以免建立重複藏品或圖片。
+- 無法安全重試的任務會寫入 `job_dead_<jobId>`；payload 保留供人工復原。執行
+  `diagQueueHealth()` 可查看 pending／dead-letter／orphan 數量與錯誤摘要，不會輸出 CDN URL 或 payload。
+- 只有確認失敗發生在寫入前，才可從 Apps Script 手動執行 `safeEnqueue("<jobId>")`；它會重新從
+  attempt 1 排入。標為 `PERSISTENCE_MAY_HAVE_STARTED` 或來源不明的 orphan payload 會拒絕重跑，
+  必須先用 Catalog／AP_MEDIA reconcile 檢查是否已有部分資料。
+- Discord `queue_status` 可讀取計數；`reset_queue` 已停用。`resetBot()` 只有在 pending、payload、
+  dead-letter 全部為 0 時才允許執行。
 
 ## 部署後：零 Gemini 額度 canary
 

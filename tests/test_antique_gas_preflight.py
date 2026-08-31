@@ -160,7 +160,10 @@ const spreadsheet = {
 };
 const context = {
   console: {log() {}, warn() {}, error() {}},
-  PropertiesService: {getScriptProperties() { return {getProperty(key) { return secrets[key] || ''; }}}},
+  PropertiesService: {getScriptProperties() { return {
+    getProperty(key) { return secrets[key] || ''; },
+    getProperties() { return Object.assign({}, secrets); }
+  }}},
   DriveApp: {getFolderById() { return {getName() { return 'AP Root'; }}; }},
   SpreadsheetApp: {openById() { return spreadsheet; }},
   ScriptApp: {getProjectTriggers() { return [{getHandlerFunction() { return 'mainTick'; }}]; }}
