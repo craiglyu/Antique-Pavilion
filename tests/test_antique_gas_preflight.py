@@ -1,4 +1,4 @@
-"""No-network tests for the AP GAS v10.2.2 deployment and migration gates.
+"""No-network tests for the AP GAS v10.3 deployment and migration gates.
 
 CHANGE GAS-PREFLIGHT: verify read-only diagnostics, secret redaction, Catalog / AP_MEDIA
 integrity rules, and the zero-Gemini postdeploy canary contract.
@@ -6,6 +6,8 @@ CHANGE GAS-CATALOG-PREVIEW: verify the redacted Catalog layout classifier distin
 stale headers from genuinely legacy-positioned rows without returning cell contents.
 CHANGE GAS-DD105-HEADERS: verify the Craig-approved migration only writes A1:M1,
 is idempotent, rejects drift, and restores the legacy header after failed verification.
+CHANGE GAS-LOCAL-BRIDGE: verify GAS has no Discord egress/trigger requirement and the
+local bridge secret is a fail-closed deployment prerequisite.
 """
 
 from __future__ import annotations
@@ -54,6 +56,8 @@ process.stdout.write(JSON.stringify({ok: true}));
     assert "function diagCatalogContractPreview()" in gas
     assert "function applyDd105CatalogHeaderMigration()" in gas
     assert "function diagMediaReconcilePlan()" in gas
+    assert "function diagBridgeReconcilePlan()" in gas
+    assert '"bridge.partial_write"' in gas
     assert "function diagPostdeployCanary()" in gas
     assert "geminiCalls: 0" in gas
     assert "ScriptApp.getService()" in gas
@@ -70,6 +74,10 @@ process.stdout.write(JSON.stringify({ok: true}));
     assert "CHANGE GAS-DD105-HEADERS" in runbook
     assert "CHANGE GAS-DD105-HEADERS" in agents
     assert "DD-105 — Catalog 標題契約正規化" in agents
+    assert "CHANGE GAS-LOCAL-BRIDGE" in gas
+    assert "CHANGE GAS-LOCAL-BRIDGE" in runbook
+    assert "CHANGE GAS-LOCAL-BRIDGE" in agents
+    assert "DD-106 — Local Discord Intake Bridge" in agents
 
 
 def test_catalog_and_media_integrity_rules_without_network():
@@ -148,7 +156,7 @@ const source = fs.readFileSync(process.argv[1], 'utf8');
 const secrets = {
   DISCORD_BOT_TOKEN: 'discord-super-secret',
   GEMINI_API_KEY: 'gemini-super-secret',
-  AP_INGEST_SECRET: 'ingest-super-secret',
+  AP_INGEST_SECRET: 'ingest-super-secret-32-chars',
   pending_jobs: '[]'
 };
 const catalogHeaders = ['UUID','入庫時間','用戶描述','品名','分類','年代','故事','拍賣參考品','參考價格','Drive URL','標籤','狀態','展示建議'];
@@ -180,7 +188,7 @@ const context = {
   }}},
   DriveApp: {getFolderById() { return {getName() { return 'AP Root'; }}; }},
   SpreadsheetApp: {openById() { return spreadsheet; }},
-  ScriptApp: {getProjectTriggers() { return [{getHandlerFunction() { return 'mainTick'; }}]; }}
+  ScriptApp: {getProjectTriggers() { return []; }}
 };
 vm.createContext(context);
 vm.runInContext(source, context);
@@ -413,10 +421,13 @@ process.stdout.write(JSON.stringify({ok: true, writes: writes.length}));
 def test_diagnostics_are_structurally_read_only():
     gas = GAS_SOURCE.read_text(encoding="utf-8")
     preflight = gas.split("function diagPredeployAudit()", 1)[1].split(
-        "/** Controlled setup.", 1
+        "/** Controlled local-bridge setup.", 1
     )[0]
     reconcile = gas.split("function diagMediaReconcilePlan()", 1)[1].split(
-        "function discordReadOnlyCanary_()", 1
+        "/** Read-only plan for durable local-bridge", 1
+    )[0]
+    bridge_reconcile = gas.split("function diagBridgeReconcilePlan()", 1)[1].split(
+        "/** Zero Gemini cost.", 1
     )[0]
     catalog_preview = gas.split("function diagCatalogContractPreview()", 1)[1].split(
         "/**\n * DD-105", 1
@@ -426,6 +437,9 @@ def test_diagnostics_are_structurally_read_only():
     )[0]
     assert "ScriptApp.getService()" in postdeploy
     assert "UrlFetchApp.fetch(serviceUrl" in postdeploy
+    assert "discordReadOnlyCanary_" not in postdeploy
+    assert "post.discord.bot" not in postdeploy
+    assert 'gasEgressCalls: 0' in postdeploy
     assert "doGet({" not in postdeploy
     forbidden_mutations = (
         ".setValues(",
@@ -436,6 +450,6 @@ def test_diagnostics_are_structurally_read_only():
         "setupTrigger(",
         "fetchGeminiWithFallback_(",
     )
-    for function_source in (catalog_preview, preflight, reconcile, postdeploy):
+    for function_source in (catalog_preview, preflight, reconcile, bridge_reconcile, postdeploy):
         for forbidden in forbidden_mutations:
             assert forbidden not in function_source

@@ -1,0 +1,5 @@
+# CHANGE GAS-LOCAL-BRIDGE: minimal local Discord Intake runtime dependencies.
+aiohttp>=3.9,<4
+discord.py>=2.3,<3
+Pillow>=10,<13
+pytz>=2024.1

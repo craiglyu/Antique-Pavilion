@@ -1,0 +1,5 @@
+# CHANGE GAS-LOCAL-BRIDGE: placeholders only; copy values into gitignored .env.antique.
+DISCORD_BOT_TOKEN=replace-with-raw-discord-token
+AP_GAS_DOPOST_URL=https://script.google.com/macros/s/replace-with-deployment-id/exec
+AP_INGEST_SECRET=replace-with-a-random-secret-of-at-least-24-characters
+AP_ENTERPRISE_SSL_BYPASS=0

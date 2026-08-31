@@ -3,6 +3,32 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-08-31T07:17:26Z",
+      "category": "fix",
+      "scope": "antique-intake.local-discord-gas-bridge",
+      "version_from": "10.2.2",
+      "version_to": "10.3.0",
+      "summary": "依 Discord 實測 40333 與 Craig 核准的 DD-106，將藏品 Intake 固定改為本地 Python Gateway：同訊息 1–8 圖先在本地壓縮，再以 secret-protected GAS doPost 統一執行 Gemini fallback、私人 Drive 歸檔、Catalog 與 AP_MEDIA 寫入；GAS 停用 Discord egress 與 polling trigger。",
+      "rationale": "Discord token 已驗證可用，但 GAS 對 bot identity 回傳 200、對 channel/messages 回傳 Cloudflare 40333，證實問題是 GAS 出站來源而非 token。新版以 Discord messageId 做冪等鍵、對可能半寫入保留 durable marker 並 fail closed，同時限制 transport retry、JSON 與壓縮影像預算，避免 timeout 重送產生重複藏品。",
+      "breaking": true,
+      "rollback": "停止本地 Intake Bot 並切回上一個 GAS deployment；不得重新啟用 GAS Discord polling，既有 partial marker 先以 diagBridgeReconcilePlan() 人工核對",
+      "files": [
+        "AGENTS.md",
+        "ap_discord_bot.py",
+        "config/ap_intake_env.example",
+        "requirements-ap-intake.txt",
+        "scripts/ap_intake_bridge.py",
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "scripts/GAS/DEPLOYMENT.md",
+        "tests/test_ap_intake_bridge.py",
+        "tests/test_antique_gas_preflight.py",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "GAS-LOCAL-BRIDGE"
+      ]
+    },
+    {
       "ts": "2026-08-31T05:44:13Z",
       "category": "fix",
       "scope": "antique-gas.dd105-catalog-header-migration",

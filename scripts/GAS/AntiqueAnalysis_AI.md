@@ -1,22 +1,12 @@
 /**
- * 🏺 骨董影像編目代理人 v10.2.2 — Discord 多圖耐久佇列版
+ * 🏺 骨董影像編目代理人 v10.3 — Local Discord Bridge 多圖版
  *
- * [v9.0] 架構革新：Telegram Webhook 推播 → Discord REST 輪詢
- *  - 移除 doPost，根治 Webhook 超時 / 重送暴風問題
- *  - GAS 每分鐘主動 GET Discord 新訊息，零超時壓力
- *  - 保留全部 Job Queue / LockService / CacheService 防彈機制
- *  - Discord Embed 格式化報告（比 MarkdownV2 更穩定優雅）
- *  - 直接讀取 Discord CDN 附件 URL，無需 getFile 二次 API
- *
- * 主要函式異動對照：
- *  doPost()                  → 已移除
- *  getTelegramFile()         → getDiscordFile(url)
- *  sendMessage()             → sendDiscordMessage(channelId, content, replyId?)
- *  sendMarkdownV2Message()   → sendDiscordEmbed(channelId, embed, replyId?)
- *  escapeTelegramMarkdownV2  → 已移除
- *  [新增] pollDiscordChannel()   每分鐘收件，取代 doPost 角色
- *  [新增] fetchDiscordMessages() Discord REST API 封裝
- *  [新增] mainTick()             輪詢 + 消費 Worker 統一入口
+ * [v10.3] 架構修正：Discord Gateway 留在本地 Python，GAS 僅處理受保護的 doPost。
+ *  - 本地 Intake Bot 負責 Discord 收件、圖片下載／壓縮與 Discord 回覆
+ *  - GAS 負責 Gemini fallback、私人 Drive 歸檔、Catalog 與 AP_MEDIA 寫入
+ *  - source messageId 是冪等鍵；半寫入狀態 fail closed，必須人工 reconcile
+ *  - GAS 不建立輪詢 trigger，也禁止直接呼叫 Discord REST/CDN
+ *  - 舊 polling / queue 函式只保留為歷史相容碼，所有出站入口都有禁用 gate
  *
  * CHANGE GAS-GEMINI-FALLBACK: Gemini 3.7 → 3.6 → 3.5 → 3.5 Flash-Lite，含短暫錯誤重試、
  * 模型 cooldown 與可觀測 receipt。
@@ -30,13 +20,17 @@
  * 舊資料位置或證據不足三種狀態，供 DD 遷移決策使用。
  * CHANGE GAS-DD105-HEADERS: Craig 核准的 DD-105 受控 header-only migration；僅在舊標題
  * 與新版位置證據完全吻合時寫入 A1:M1，驗證失敗即回復舊標題。
+ * CHANGE GAS-LOCAL-BRIDGE: Discord 40333 已證實 GAS 出站被 Cloudflare 封鎖；Discord I/O
+ * 固定留在本地 Python，GAS doPost 以 AP_INGEST_SECRET、messageId 冪等與 partial-write gate
+ * 繼續集中處理 Gemini、Drive、Catalog 與 AP_MEDIA。
  */
 
 // ============================================================
 // 🔑 私鑰與設定
 // ============================================================
 // 憑證只放 Apps Script「專案設定 → 指令碼屬性」，不可再寫入原始碼或 Git：
-//   DISCORD_BOT_TOKEN / GEMINI_API_KEY / AP_INGEST_SECRET（僅舊 doPost 相容入口）
+//   GEMINI_API_KEY / AP_INGEST_SECRET（本地 Intake Bridge 必填）
+// DISCORD_BOT_TOKEN 僅留給舊版診斷相容；v10.3 GAS 不讀取其值發送 Discord 請求。
 const DISCORD_BOT_TOKEN  = String(PropertiesService.getScriptProperties().getProperty("DISCORD_BOT_TOKEN") || "");
 const DISCORD_CHANNEL_ID = "1495279823009087551";           // 右鍵頻道 → Copy Channel ID（需開啟開發者模式）
 const GEMINI_KEY         = String(PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY") || "");
@@ -55,6 +49,7 @@ const GEMINI_MODEL_ROUTES = Object.freeze([
 ]);
 const GEMINI_TRANSIENT_RETRIES = 1; // 首次 + 1 次短重試，再換下一模型
 const DISCORD_API        = "https://discord.com/api/v10";
+const DISCORD_IO_MODE    = "local_bridge";
 const MAX_IMAGES_PER_ARTIFACT = 8;
 const INLINE_BINARY_BUDGET_BYTES = 12 * 1024 * 1024;
 const MEDIA_SHEET_NAME = "AP_MEDIA";
@@ -94,26 +89,16 @@ const JOB_DEAD_PREFIX = "job_dead_";
 const JOB_CACHE_SECONDS = 21600;
 const JOB_MAX_ATTEMPTS = 3; // 初次 + 最多 2 次寫入前重試
 const JOB_PAYLOAD_MAX_CHARS = 8000; // Script Property 單值保守上限
+const BRIDGE_INFLIGHT_PREFIX = "bridge_inflight_";
+const BRIDGE_PARTIAL_PREFIX = "bridge_partial_";
+const BRIDGE_INFLIGHT_SECONDS = 600;
 
 // ============================================================
-// ⏰ mainTick：每分鐘計時觸發器的統一入口
-//    Step 1: pollDiscordChannel() — 收新圖片任務進 Queue
-//    Step 2: processJobAsync()    — 消費 Queue 處理一筆影像編目
-//
-//    設計原理：兩步驟有先後順序，同一個 Tick 裡先收後處理，
-//    確保新進任務最快在下一個 Tick 被處理（最長延遲 = 1 分鐘）。
+// ⛔ v10.3：Discord polling 已停用。
+// 舊函式保留供歷史比對，但 mainTick 與所有 Discord egress 入口 fail closed。
 // ============================================================
 function mainTick() {
-  try {
-    pollDiscordChannel();
-  } catch (e) {
-    console.error("[mainTick] pollDiscordChannel 失敗: " + e.message);
-  }
-  try {
-    processJobAsync();
-  } catch (e) {
-    console.error("[mainTick] processJobAsync 失敗: " + e.message);
-  }
+  throw new Error("Discord 40333：AP 已切換 local_bridge；mainTick 不得建立或執行");
 }
 
 // ============================================================
@@ -259,6 +244,7 @@ function pollDiscordChannel() {
 //    - afterId 為 Snowflake → 取其後升序 N 筆
 // ============================================================
 function fetchDiscordMessages(afterId, limit) {
+  assertDiscordEgressDisabled_();
   let url = `${DISCORD_API}/channels/${DISCORD_CHANNEL_ID}/messages?limit=${limit}`;
   if (afterId && afterId !== "0" && afterId !== "1") {
     url += `&after=${afterId}`;
@@ -704,6 +690,7 @@ function processJobAsync() {
  * 發送純文字訊息，可帶 Reply
  */
 function sendDiscordMessage(channelId, content, replyToMessageId) {
+  assertDiscordEgressDisabled_();
   const payload = {
     content: String(content).substring(0, 2000)
   };
@@ -729,6 +716,7 @@ function sendDiscordMessage(channelId, content, replyToMessageId) {
  * { title, description, color(hex int), fields:[{name,value,inline}], footer:{text}, url }
  */
 function sendDiscordEmbed(channelId, embed, replyToMessageId) {
+  assertDiscordEgressDisabled_();
   const payload = { embeds: [embed] };
   if (replyToMessageId) {
     payload.message_reference = { message_id: replyToMessageId };
@@ -758,6 +746,7 @@ function sendDiscordEmbed(channelId, embed, replyToMessageId) {
 //    無需像 Telegram 的 getFile + 二次 fetch 兩步驟
 // ============================================================
 function getDiscordFile(imageUrl) {
+  assertDiscordEgressDisabled_();
   // Discord CDN URL 通常含 ex= 過期參數，建議在訊息收到後儘早處理
   const res = UrlFetchApp.fetch(imageUrl, { muteHttpExceptions: true });
   const httpCode = res.getResponseCode();
@@ -770,6 +759,12 @@ function getDiscordFile(imageUrl) {
     blob.setContentType("image/jpeg");
   }
   return blob;
+}
+
+function assertDiscordEgressDisabled_() {
+  if (DISCORD_IO_MODE === "local_bridge") {
+    throw new Error("Discord 40333：v10.3 禁止 GAS 直接存取 Discord；請啟動本地 ap_discord_bot.py");
+  }
 }
 
 function safeDriveFileName_(value) {
@@ -929,89 +924,218 @@ function logToSheet(event, detail, jobId) {
 }
 
 // ============================================================
-// 📨 doPost：接收 Python Bot 的影像編目請求
-//    Legacy client → POST {ingestSecret, images:[...], caption, messageId} → GAS
-//    GAS → Gemini 編目 → Drive/Sheets 寫入 → 回傳 JSON 給 Python
+// 📨 doPost：本地 Intake Bridge 的唯一 GAS 入口
+//    POST {ingestSecret, images:[...], caption, messageId} → GAS
+//    messageId 是冪等鍵；任何可能的半寫入都 fail closed，不自動重跑。
 // ============================================================
+function bridgeJsonResponse_(payload) {
+  return ContentService
+    .createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function bridgeError_(message, code, retrySafe) {
+  const err = new Error(message);
+  err.bridgeCode = code || "BRIDGE_ERROR";
+  err.retrySafe = retrySafe === true;
+  return err;
+}
+
+/**
+ * Rebuild the minimum safe response for a source message already committed to
+ * both AP_MEDIA and Catalog.  No Gemini call and no write occurs on replay.
+ */
+function findExistingBridgeArtifact_(spreadsheet, sourceMessageId) {
+  const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
+  if (!mediaSheet || mediaSheet.getLastRow() < 2) return null;
+  const mediaRows = mediaSheet
+    .getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length)
+    .getValues();
+  const matched = mediaRows.filter(row => String(row[9] || "") === String(sourceMessageId));
+  if (!matched.length) return null;
+
+  const artifactUuids = Array.from(new Set(matched.map(row => String(row[0] || "")).filter(Boolean)));
+  if (artifactUuids.length !== 1) {
+    throw bridgeError_(
+      `messageId ${sourceMessageId} 對應 ${artifactUuids.length} 個 artifactUuid，必須人工 reconcile`,
+      "IDEMPOTENCY_CONFLICT",
+      false
+    );
+  }
+  const artifactUuid = artifactUuids[0];
+  const catalogSheet = spreadsheet.getSheets()[0];
+  const catalogRows = catalogSheet.getLastRow() >= 2
+    ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+    : [];
+  const catalogRow = catalogRows.find(row => String(row[0] || "") === artifactUuid);
+  if (!catalogRow) {
+    throw bridgeError_(
+      `messageId ${sourceMessageId} 已有 AP_MEDIA，但 Catalog 缺少 ${artifactUuid}；必須人工 reconcile`,
+      "PARTIAL_INGEST_REQUIRES_RECONCILE",
+      false
+    );
+  }
+  const primary = matched.find(row => row[6] === true || String(row[6]).toLowerCase() === "true") || matched[0];
+  const status = String(catalogRow[11] || "");
+  return {
+    success: true,
+    duplicate: true,
+    messageId: String(sourceMessageId),
+    artifactUuid: artifactUuid,
+    imageCount: matched.length,
+    fileUrl: String(primary[3] || ""),
+    analysis: {
+      isValid: status !== STATUS_REJECTED,
+      itemName: String(catalogRow[3] || ""),
+      category: String(catalogRow[4] || ""),
+      era: String(catalogRow[5] || ""),
+      story: String(catalogRow[6] || ""),
+      refItem: String(catalogRow[7] || ""),
+      refPrice: String(catalogRow[8] || ""),
+      tags: String(catalogRow[10] || ""),
+      displayRecommendation: String(catalogRow[12] || ""),
+      features: "相同 Discord 訊息已完成編目；本次直接回傳既有紀錄。",
+      rejectionReason: status === STATUS_REJECTED ? "既有紀錄已標記為退件。" : ""
+    }
+  };
+}
+
 function doPost(e) {
+  let messageId = "";
+  let requestAccepted = false;
+  let persistenceStarted = false;
+  let inflightKey = "";
+  let partialKey = "";
+  const props = PropertiesService.getScriptProperties();
+  const cache = CacheService.getScriptCache();
   try {
     if (!e || !e.postData || !e.postData.contents) {
-      throw new Error("缺少 POST JSON payload");
+      throw bridgeError_("缺少 POST JSON payload", "INVALID_REQUEST", false);
     }
-    const data      = JSON.parse(e.postData.contents);
+    const data = JSON.parse(e.postData.contents);
     if (!AP_INGEST_SECRET || String(data.ingestSecret || "") !== AP_INGEST_SECRET) {
-      throw new Error("未授權的影像編目請求");
+      throw bridgeError_("未授權的影像編目請求", "UNAUTHORIZED", false);
     }
+    messageId = cleanAnalysisText_(data.messageId, 100, false);
+    if (!/^\d{10,30}$/.test(messageId)) {
+      throw bridgeError_("缺少有效 Discord messageId，拒絕無冪等鍵的請求", "INVALID_MESSAGE_ID", false);
+    }
+    requestAccepted = true;
+    inflightKey = BRIDGE_INFLIGHT_PREFIX + messageId;
+    partialKey = BRIDGE_PARTIAL_PREFIX + messageId;
+
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+      const existing = findExistingBridgeArtifact_(spreadsheet, messageId);
+      if (existing) {
+        cache.remove(inflightKey);
+        props.deleteProperty(partialKey);
+        return bridgeJsonResponse_(existing);
+      }
+      const partialRecord = props.getProperty(partialKey);
+      if (partialRecord) {
+        throw bridgeError_(
+          `messageId ${messageId} 曾進入寫入階段；執行 diagBridgeReconcilePlan() 後再處理`,
+          "PARTIAL_INGEST_REQUIRES_RECONCILE",
+          false
+        );
+      }
+      if (cache.get(inflightKey)) {
+        return bridgeJsonResponse_({
+          success: false,
+          code: "INGEST_IN_PROGRESS",
+          retrySafe: true,
+          messageId: messageId,
+          error: "相同 messageId 正在處理中；稍後以同一請求重查"
+        });
+      }
+      cache.put(inflightKey, new Date().toISOString(), BRIDGE_INFLIGHT_SECONDS);
+    } finally {
+      lock.releaseLock();
+    }
+
     const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
-    const caption   = cleanAnalysisText_(data.caption, 800, false) || "無描述";
-    const messageId = cleanAnalysisText_(data.messageId, 100, false);
+    const caption = cleanAnalysisText_(data.caption, 800, false) || "無描述";
     const suppliedImages = Array.isArray(data.images) && data.images.length
       ? data.images
       : [{ imageBase64: data.imageBase64, mimeType: data.mimeType, filename: data.filename }];
-    if (suppliedImages.length > MAX_IMAGES_PER_ARTIFACT) {
-      throw new Error(`同一藏品最多 ${MAX_IMAGES_PER_ARTIFACT} 張圖片`);
+    if (!suppliedImages.length || suppliedImages.length > MAX_IMAGES_PER_ARTIFACT) {
+      throw bridgeError_(
+        `同一藏品圖片數須為 1–${MAX_IMAGES_PER_ARTIFACT}`,
+        "INVALID_IMAGE_COUNT",
+        false
+      );
     }
 
     const totalBase64Length = suppliedImages.reduce((sum, image) => {
       const encoded = image && image.imageBase64;
-      if (typeof encoded !== "string" || encoded.length < 100) return sum;
-      return sum + encoded.length;
+      return sum + (typeof encoded === "string" ? encoded.length : 0);
     }, 0);
-    // Reject before decoding so an oversized legacy request cannot force GAS
-    // to allocate every image in memory first.
     if (totalBase64Length > 28000000) {
-      throw new Error("多圖 POST payload 超過 20 MB 安全上限；請改用 Discord 上傳");
+      throw bridgeError_("多圖 POST payload 超過安全上限；請減少圖片或降低解析度", "PAYLOAD_TOO_LARGE", false);
     }
     const attachments = [];
     const blobs = suppliedImages.map((image, index) => {
       const imgB64 = image && image.imageBase64;
       if (typeof imgB64 !== "string" || imgB64.length < 100) {
-        throw new Error(`第 ${index + 1} 張缺少有效的 imageBase64`);
+        throw bridgeError_(`第 ${index + 1} 張缺少有效的 imageBase64`, "INVALID_IMAGE", false);
       }
       const requestedMime = String(image.mimeType || "image/jpeg").toLowerCase();
-      const mimeType = allowedMimeTypes.includes(requestedMime) ? requestedMime : "image/jpeg";
-      const filename = safeDriveFileName_(image.filename || `Antique_${Date.now()}_${index + 1}${extensionForMime_(mimeType)}`);
+      if (!allowedMimeTypes.includes(requestedMime)) {
+        throw bridgeError_(`第 ${index + 1} 張 MIME type 不支援`, "INVALID_MIME_TYPE", false);
+      }
+      const filename = safeDriveFileName_(image.filename || `Antique_${Date.now()}_${index + 1}${extensionForMime_(requestedMime)}`);
       attachments.push({
         id: cleanAnalysisText_(image.attachmentId, 100, false),
         filename: filename,
-        contentType: mimeType
+        contentType: requestedMime
       });
-      return Utilities.newBlob(Utilities.base64Decode(imgB64), mimeType, filename);
+      return Utilities.newBlob(Utilities.base64Decode(imgB64), requestedMime, filename);
     });
-    // Public POST remains a compatibility path. Limit the complete JSON body;
-    // Discord polling does not pay the base64 transport overhead.
-    // Gemini 影像編目
-    const analysis = analyzeWithGemini(blobs, caption);
-    if (!analysis) {
-      return ContentService
-        .createTextOutput(JSON.stringify({ success: false, error: "Gemini 回傳空值" }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
 
-    // Drive 歸檔 + Sheets 寫入
+    const analysis = analyzeWithGemini(blobs, caption);
+    if (!analysis) throw bridgeError_("Gemini 回傳空值", "GEMINI_EMPTY", true);
+
     const category = analysis.isValid ? (analysis.category || "未分類") : "退回件";
-    const era      = analysis.isValid ? (analysis.era      || "時代不詳") : "無";
+    const era = analysis.isValid ? (analysis.era || "時代不詳") : "無";
     const artifactUuid = Utilities.getUuid();
+    props.setProperty(partialKey, JSON.stringify({
+      messageId: messageId,
+      artifactUuid: artifactUuid,
+      phase: "PERSISTENCE_STARTED",
+      startedAt: new Date().toISOString()
+    }));
+    persistenceStarted = true;
     const savedMedia = saveArtifactMedia_(blobs, attachments, category, era, artifactUuid);
     const fileUrl = savedMedia[0].driveUrl;
     writeMediaRows_(artifactUuid, savedMedia, analysis.views || [], messageId);
     writeToSheet(caption, analysis, fileUrl, artifactUuid);
+    props.deleteProperty(partialKey);
+    cache.remove(inflightKey);
 
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        success:   true,
-        analysis:  analysis,
-        fileUrl:   fileUrl,
-        messageId: messageId,
-        artifactUuid: artifactUuid,
-        imageCount: savedMedia.length
-      }))
-      .setMimeType(ContentService.MimeType.JSON);
-
+    return bridgeJsonResponse_({
+      success: true,
+      duplicate: false,
+      analysis: analysis,
+      fileUrl: fileUrl,
+      messageId: messageId,
+      artifactUuid: artifactUuid,
+      imageCount: savedMedia.length
+    });
   } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, error: err.message }))
-      .setMimeType(ContentService.MimeType.JSON);
+    if (inflightKey && !persistenceStarted) cache.remove(inflightKey);
+    const code = String(err.bridgeCode || "BRIDGE_ERROR");
+    const retrySafe = requestAccepted && !persistenceStarted && err.retrySafe === true;
+    console.error(`[AP Bridge] ${code} messageId=${messageId || "n/a"}: ${err.message}`);
+    return bridgeJsonResponse_({
+      success: false,
+      code: code,
+      retrySafe: retrySafe,
+      messageId: messageId,
+      error: err.message
+    });
   }
 }
 
@@ -2029,7 +2153,7 @@ function finalizePreflightReport_(checks, integrityIssues) {
   const warnCount = checks.filter(check => check.status === "WARN").length
     + issues.filter(issue => issue.severity === "WARN").length;
   return {
-    version: "AP-GAS-v10.2-preflight",
+    version: "AP-GAS-v10.3-preflight",
     generatedAt: new Date().toISOString(),
     status: failCount === 0 ? "PASS" : "FAIL",
     summary: { fail: failCount, warn: warnCount, checks: checks.length, integrityIssues: issues.length },
@@ -2306,16 +2430,18 @@ function diagPredeployAudit() {
   const propertyState = {
     DISCORD_BOT_TOKEN: Boolean(String(props.getProperty("DISCORD_BOT_TOKEN") || "")),
     GEMINI_API_KEY: Boolean(String(props.getProperty("GEMINI_API_KEY") || "")),
-    AP_INGEST_SECRET: Boolean(String(props.getProperty("AP_INGEST_SECRET") || ""))
+    AP_INGEST_SECRET: String(props.getProperty("AP_INGEST_SECRET") || "").length >= 24
   };
-  ["DISCORD_BOT_TOKEN", "GEMINI_API_KEY"].forEach(key => {
+  ["GEMINI_API_KEY", "AP_INGEST_SECRET"].forEach(key => {
     addPreflightCheck_(checks, `property.${key}`, propertyState[key] ? "PASS" : "FAIL",
-      propertyState[key] ? "已設定（值不回傳）" : "缺少必要 Script Property",
+      propertyState[key] ? "已設定（值不回傳）" : "缺少 local bridge 必要 Script Property",
       propertyState[key] ? "" : `在 Apps Script 專案設定新增 ${key}`);
   });
-  addPreflightCheck_(checks, "property.AP_INGEST_SECRET", propertyState.AP_INGEST_SECRET ? "PASS" : "WARN",
-    propertyState.AP_INGEST_SECRET ? "已設定（值不回傳）" : "未啟用舊 doPost 相容入口",
-    propertyState.AP_INGEST_SECRET ? "" : "只有仍需使用 HTTP doPost 時才設定；Discord polling 不需要");
+  addPreflightCheck_(checks, "property.DISCORD_BOT_TOKEN", "PASS",
+    propertyState.DISCORD_BOT_TOKEN
+      ? "仍有舊值，但 local_bridge 不會讀取或傳送（值不回傳）"
+      : "local_bridge 不需要在 GAS 保存 Discord token",
+    "可在確認本地 Bot 正常後移除 GAS 內的舊 Discord token");
 
   try {
     const folder = DriveApp.getFolderById(ROOT_FOLDER_ID);
@@ -2372,16 +2498,17 @@ function diagPredeployAudit() {
     const triggerNames = ScriptApp.getProjectTriggers().map(trigger => trigger.getHandlerFunction());
     const mainCount = triggerNames.filter(name => name === "mainTick").length;
     const legacyCount = triggerNames.filter(name => name === "processJobAsync").length;
-    const healthy = mainCount === 1 && legacyCount === 0;
-    addPreflightCheck_(checks, "trigger.mainTick", healthy ? "PASS" : "WARN",
+    const healthy = mainCount === 0 && legacyCount === 0;
+    addPreflightCheck_(checks, "trigger.local_bridge", healthy ? "PASS" : "FAIL",
       `mainTick=${mainCount}；legacy processJobAsync=${legacyCount}`,
-      healthy ? "" : "部署程式後執行 setupAntiquePipeline() 重建唯一 mainTick trigger");
+      healthy ? "" : "執行 cleanupTriggers()；local_bridge 不可保留 Discord polling trigger");
   } catch (err) {
-    addPreflightCheck_(checks, "trigger.mainTick", "WARN", err.message, "完成 Apps Script 授權後重跑");
+    addPreflightCheck_(checks, "trigger.local_bridge", "WARN", err.message, "完成 Apps Script 授權後重跑");
   }
 
   try {
-    const queueHealth = buildQueueHealthReport_(props.getProperties());
+    const propertySnapshot = props.getProperties();
+    const queueHealth = buildQueueHealthReport_(propertySnapshot);
     addPreflightCheck_(checks, "queue.pending_jobs", queueHealth.pendingCount > 20 ? "WARN" : "PASS",
       `待處理 ${queueHealth.pendingCount} 筆；durable payload ${queueHealth.durablePayloadCount} 筆`,
       queueHealth.pendingCount > 20 ? "先暫停部署並確認 worker 是否持續消費" : "");
@@ -2396,6 +2523,11 @@ function diagPredeployAudit() {
     addPreflightCheck_(checks, "queue.orphan_payload", queueHealth.orphanPayloadJobIds.length ? "WARN" : "PASS",
       `未入隊且未進 dead-letter 的 durable payload ${queueHealth.orphanPayloadJobIds.length} 筆`,
       queueHealth.orphanPayloadJobIds.length ? "執行 diagQueueHealth() 比對後再決定是否重排" : "");
+    const partialCount = Object.keys(propertySnapshot)
+      .filter(key => key.startsWith(BRIDGE_PARTIAL_PREFIX)).length;
+    addPreflightCheck_(checks, "bridge.partial_write", partialCount ? "FAIL" : "PASS",
+      `local bridge partial marker ${partialCount} 筆`,
+      partialCount ? "停止 Intake；執行 diagBridgeReconcilePlan()，不可自動清除或重送" : "");
   } catch (err) {
     addPreflightCheck_(checks, "queue.pending_jobs", "FAIL", err.message, "由 Craig 確認後才可清空損壞佇列");
   }
@@ -2405,24 +2537,23 @@ function diagPredeployAudit() {
   return report;
 }
 
-/** Controlled setup. It creates AP_MEDIA only when missing and rebuilds the trigger. */
+/** Controlled local-bridge setup. Creates AP_MEDIA and removes legacy polling triggers. */
 function setupAntiquePipeline() {
-  if (!DISCORD_BOT_TOKEN) throw new Error("缺少 Script Property: DISCORD_BOT_TOKEN");
   if (!GEMINI_KEY) throw new Error("缺少 Script Property: GEMINI_API_KEY");
+  if (AP_INGEST_SECRET.length < 24) throw new Error("AP_INGEST_SECRET 至少需 24 字元");
   DriveApp.getFolderById(ROOT_FOLDER_ID).getName();
   const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
   const catalogSheet = spreadsheet.getSheets()[0];
   const header = catalogSheet.getRange(1, 1, 1, CATALOG_HEADERS.length).getDisplayValues()[0];
   if (header.join("|") !== CATALOG_HEADERS.join("|")) {
-    throw new Error("Catalog A:M 與凍結契約不一致；停止 setup，不重建 trigger");
+    throw new Error("Catalog A:M 與凍結契約不一致；停止 local bridge setup");
   }
   ensureMediaSheet_(spreadsheet);
-  const beforeTrigger = diagPredeployAudit();
-  if (beforeTrigger.status !== "PASS") {
-    throw new Error("Preflight FAIL；先修正資料契約或完整性問題，再建立 trigger");
-  }
-  setupTrigger();
+  cleanupTriggers();
   const report = diagPredeployAudit();
+  if (report.status !== "PASS") {
+    throw new Error("Preflight FAIL；先修正資料契約、憑證或完整性問題");
+  }
   console.log("[AP Setup] " + JSON.stringify(report));
   return report;
 }
@@ -2451,19 +2582,45 @@ function diagMediaReconcilePlan() {
   return plan;
 }
 
-function discordReadOnlyCanary_() {
-  const headers = {
-    "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
-    "User-Agent": "DiscordBot (https://antique-pavilion, 1.0)"
+/** Read-only plan for durable local-bridge partial-write markers. */
+function diagBridgeReconcilePlan() {
+  const props = PropertiesService.getScriptProperties().getProperties();
+  const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+  const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
+  const mediaRows = mediaSheet && mediaSheet.getLastRow() >= 2
+    ? mediaSheet.getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length).getValues()
+    : [];
+  const catalogSheet = spreadsheet.getSheets()[0];
+  const catalogRows = catalogSheet.getLastRow() >= 2
+    ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+    : [];
+  const items = Object.keys(props)
+    .filter(key => key.startsWith(BRIDGE_PARTIAL_PREFIX))
+    .map(key => {
+      let record = {};
+      try { record = JSON.parse(props[key]); } catch (_) {}
+      const messageId = key.substring(BRIDGE_PARTIAL_PREFIX.length);
+      const artifactUuid = String(record.artifactUuid || "");
+      return {
+        messageId: messageId,
+        artifactUuid: artifactUuid,
+        phase: String(record.phase || "UNKNOWN"),
+        startedAt: String(record.startedAt || ""),
+        mediaRows: mediaRows.filter(row => String(row[0] || "") === artifactUuid).length,
+        catalogRows: catalogRows.filter(row => String(row[0] || "") === artifactUuid).length,
+        action: "人工比對 Drive / AP_MEDIA / Catalog；確認後才可清除 marker 或重送"
+      };
+    });
+  const plan = {
+    version: "AP-GAS-v10.3-bridge-reconcile",
+    generatedAt: new Date().toISOString(),
+    mode: "READ_ONLY_PLAN",
+    status: items.length ? "ACTION_REQUIRED" : "CLEAN",
+    partialCount: items.length,
+    items: items
   };
-  const endpoints = [
-    { id: "bot", url: DISCORD_API + "/users/@me" },
-    { id: "channel", url: DISCORD_API + "/channels/" + DISCORD_CHANNEL_ID }
-  ];
-  return endpoints.map(endpoint => {
-    const response = UrlFetchApp.fetch(endpoint.url, { headers: headers, muteHttpExceptions: true });
-    return { id: endpoint.id, httpCode: Number(response.getResponseCode()), ok: response.getResponseCode() === 200 };
-  });
+  console.log("[AP Bridge Reconcile Plan] " + JSON.stringify(plan));
+  return plan;
 }
 
 /** Zero Gemini cost. Run after deployment; run Gemini canary separately only when needed. */
@@ -2472,17 +2629,15 @@ function diagPostdeployCanary() {
   const checks = [];
   const triggers = ScriptApp.getProjectTriggers().map(trigger => trigger.getHandlerFunction());
   const mainCount = triggers.filter(name => name === "mainTick").length;
-  addPreflightCheck_(checks, "post.trigger", mainCount === 1 ? "PASS" : "FAIL", `mainTick=${mainCount}`,
-    mainCount === 1 ? "" : "執行 setupAntiquePipeline()");
-
-  let discord = [];
-  try {
-    discord = discordReadOnlyCanary_();
-    discord.forEach(result => addPreflightCheck_(checks, `post.discord.${result.id}`, result.ok ? "PASS" : "FAIL",
-      `HTTP ${result.httpCode}`, result.ok ? "" : "確認 Discord token、channel 權限與 GAS 出站存取"));
-  } catch (err) {
-    addPreflightCheck_(checks, "post.discord", "FAIL", err.message, "確認 Discord token 與 GAS 網路存取");
-  }
+  const legacyCount = triggers.filter(name => name === "processJobAsync").length;
+  const noPollingTriggers = mainCount === 0 && legacyCount === 0;
+  addPreflightCheck_(checks, "post.local_bridge.trigger", noPollingTriggers ? "PASS" : "FAIL",
+    `mainTick=${mainCount}；legacy processJobAsync=${legacyCount}`,
+    noPollingTriggers ? "" : "執行 cleanupTriggers()；GAS 不可再輪詢 Discord");
+  addPreflightCheck_(checks, "post.local_bridge.mode",
+    DISCORD_IO_MODE === "local_bridge" && AP_INGEST_SECRET.length >= 24 ? "PASS" : "FAIL",
+    `mode=${DISCORD_IO_MODE}；GAS Discord egress calls=0`,
+    "設定至少 24 字元 AP_INGEST_SECRET，並確認部署的是 v10.3 local_bridge");
 
   try {
     const service = ScriptApp.getService();
@@ -2522,7 +2677,7 @@ function diagPostdeployCanary() {
     geminiCalls: 0,
     preflight: preflight,
     postdeploy: post,
-    discord: discord
+    discord: { mode: DISCORD_IO_MODE, gasEgressCalls: 0 }
   };
   console.log("[AP Postdeploy Canary] " + JSON.stringify(report));
   return report;
@@ -2542,11 +2697,7 @@ function cleanupTriggers() {
 
 function setupTrigger() {
   cleanupTriggers();
-  ScriptApp.newTrigger("mainTick")
-    .timeBased()
-    .everyMinutes(1)
-    .create();
-  console.log("✅ mainTick 1分鐘常駐 Trigger 建立完成");
+  throw new Error("v10.3 local_bridge 禁止建立 mainTick；舊 trigger 已清除");
 }
 
 // ============================================================
@@ -2581,7 +2732,7 @@ function safeEnqueue(jobId) {
 
 /**
  * 安全重置：僅在 queue / durable payload / dead-letter 全空時，
- * 重置 Discord lastId 並重建 Trigger；有資料時 fail closed。
+ * 清除舊 Discord lastId 與 polling trigger；有資料時 fail closed。
  */
 function resetBot() {
   const props = PropertiesService.getScriptProperties();
@@ -2593,15 +2744,16 @@ function resetBot() {
   }
   props.deleteProperty(PENDING_JOBS_PROPERTY);
   props.deleteProperty("discord_last_message_id");
-  setupTrigger();
-  console.log("✅ resetBot 完成：確認空佇列、Discord lastId 重置、mainTick Trigger 重建");
-  console.log("   系統將在下一個整分鐘自動開始輪詢 Discord Channel");
+  cleanupTriggers();
+  console.log("✅ resetBot 完成：確認空佇列、Discord lastId 重置、legacy trigger 已移除");
+  console.log("   v10.3 請在本地啟動 ap_discord_bot.py；GAS 不再輪詢 Discord");
 }
 
 /**
  * 驗證 Discord Bot 連線
  */
 function diagTestDiscordConnection() {
+  assertDiscordEgressDisabled_();
   const headers = {
     "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
     "User-Agent": "DiscordBot (https://antique-pavilion, 1.0)"
@@ -2626,6 +2778,7 @@ function diagTestDiscordConnection() {
  * 完整連線診斷：逐步測試 5 個端點，找出 403 的確切位置
  */
 function diagFull() {
+  assertDiscordEgressDisabled_();
   const GUILD_ID = "1495279821469782026";
   const headers  = {
     "Authorization": `Bot ${DISCORD_BOT_TOKEN}`,
@@ -2676,6 +2829,7 @@ function tempCheckId() {
 
 
 function diagFullInventory() {
+  assertDiscordEgressDisabled_();
   const headers = {
     "Authorization": "Bot " + DISCORD_BOT_TOKEN,
     "User-Agent": "DiscordBot (https://antique-pavilion, 1.0)"

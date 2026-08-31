@@ -29,11 +29,12 @@ and craftsmanship. Aesthetic reference points: Sotheby's Asia, Christie's Hong K
 | Layer | Tech | Why |
 |---|---|---|
 | Frontend | **Pure HTML / CSS / vanilla JS** — NO React/Vue/Tailwind/etc. | GitHub Pages compatibility, simplicity, longevity |
-| Backend | **Google Apps Script (GAS) v9** | Runs free under Craig's Google account, no infra cost |
+| Backend | **Google Apps Script (GAS) v10.3** | Runs free under Craig's Google account, no infra cost |
 | Storage | Google Sheets (catalog) + Google Drive (images) | Same — free, durable |
 <!-- CHANGE GAS-GEMINI-FALLBACK: Craig 於 2026-08-30 核准 AP GAS 多模型 fallback。 -->
 | AI judgment | **Gemini 3.7 Flash → 3.6 Flash → 3.5 Flash → 3.5 Flash-Lite** via GAS `generateContent` | Free-tier first；3.7/3.6/3.5 medium，3.5 Lite minimal；technical-failure fallback only |
-| Discord I/O | **Python bot in WSL2** (`scripts/ap_org_bot.py`) | GAS IP is blocked by Discord (error 40333) |
+<!-- CHANGE GAS-LOCAL-BRIDGE: Craig 於 2026-08-31 核准 Discord Intake 固定走本地 Python → GAS doPost。 -->
+| Discord I/O | **Python bots in WSL2** (`ap_discord_bot.py` Intake；`scripts/ap_org_bot.py` ORG) | GAS IP is blocked by Discord (error 40333) |
 | Knowledge base | **Notion (8 DBs)**, opt-in via `NOTION_API_KEY` | Long-form, structured, queryable |
 | Skills | `.claude/commands/*.md` (9 skills) | Plain markdown — readable by ANY agent, not just Claude |
 
@@ -43,8 +44,9 @@ and craftsmanship. Aesthetic reference points: Sotheby's Asia, Christie's Hong K
 - No prompt text in `.py` files — all prompts live in `scripts/ap_org_bot/prompts/<layer>/<agent>.md`
 - No Discord bot may directly call Gemini API — that goes through GAS (so Gemini billing is
   centralized under one Google account)
-- GAS Script Properties hold `DISCORD_BOT_TOKEN` / `GEMINI_API_KEY`; the legacy HTTP intake
-  additionally requires `AP_INGEST_SECRET`. Missing secrets fail closed and none may enter Git.
+- GAS Script Properties hold `GEMINI_API_KEY` / `AP_INGEST_SECRET`; the local Python Intake
+  environment holds the raw `DISCORD_BOT_TOKEN`, matching `AP_INGEST_SECRET`, and formal
+  `AP_GAS_DOPOST_URL`. Missing secrets fail closed and none may enter Git.
 
 ---
 
@@ -95,6 +97,27 @@ sizeBytes | createdAt
 - 新上傳原圖在人工 publish 前維持私人 Drive 權限；publish 才開啟連結檢視。
 - Inline Gemini payload 的 binary 安全預算為 12 MiB；超過改走 Gemini Files API。
 - 前端卡片仍只載封面；多圖只在 catalog lightbox 內 lazy-load，且不得自動輪播。
+
+### DD-106 — Local Discord Intake Bridge（Craig 2026-08-31 核准）
+
+Discord 官方 API 已從 GAS 實測回傳 `40333 internal network error`；因此 GAS 不得再直接
+輪詢 Discord REST 或讀取 Discord CDN，也不得建立 `mainTick`／`processJobAsync` trigger。
+
+固定資料流：
+
+```
+Discord Gateway → ap_discord_bot.py → 本地壓縮 → GAS /exec doPost
+→ Gemini fallback → private Drive → Catalog + AP_MEDIA → JSON → Discord reply
+```
+
+- `ap_discord_bot.py` 只負責 Discord I/O、1–8 張同訊息分組、下載、壓縮與回覆；不得直接呼叫 Gemini。
+- GAS `doPost()` 以至少 24 字元的 `AP_INGEST_SECRET` 驗證，並以 Discord `messageId` 做冪等鍵。
+- 同一 `messageId` 已完整寫入時只回傳既有結果，不再呼叫 Gemini、不再新增 Drive／Sheet 資料。
+- 寫入可能開始但未完整結束時保留 durable partial marker，停止自動重跑；先執行
+  `diagBridgeReconcilePlan()`，由 Craig 人工決定復原。
+- 本地最多 3 次只針對 timeout、連線錯誤、HTTP 429／5xx 的 transport retry；HTML、4xx、
+  非 JSON、未授權或 partial write 一律停手。
+- Web App 必須使用正式 `/exec` URL；`doGet()` 保持 guest 可讀，`doPost()` 由 shared secret 保護。
 
 <!-- CHANGE GAS-DD105-HEADERS: Craig 核准 Catalog A1:M1 header-only migration。 -->
 ### DD-105 — Catalog 標題契約正規化（Craig 2026-08-31 核准）
@@ -213,7 +236,7 @@ Antique Digital Pavilion/
 │   └── opus_inbox/, opus_rulings/        ← gitignored
 ├── tests/                                ← 292+ tests, run via `pytest -q`
 │   └── test_change_log_contract.py       ← §12 完工協議的機器檢查
-└── ap_discord_bot.py                     ← separate bot for Gemini authentication pipeline
+└── ap_discord_bot.py                     ← local Discord Intake → compressed secure GAS bridge
 ```
 
 ---
@@ -258,6 +281,19 @@ python3 -u scripts/ap_org_bot.py
 
 Expected log within 30 seconds: `active agents:` (8 keys) → `ORG Bot ready as AP_org_bot#3797`
 → `Synced 4 slash commands.` → `[scheduler] poll @ 11:00 / 20:00`.
+
+### Boot the antique Intake bridge (from WSL2)
+
+Set `DISCORD_BOT_TOKEN`, `AP_GAS_DOPOST_URL`, and the same `AP_INGEST_SECRET` used by GAS in
+the gitignored local environment, then:
+
+```bash
+cd "/mnt/c/Users/A50529/Desktop/Craig/Antique Digital Pavilion"
+python3 -u ap_discord_bot.py
+```
+
+Expected log: `吉寶軒 Intake Bridge v3.0` and
+`Discord Gateway → local compression → GAS doPost`. It creates no GAS polling trigger.
 
 ### Run a Council topic from CLI
 
