@@ -1,3 +1,5 @@
+<!-- CHANGE AP-BOT-LAUNCHER: local browser control center for the two AP Bots. -->
+
 # 吉寶軒 AP 專案 — 背景服務啟動手冊
 
 > 每次重啟電腦後，需手動在 WSL2 重啟以下服務。
@@ -28,9 +30,39 @@ ls "/mnt/c/Users/A50529/Desktop/Craig/Antique Digital Pavilion/.env.antique"
 
 ---
 
-## 標準啟動流程（使用 tmux，推薦）
+## 標準啟動流程（Web Control Center，推薦）
 
-### 方法 A：tmux（可隨時 detach，關閉 terminal Bot 繼續跑）
+在 WSL2 執行：
+
+```bash
+cd "/mnt/c/Users/A50529/Desktop/Craig/Antique Digital Pavilion"
+python3 -u scripts/ap_launcher_web.py
+```
+
+瀏覽器會開啟 `http://127.0.0.1:8610`；若該 port 已使用，會在 8610–8620 自動選擇。
+Launcher 啟動時**不會自動啟動任何 Bot**，由你在 GUI 分別選擇：
+
+- 鑑定助手：啟動／停止／重新啟動。
+- AP ORG：啟動／停止／重新啟動。
+- 啟動兩個 Bot／停止所有由 Launcher 管理的 Bot。
+- 查看 PID、uptime、Discord／GAS 健康與即時遮蔽 Log。
+
+Launcher 只監聽 loopback；它不顯示 token／secret，也不會停止原本由 tmux 或其他 terminal
+啟動的外部 Bot。若要只開控制台、不自動開瀏覽器：
+
+```bash
+python3 -u scripts/ap_launcher_web.py --no-browser
+```
+
+只有在離線 UI 測試時才使用 `AP_LAUNCHER_HEALTHCHECKS=0`；正式運行維持預設值 `1`。
+
+關閉 Launcher（Ctrl+C）時，只會停止由本次 Launcher 啟動的 Bot process group。
+
+---
+
+## 備用啟動流程（tmux）
+
+### tmux（可隨時 detach，關閉 terminal Bot 繼續跑）
 
 ```bash
 # 開啟新 tmux session
@@ -64,7 +96,7 @@ python3 -u scripts/ap_org_bot.py
 
 ---
 
-### 方法 B：快速啟動腳本（一鍵開兩個 Bot）
+### 快速啟動腳本（一鍵開兩個 Bot）
 
 ```bash
 cd "/mnt/c/Users/A50529/Desktop/Craig/Antique Digital Pavilion"
@@ -148,7 +180,9 @@ git push -u origin main
 
 **鑑定助理 Bot（ap_discord_bot.py）：**
 ```
-鑑定助理 Bot ready as ...
+鑑定助理 Bot 上線：...
+Slash commands 同步：...
+[CatchUp] 完成
 ```
 
 **ORG Bot（scripts/ap_org_bot.py）：**
@@ -202,6 +236,6 @@ echo "請回答：1+1=?" | claude -p --model claude-sonnet-4-6 --max-turns 1
 ## 重啟電腦後 Checklist
 
 - [ ] 開啟 WSL2 terminal
-- [ ] `tmux attach -t ap` 或 `bash start_bots.sh`
+- [ ] `python3 -u scripts/ap_launcher_web.py`（或使用備用 tmux）
 - [ ] 確認兩個 Bot 的 ready log 出現
 - [ ] Discord `/poll-now` 測試 Feedback PM 流程（若有待處理 feedback）

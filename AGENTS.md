@@ -119,6 +119,22 @@ Discord Gateway → ap_discord_bot.py → 本地壓縮 → GAS /exec doPost
   非 JSON、未授權或 partial write 一律停手。
 - Web App 必須使用正式 `/exec` URL；`doGet()` 保持 guest 可讀，`doPost()` 由 shared secret 保護。
 
+### DD-107 — Local Bot Control Center（Craig 2026-08-31 核准）
+
+<!-- CHANGE AP-BOT-LAUNCHER: Craig 核准以 Odin launcher_web 模式管理兩個本地 AP Bot。 -->
+
+`scripts/ap_launcher_web.py` 是兩個 Python Bot 的本地操作介面。它使用 Python stdlib HTTP/SSE，
+預設只 bind `127.0.0.1`，啟動控制台時不得自動啟動任一 Bot。
+
+- 只允許固定的 `intake`／`org` service key，不接受任意 shell command。
+- 兩個 Bot 必須能個別 start／stop／restart；另提供明確的 Start All／Stop All。
+- 只停止由 Launcher 本身建立的 process group；偵測到 tmux／其他 terminal 程序時標為
+  `EXTERNAL` 並拒絕接管或終止。
+- GUI 與 SSE log 不得回傳 secret；token assignment、Discord token pattern 與 signed URL query
+  必須先遮蔽。
+- 健康狀態必須分開呈現 process、Discord、GAS 與 ORG scheduler，不得把 PID 存活等同完整上線。
+- GUI stack 維持 inline pure HTML/CSS/vanilla JS；不得增加 npm、frontend framework 或 build step。
+
 <!-- CHANGE GAS-DD105-HEADERS: Craig 核准 Catalog A1:M1 header-only migration。 -->
 ### DD-105 — Catalog 標題契約正規化（Craig 2026-08-31 核准）
 
@@ -216,6 +232,7 @@ Antique Digital Pavilion/
 │   ├── prompts_versioning.yaml           ← prompt version metadata
 │   └── migrations/                       ← future schema migrations (Sprint 4)
 ├── scripts/
+│   ├── ap_launcher_web.py                ← loopback-only GUI for Intake / ORG Bot control
 │   ├── ap_org_bot.py                     ← thin shim → ap_org_bot.main:main
 │   ├── ap_org_bot/                       ← ★ refactored package (42 modules)
 │   │   ├── infra/                        # paths, env, ssl, claude_cli, budget_gate, notion
@@ -294,6 +311,16 @@ python3 -u ap_discord_bot.py
 
 Expected log: `吉寶軒 Intake Bridge v3.0` and
 `Discord Gateway → local compression → GAS doPost`. It creates no GAS polling trigger.
+
+### Boot both Bots from the local control center
+
+```bash
+cd "/mnt/c/Users/A50529/Desktop/Craig/Antique Digital Pavilion"
+python3 -u scripts/ap_launcher_web.py
+```
+
+The launcher opens a loopback browser GUI, does not autostart either Bot, and refuses to stop an
+externally-owned tmux process. Use `--no-browser` for a headless control-server start.
 
 ### Run a Council topic from CLI
 
