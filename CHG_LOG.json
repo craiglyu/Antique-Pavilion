@@ -3,6 +3,26 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-08-31T05:24:35Z",
+      "category": "feat",
+      "scope": "antique-gas.catalog-contract-preview",
+      "version_from": "10.2",
+      "version_to": "10.2.1",
+      "summary": "新增唯讀且去內容化的 Catalog 契約診斷，依 J:M 的 Drive URL、外部網址與既有狀態 enum 結構訊號，區分只有舊標題、資料仍採舊位置及混合／不明三種情況，供後續 DD 遷移決策使用。",
+      "rationale": "線上 preflight 顯示 129 筆資料通過位置檢查，但 A:M 標題仍是舊契約；直接改標題或直接部署都有欄位語意錯置風險。診斷只輸出聚合計數與允許的狀態分布，不洩漏藏品內容、URL、公式或憑證，也不對 Sheet、Drive、trigger、queue 執行任何寫入。",
+      "breaking": false,
+      "rollback": "git revert <this commit>",
+      "files": [
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "scripts/GAS/DEPLOYMENT.md",
+        "tests/test_antique_gas_preflight.py",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "GAS-CATALOG-PREVIEW"
+      ]
+    },
+    {
       "ts": "2026-08-31T01:29:13Z",
       "category": "fix",
       "scope": "antique-gas.discord-queue-reliability",

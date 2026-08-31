@@ -2,6 +2,8 @@
 
 CHANGE GAS-PREFLIGHT: verify read-only diagnostics, secret redaction, Catalog / AP_MEDIA
 integrity rules, and the zero-Gemini postdeploy canary contract.
+CHANGE GAS-CATALOG-PREVIEW: verify the redacted Catalog layout classifier distinguishes
+stale headers from genuinely legacy-positioned rows without returning cell contents.
 """
 
 from __future__ import annotations
@@ -45,6 +47,7 @@ process.stdout.write(JSON.stringify({ok: true}));
     review = REVIEW_CODE.read_text(encoding="utf-8")
     runbook = DEPLOYMENT.read_text(encoding="utf-8")
     assert "function diagPredeployAudit()" in gas
+    assert "function diagCatalogContractPreview()" in gas
     assert "function diagMediaReconcilePlan()" in gas
     assert "function diagPostdeployCanary()" in gas
     assert "geminiCalls: 0" in gas
@@ -56,6 +59,8 @@ process.stdout.write(JSON.stringify({ok: true}));
     assert "CHANGE GAS-PREFLIGHT" in gas
     assert "CHANGE GAS-PREFLIGHT" in review
     assert "CHANGE GAS-PREFLIGHT" in runbook
+    assert "CHANGE GAS-CATALOG-PREVIEW" in gas
+    assert "CHANGE GAS-CATALOG-PREVIEW" in runbook
 
 
 def test_catalog_and_media_integrity_rules_without_network():
@@ -182,6 +187,68 @@ process.stdout.write(JSON.stringify({ok: true, status: report.status}));
     assert json.loads(result.stdout) == {"ok": True, "status": "PASS"}
 
 
+def test_catalog_contract_preview_classifies_layout_without_leaking_cells():
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const context = {
+  console: {log() {}, warn() {}, error() {}},
+  PropertiesService: {getScriptProperties() { return {getProperty() { return 'x'; }}}}
+};
+vm.createContext(context);
+vm.runInContext(source, context);
+
+const legacyHeaders = ['ID','上傳時間','用戶描述','品名','分類','年代/斷代','商品描述',
+  '參考商品','參考成交價','參考網頁','雲端圖檔','標籤','審核狀態'];
+function row(j, k, l, m) {
+  return ['id','time','PRIVATE-ARTIFACT-NAME','item','category','era','story','ref','price',j,k,l,m];
+}
+function formulas(j, k) {
+  return ['','','','','','','','','',j,k,'',''];
+}
+
+const currentRows = [
+  row('查看圖片', '青銅，鼎', '完成', '適合獨立櫃位展示'),
+  row('查看圖片', '陶瓷，瓶', '待人工覆核', '建議柔和側光展示')
+];
+const currentFormulas = [
+  formulas('=HYPERLINK("https://drive.google.com/file/d/PRIVATE-DRIVE-ONE/view","查看")', ''),
+  formulas('=HYPERLINK("https://drive.google.com/file/d/PRIVATE-DRIVE-TWO/view","查看")', '')
+];
+const current = context.buildCatalogContractPreview_(legacyHeaders, currentRows, currentFormulas);
+assert.strictEqual(current.classification, 'STALE_LEGACY_HEADERS_CURRENT_POSITIONAL_DATA');
+assert.strictEqual(current.confidence, 'high');
+assert.strictEqual(current.writesPerformed, 0);
+
+const legacyRows = [
+  row('https://auction.example/PRIVATE-LOT-ONE', '查看圖片', '青銅，鼎', '完成'),
+  row('https://auction.example/PRIVATE-LOT-TWO', '查看圖片', '陶瓷，瓶', '待人工覆核')
+];
+const legacyFormulas = [
+  formulas('', '=HYPERLINK("https://drive.google.com/file/d/PRIVATE-LEGACY-ONE/view","查看")'),
+  formulas('', '=HYPERLINK("https://drive.google.com/file/d/PRIVATE-LEGACY-TWO/view","查看")')
+];
+const legacy = context.buildCatalogContractPreview_(legacyHeaders, legacyRows, legacyFormulas);
+assert.strictEqual(legacy.classification, 'LEGACY_HEADERS_LEGACY_POSITIONAL_DATA');
+assert.strictEqual(legacy.confidence, 'high');
+
+const serialized = JSON.stringify({current, legacy});
+['PRIVATE-ARTIFACT-NAME','PRIVATE-DRIVE-ONE','PRIVATE-LOT-ONE','PRIVATE-LEGACY-ONE']
+  .forEach(value => assert.ok(!serialized.includes(value)));
+assert.ok(serialized.includes('不回傳儲存格原文'));
+process.stdout.write(JSON.stringify({ok: true, current: current.classification, legacy: legacy.classification}));
+"""
+    result = _run_node(harness, GAS_SOURCE)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "ok": True,
+        "current": "STALE_LEGACY_HEADERS_CURRENT_POSITIONAL_DATA",
+        "legacy": "LEGACY_HEADERS_LEGACY_POSITIONAL_DATA",
+    }
+
+
 def test_diagnostics_are_structurally_read_only():
     gas = GAS_SOURCE.read_text(encoding="utf-8")
     preflight = gas.split("function diagPredeployAudit()", 1)[1].split(
@@ -189,6 +256,9 @@ def test_diagnostics_are_structurally_read_only():
     )[0]
     reconcile = gas.split("function diagMediaReconcilePlan()", 1)[1].split(
         "function discordReadOnlyCanary_()", 1
+    )[0]
+    catalog_preview = gas.split("function diagCatalogContractPreview()", 1)[1].split(
+        "/**\n * Read-only and zero-Gemini-cost.", 1
     )[0]
     postdeploy = gas.split("function diagPostdeployCanary()", 1)[1].split(
         "// ============================================================\n// 🧹 Trigger", 1
@@ -205,6 +275,6 @@ def test_diagnostics_are_structurally_read_only():
         "setupTrigger(",
         "fetchGeminiWithFallback_(",
     )
-    for function_source in (preflight, reconcile, postdeploy):
+    for function_source in (catalog_preview, preflight, reconcile, postdeploy):
         for forbidden in forbidden_mutations:
             assert forbidden not in function_source

@@ -1,7 +1,8 @@
 <!-- CHANGE GAS-PREFLIGHT: AP GAS deployment gate and zero-cost canary runbook. -->
 <!-- CHANGE GAS-QUEUE-SAFETY: v10.2 locked queue, durable payload, retry and dead-letter runbook. -->
+<!-- CHANGE GAS-CATALOG-PREVIEW: read-only redacted Catalog contract diagnosis before migration. -->
 
-# AP GAS v10.2 部署與驗收手冊
+# AP GAS v10.2.1 部署與驗收手冊
 
 這份手冊適用於 `AntiqueAnalysis_AI.md` 主資料管線與 `review_desk/` 人工覆核台。
 所有診斷預設唯讀；本地提交不代表線上已部署。
@@ -34,6 +35,24 @@
 - `queue.pending_jobs` 無法解析：不要直接清空，先保存 Script Property 原始值並查明原因。
 
 `diagMediaReconcilePlan()` 只產生 `READ_ONLY_PLAN`，不修資料、不刪 Drive 檔案、不改分享權限。
+
+## Catalog 標題不一致時的唯讀判讀
+
+若 `diagPredeployAudit()` 回報 `catalog.headers: FAIL`，先執行
+`diagCatalogContractPreview()`，不要先改 Sheet 第一列。這個函式只讀取 Catalog A:M，輸出
+J:M 的公式／URL／狀態等結構計數；不回傳任何儲存格原文、URL、公式、藏品名稱或憑證。
+
+依 `classification` 停在對應決策點：
+
+- `STALE_LEGACY_HEADERS_CURRENT_POSITIONAL_DATA`：高機率只有標題過期；仍需 Craig 依 DD 核准
+  header-only migration，診斷本身不會改寫。
+- `LEGACY_HEADERS_LEGACY_POSITIONAL_DATA`：資料也仍在舊位置；需先建立可復原備份，再制定完整
+  欄位遷移 DD，不可只改第一列。
+- `AMBIGUOUS_LEGACY_HEADERS` 或 `UNKNOWN_HEADERS_OR_LAYOUT`：證據不足或混合格式；停止部署，
+  再人工查看少量受限資料列。
+- `CURRENT_CONTRACT`：Catalog 已符合凍結契約，可重新執行 `diagPredeployAudit()`。
+
+請保留完整 `[AP Catalog Contract Preview]` JSON 執行紀錄供 migration go/no-go 判讀。
 
 ## v10.2 Queue 升級注意事項
 

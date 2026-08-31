@@ -1,5 +1,5 @@
 /**
- * 🏺 骨董影像編目代理人 v10.2 — Discord 多圖耐久佇列版
+ * 🏺 骨董影像編目代理人 v10.2.1 — Discord 多圖耐久佇列版
  *
  * [v9.0] 架構革新：Telegram Webhook 推播 → Discord REST 輪詢
  *  - 移除 doPost，根治 Webhook 超時 / 重送暴風問題
@@ -26,6 +26,8 @@
  * Drive、trigger 與多圖一致性；另提供零 Gemini 額度的部署後 canary 與 reconcile plan。
  * CHANGE GAS-QUEUE-SAFETY: Discord job payload 同步持久化至 Script Properties；入隊統一加鎖，
  * 寫入前暫時性錯誤最多重試 2 次，寫入開始後一律進 dead-letter，避免重跑造成重複藏品。
+ * CHANGE GAS-CATALOG-PREVIEW: 提供零寫入、去內容化的 Catalog 契約診斷，辨識僅標題過期、
+ * 舊資料位置或證據不足三種狀態，供 DD 遷移決策使用。
  */
 
 // ============================================================
@@ -65,6 +67,10 @@ const MEDIA_HEADERS = Object.freeze([
 const CATALOG_HEADERS = Object.freeze([
   "UUID", "入庫時間", "用戶描述", "品名", "分類", "年代", "故事",
   "拍賣參考品", "參考價格", "Drive URL", "標籤", "狀態", "展示建議"
+]);
+const LEGACY_CATALOG_HEADERS = Object.freeze([
+  "ID", "上傳時間", "用戶描述", "品名", "分類", "年代/斷代", "商品描述",
+  "參考商品", "參考成交價", "參考網頁", "雲端圖檔", "標籤", "審核狀態"
 ]);
 const MEDIA_VIEW_ROLES = Object.freeze([
   "front", "back", "side", "base", "mark", "detail", "interior",
@@ -1853,7 +1859,7 @@ function diagTestGeminiFallbackCanary() {
 }
 
 // ============================================================
-// 🩺 v10.2 deployment preflight / integrity diagnostics
+// 🩺 v10.2.1 deployment preflight / integrity diagnostics
 // ============================================================
 function diagnosticIssue_(severity, code, detail, rowNumber, artifactUuid, remediation) {
   return {
@@ -2028,6 +2034,140 @@ function finalizePreflightReport_(checks, integrityIssues) {
     checks: checks,
     integrityIssues: issues.slice(0, 200)
   };
+}
+
+function ratioForCatalogPreview_(numerator, denominator) {
+  if (!denominator) return 0;
+  return Math.round((Number(numerator || 0) / denominator) * 1000) / 1000;
+}
+
+function profileCatalogContractColumn_(displayRows, formulaRows, columnIndex) {
+  const profile = {
+    nonBlank: 0,
+    blank: 0,
+    hyperlinkFormula: 0,
+    driveLike: 0,
+    nonDriveWebLike: 0,
+    allowedStatus: 0,
+    delimiterLike: 0,
+    longText: 0,
+    statusDistribution: {}
+  };
+  (displayRows || []).forEach((row, rowIndex) => {
+    const value = String((row || [])[columnIndex] || "").trim();
+    const formula = String(((formulaRows || [])[rowIndex] || [])[columnIndex] || "").trim();
+    const combined = `${value} ${formula}`;
+    if (!value && !formula) {
+      profile.blank += 1;
+      return;
+    }
+    profile.nonBlank += 1;
+    if (/^=\s*HYPERLINK\s*\(/i.test(formula)) profile.hyperlinkFormula += 1;
+    if (/drive\.google\.com|drive\.googleusercontent\.com/i.test(combined)) {
+      profile.driveLike += 1;
+    } else if (/https?:\/\//i.test(combined)) {
+      profile.nonDriveWebLike += 1;
+    }
+    if (CATALOG_ALLOWED_STATUSES.includes(value)) {
+      profile.allowedStatus += 1;
+      profile.statusDistribution[value] = (profile.statusDistribution[value] || 0) + 1;
+    }
+    if (/[,，、;；|#]/.test(value)) profile.delimiterLike += 1;
+    if (value.length >= 24) profile.longText += 1;
+  });
+  profile.driveRatio = ratioForCatalogPreview_(profile.driveLike, profile.nonBlank);
+  profile.nonDriveWebRatio = ratioForCatalogPreview_(profile.nonDriveWebLike, profile.nonBlank);
+  profile.allowedStatusRatio = ratioForCatalogPreview_(profile.allowedStatus, profile.nonBlank);
+  profile.delimiterRatio = ratioForCatalogPreview_(profile.delimiterLike, profile.nonBlank);
+  profile.longTextRatio = ratioForCatalogPreview_(profile.longText, profile.nonBlank);
+  return profile;
+}
+
+function buildCatalogContractPreview_(headers, displayRows, formulaRows) {
+  const actualHeaders = (headers || []).map(value => String(value || "").trim());
+  const currentHeader = actualHeaders.join("|") === CATALOG_HEADERS.join("|");
+  const legacyHeader = actualHeaders.join("|") === LEGACY_CATALOG_HEADERS.join("|");
+  const columns = {
+    J: profileCatalogContractColumn_(displayRows, formulaRows, 9),
+    K: profileCatalogContractColumn_(displayRows, formulaRows, 10),
+    L: profileCatalogContractColumn_(displayRows, formulaRows, 11),
+    M: profileCatalogContractColumn_(displayRows, formulaRows, 12)
+  };
+
+  let currentPositionScore = 0;
+  let legacyPositionScore = 0;
+  if (columns.J.driveRatio >= 0.8) currentPositionScore += 3;
+  if (columns.K.driveRatio <= 0.2) currentPositionScore += 1;
+  if (columns.L.allowedStatusRatio >= 0.8) currentPositionScore += 4;
+  if (columns.M.allowedStatusRatio <= 0.2) currentPositionScore += 1;
+  if (columns.K.driveRatio >= 0.8) legacyPositionScore += 3;
+  if (columns.J.nonDriveWebRatio >= 0.5) legacyPositionScore += 2;
+  if (columns.M.allowedStatusRatio >= 0.8) legacyPositionScore += 4;
+  if (columns.L.allowedStatusRatio <= 0.2) legacyPositionScore += 1;
+
+  let classification = "UNKNOWN_HEADERS_OR_LAYOUT";
+  let confidence = "low";
+  let nextStep = "停止部署；人工比對受限樣本與公式，先不要改標題或資料列。";
+  if (currentHeader) {
+    classification = "CURRENT_CONTRACT";
+    confidence = "high";
+    nextStep = "Catalog 已符合凍結契約；重新執行 diagPredeployAudit()。";
+  } else if (legacyHeader && currentPositionScore >= 7 && legacyPositionScore <= 3) {
+    classification = "STALE_LEGACY_HEADERS_CURRENT_POSITIONAL_DATA";
+    confidence = "high";
+    nextStep = "資料位置看似已符合新契約；依 DD 核准 header-only migration，仍不得由診斷函式自動改寫。";
+  } else if (legacyHeader && legacyPositionScore >= 7 && currentPositionScore <= 3) {
+    classification = "LEGACY_HEADERS_LEGACY_POSITIONAL_DATA";
+    confidence = "high";
+    nextStep = "資料仍採舊位置；先備份並制定完整欄位遷移 DD，不可只改第一列標題。";
+  } else if (legacyHeader) {
+    classification = "AMBIGUOUS_LEGACY_HEADERS";
+    confidence = "medium";
+    nextStep = "舊標題下的欄位證據不一致；停止部署並人工檢查少量受限資料列。";
+  }
+
+  return {
+    version: "AP-GAS-v10.2.1-catalog-preview",
+    generatedAt: new Date().toISOString(),
+    mode: "READ_ONLY_REDACTED",
+    writesPerformed: 0,
+    rowCount: (displayRows || []).length,
+    headerState: currentHeader ? "CURRENT" : (legacyHeader ? "LEGACY" : "UNKNOWN"),
+    actualHeaders: actualHeaders,
+    expectedHeaders: CATALOG_HEADERS.slice(),
+    classification: classification,
+    confidence: confidence,
+    scores: {
+      currentPosition: currentPositionScore,
+      legacyPosition: legacyPositionScore,
+      currentMaximum: 9,
+      legacyMaximum: 10
+    },
+    columns: columns,
+    nextStep: nextStep,
+    privacy: "不回傳儲存格原文、URL、公式、藏品名稱或憑證"
+  };
+}
+
+/**
+ * Read-only Catalog migration preview. It only returns aggregate structural
+ * signals for J:M and never logs cell contents, URLs, formulas, or secrets.
+ */
+function diagCatalogContractPreview() {
+  const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+  const catalogSheet = spreadsheet.getSheets()[0];
+  const header = catalogSheet.getRange(1, 1, 1, CATALOG_HEADERS.length).getDisplayValues()[0];
+  const lastRow = catalogSheet.getLastRow();
+  const rowCount = Math.max(0, lastRow - 1);
+  const displayRows = rowCount
+    ? catalogSheet.getRange(2, 1, rowCount, CATALOG_HEADERS.length).getDisplayValues()
+    : [];
+  const formulaRows = rowCount
+    ? catalogSheet.getRange(2, 1, rowCount, CATALOG_HEADERS.length).getFormulas()
+    : [];
+  const report = buildCatalogContractPreview_(header, displayRows, formulaRows);
+  console.log("[AP Catalog Contract Preview] " + JSON.stringify(report));
+  return report;
 }
 
 /**
