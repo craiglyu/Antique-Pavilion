@@ -3,6 +3,24 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-01T07:08:00Z",
+      "category": "feat",
+      "scope": "ap-bots.windows-console-entrypoint",
+      "summary": "新增 Windows 一鍵 AP Control Center 啟動器，並在 STARTUP.md 補上日常開啟、查看即時運行紀錄與安全關閉的操作說明。",
+      "rationale": "Control Center 已有 loopback GUI 與 SSE Log，但日常操作仍需手動輸入 WSL 命令。BAT 固定使用既有專案與 Python 路徑、由 Launcher 自動開啟瀏覽器，且不保存或輸出任何憑證。",
+      "breaking": false,
+      "rollback": "git revert <this commit>；既有 WSL python3 -u scripts/ap_launcher_web.py 入口不受影響",
+      "files": [
+        "Start_AP_Control_Center.bat",
+        "STARTUP.md",
+        "tests/test_ap_launcher_web.py",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "AP-CONSOLE-LAUNCHER"
+      ]
+    },
+    {
       "ts": "2026-09-01T06:26:00Z",
       "category": "fix",
       "scope": "antique-gas.postdeploy-canary-url",

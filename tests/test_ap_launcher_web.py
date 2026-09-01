@@ -2,6 +2,8 @@
 
 CHANGE AP-BOT-LAUNCHER: verify allowlisted Bot controls, loopback binding,
 secret-safe status/logs, health separation, and external-process non-ownership.
+CHANGE AP-CONSOLE-LAUNCHER: verify the Windows one-click entrypoint remains
+fixed to the AP WSL project and never contains credentials.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 LAUNCHER_PATH = REPO / "scripts" / "ap_launcher_web.py"
+WINDOWS_LAUNCHER = REPO / "Start_AP_Control_Center.bat"
 
 
 @pytest.fixture(scope="module")
@@ -44,6 +47,16 @@ def test_launcher_source_parses_and_uses_only_allowlisted_entrypoints():
     # readiness or exit state of a newly restarted child process.
     assert "if self.proc is not proc:" in source
     assert "if self.proc is proc:" in source
+
+
+def test_windows_one_click_launcher_uses_fixed_wsl_control_center_without_secrets():
+    source = WINDOWS_LAUNCHER.read_text(encoding="utf-8")
+    assert "CHANGE AP-CONSOLE-LAUNCHER" in source
+    assert "wsl.exe -d Ubuntu -- bash -lc" in source
+    assert "scripts/ap_launcher_web.py" in source
+    assert "/home/craig/miniconda3/envs/mamba_env/bin/python3" in source
+    assert "AP_INGEST_SECRET" not in source
+    assert "DISCORD_BOT_TOKEN" not in source
 
 
 def test_loopback_and_browser_security_contract(launcher):

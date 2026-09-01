@@ -1,5 +1,6 @@
 <!-- CHANGE AP-BOT-LAUNCHER: local browser control center for the two AP Bots. -->
 <!-- CHANGE GAS-DURABLE-ASYNC: Intake v4 submits durably and polls GAS worker state. -->
+<!-- CHANGE AP-CONSOLE-LAUNCHER: one-click Windows launcher and daily console instructions. -->
 
 # 吉寶軒 AP 專案 — 背景服務啟動手冊
 
@@ -33,6 +34,20 @@ ls "/mnt/c/Users/A50529/Desktop/Craig/Antique Digital Pavilion/.env.antique"
 ---
 
 ## 標準啟動流程（Web Control Center，推薦）
+
+### Windows 一鍵開啟（推薦）
+
+直接雙擊專案根目錄的 [`Start_AP_Control_Center.bat`](Start_AP_Control_Center.bat)。它會開啟一個
+Windows command window、透過既有 WSL `mamba_env` 啟動 Control Center，並自動開啟瀏覽器。
+
+- 保持 command window 開著；它是 Control Center 的宿主程序。
+- 網頁通常開在 `http://127.0.0.1:8610`。若該 port 已被使用，Launcher 會自動改用 8611–8620，
+  command window 的 `AP Bot Control Center → ...` 行會顯示實際網址。
+- 在網頁最下方的「**運行紀錄**」看 Bot console；右上角 `● LIVE` 代表即時 Log 已連線。
+- 不要用 Chrome `F12` 看 Bot Log；那只顯示前端網頁訊息。Discord／GAS／Python 運行紀錄都在
+  「運行紀錄」面板。
+- 要關閉 Control Center，先在 GUI 停止 Launcher 啟動的 Bot，再回 command window 按 `Ctrl+C`。
+  它不會終止由 tmux 或其他 terminal 啟動的外部 Bot。
 
 在 WSL2 執行：
 
