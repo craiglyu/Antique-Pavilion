@@ -1,4 +1,5 @@
 <!-- CHANGE AP-BOT-LAUNCHER: local browser control center for the two AP Bots. -->
+<!-- CHANGE GAS-DURABLE-ASYNC: Intake v4 submits durably and polls GAS worker state. -->
 
 # 吉寶軒 AP 專案 — 背景服務啟動手冊
 
@@ -14,7 +15,8 @@
 | **鑑定助理 Bot** | `ap_discord_bot.py` | #antique-analysis 圖片鑑定 → GAS → Gemini | ✅ |
 | **ORG Bot** | `scripts/ap_org_bot.py` | PM/設計/開發/行銷 Agent + Feedback PM 排程 | ✅ |
 
-> GAS（Google Apps Script）是 serverless，不需要手動啟動。
+> GAS（Google Apps Script）是 serverless，不需要手動啟動；部署 v10.4 時必須由
+> `setupAntiquePipeline()` 建立唯一 `processBridgeQueue` 每分鐘 trigger。
 
 ---
 
@@ -180,10 +182,15 @@ git push -u origin main
 
 **鑑定助理 Bot（ap_discord_bot.py）：**
 ```
+吉寶軒 Intake Bridge v4.0 啟動中...
 鑑定助理 Bot 上線：...
 Slash commands 同步：...
 [CatchUp] 完成
 ```
+
+上傳圖片後應先看到 `GAS durable job 已受理`，接著出現 `QUEUED / RUNNING` 狀態，最後才是
+`完成 ... artifactUuid=...`。若看到 `RECONCILE_REQUIRED`，停止新的 Intake 測試並到 GAS 執行
+`diagBridgeReconcilePlan()`。
 
 **ORG Bot（scripts/ap_org_bot.py）：**
 ```

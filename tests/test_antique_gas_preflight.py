@@ -1,4 +1,4 @@
-"""No-network tests for the AP GAS v10.3 deployment and migration gates.
+"""No-network tests for the AP GAS v10.4 deployment and migration gates.
 
 CHANGE GAS-PREFLIGHT: verify read-only diagnostics, secret redaction, Catalog / AP_MEDIA
 integrity rules, and the zero-Gemini postdeploy canary contract.
@@ -8,6 +8,7 @@ CHANGE GAS-DD105-HEADERS: verify the Craig-approved migration only writes A1:M1,
 is idempotent, rejects drift, and restores the legacy header after failed verification.
 CHANGE GAS-LOCAL-BRIDGE: verify GAS has no Discord egress/trigger requirement and the
 local bridge secret is a fail-closed deployment prerequisite.
+CHANGE GAS-DURABLE-ASYNC: require exactly one non-Discord background worker.
 """
 
 from __future__ import annotations
@@ -57,6 +58,11 @@ process.stdout.write(JSON.stringify({ok: true}));
     assert "function applyDd105CatalogHeaderMigration()" in gas
     assert "function diagMediaReconcilePlan()" in gas
     assert "function diagBridgeReconcilePlan()" in gas
+    assert "function diagBridgeMessageDuplicates()" in gas
+    assert "function applyDd108KnownTestDuplicateQuarantine()" in gas
+    assert "function processBridgeQueue()" in gas
+    assert "ScriptApp.newTrigger(BRIDGE_WORKER_FUNCTION)" in gas
+    assert '.everyMinutes(1)' in gas
     assert '"bridge.partial_write"' in gas
     assert "function diagPostdeployCanary()" in gas
     assert "geminiCalls: 0" in gas
@@ -188,7 +194,7 @@ const context = {
   }}},
   DriveApp: {getFolderById() { return {getName() { return 'AP Root'; }}; }},
   SpreadsheetApp: {openById() { return spreadsheet; }},
-  ScriptApp: {getProjectTriggers() { return []; }}
+  ScriptApp: {getProjectTriggers() { return [{getHandlerFunction() { return 'processBridgeQueue'; }}]; }}
 };
 vm.createContext(context);
 vm.runInContext(source, context);
@@ -421,13 +427,16 @@ process.stdout.write(JSON.stringify({ok: true, writes: writes.length}));
 def test_diagnostics_are_structurally_read_only():
     gas = GAS_SOURCE.read_text(encoding="utf-8")
     preflight = gas.split("function diagPredeployAudit()", 1)[1].split(
-        "/** Controlled local-bridge setup.", 1
+        "/** Controlled durable-bridge setup.", 1
     )[0]
     reconcile = gas.split("function diagMediaReconcilePlan()", 1)[1].split(
         "/** Read-only plan for durable local-bridge", 1
     )[0]
     bridge_reconcile = gas.split("function diagBridgeReconcilePlan()", 1)[1].split(
-        "/** Zero Gemini cost.", 1
+        "/**\n * CHANGE GAS-DURABLE-ASYNC", 1
+    )[0]
+    duplicate_diag = gas.split("function diagBridgeMessageDuplicates()", 1)[1].split(
+        "/**\n * Craig-approved DD-108 repair", 1
     )[0]
     catalog_preview = gas.split("function diagCatalogContractPreview()", 1)[1].split(
         "/**\n * DD-105", 1
@@ -450,6 +459,13 @@ def test_diagnostics_are_structurally_read_only():
         "setupTrigger(",
         "fetchGeminiWithFallback_(",
     )
-    for function_source in (catalog_preview, preflight, reconcile, bridge_reconcile, postdeploy):
+    for function_source in (
+        catalog_preview,
+        preflight,
+        reconcile,
+        bridge_reconcile,
+        duplicate_diag,
+        postdeploy,
+    ):
         for forbidden in forbidden_mutations:
             assert forbidden not in function_source

@@ -1,7 +1,8 @@
 /**
- * 🏺 骨董影像編目代理人 v10.3 — Local Discord Bridge 多圖版
+ * 🏺 骨董影像編目代理人 v10.4 — Durable Async Local Bridge 多圖版
  *
- * [v10.3] 架構修正：Discord Gateway 留在本地 Python，GAS 僅處理受保護的 doPost。
+ * [v10.4] Durable async：Discord Gateway 留在本地 Python，GAS doPost 快速入列，
+ *         processBridgeQueue 背景執行 Gemini / Drive / Sheets。
  *  - 本地 Intake Bot 負責 Discord 收件、圖片下載／壓縮與 Discord 回覆
  *  - GAS 負責 Gemini fallback、私人 Drive 歸檔、Catalog 與 AP_MEDIA 寫入
  *  - source messageId 是冪等鍵；半寫入狀態 fail closed，必須人工 reconcile
@@ -23,6 +24,9 @@
  * CHANGE GAS-LOCAL-BRIDGE: Discord 40333 已證實 GAS 出站被 Cloudflare 封鎖；Discord I/O
  * 固定留在本地 Python，GAS doPost 以 AP_INGEST_SECRET、messageId 冪等與 partial-write gate
  * 繼續集中處理 Gemini、Drive、Catalog 與 AP_MEDIA。
+ * CHANGE GAS-DURABLE-ASYNC: DD-108 將長時間同步 doPost 拆為快速私人暫存、durable message
+ * state、每分鐘單工 worker 與短輪詢；Script Properties + Script Lock 是唯一性權威，
+ * CacheService 不再承擔冪等鎖，避免 HTTP 斷線重送造成重複 Gemini／Drive／Sheet 寫入。
  */
 
 // ============================================================
@@ -30,7 +34,7 @@
 // ============================================================
 // 憑證只放 Apps Script「專案設定 → 指令碼屬性」，不可再寫入原始碼或 Git：
 //   GEMINI_API_KEY / AP_INGEST_SECRET（本地 Intake Bridge 必填）
-// DISCORD_BOT_TOKEN 僅留給舊版診斷相容；v10.3 GAS 不讀取其值發送 Discord 請求。
+// DISCORD_BOT_TOKEN 僅留給舊版診斷相容；v10.4 GAS 不讀取其值發送 Discord 請求。
 const DISCORD_BOT_TOKEN  = String(PropertiesService.getScriptProperties().getProperty("DISCORD_BOT_TOKEN") || "");
 const DISCORD_CHANNEL_ID = "1495279823009087551";           // 右鍵頻道 → Copy Channel ID（需開啟開發者模式）
 const GEMINI_KEY         = String(PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY") || "");
@@ -89,12 +93,17 @@ const JOB_DEAD_PREFIX = "job_dead_";
 const JOB_CACHE_SECONDS = 21600;
 const JOB_MAX_ATTEMPTS = 3; // 初次 + 最多 2 次寫入前重試
 const JOB_PAYLOAD_MAX_CHARS = 8000; // Script Property 單值保守上限
-const BRIDGE_INFLIGHT_PREFIX = "bridge_inflight_";
 const BRIDGE_PARTIAL_PREFIX = "bridge_partial_";
-const BRIDGE_INFLIGHT_SECONDS = 600;
+const BRIDGE_STATE_PREFIX = "bridge_state_";
+const BRIDGE_WORKER_FUNCTION = "processBridgeQueue";
+const BRIDGE_STAGING_FOLDER_NAME = "_AP_BRIDGE_STAGING";
+const BRIDGE_STATE_VERSION = "AP-bridge-state-v1";
+const BRIDGE_CLIENT_VERSION = "AP-local-bridge-v4.0";
+const BRIDGE_RUNNING_LEASE_MS = 8 * 60 * 1000;
+const BRIDGE_COMPLETED_STATE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 
 // ============================================================
-// ⛔ v10.3：Discord polling 已停用。
+// ⛔ v10.4：Discord polling 已停用；processBridgeQueue 只處理已入列的私人 payload。
 // 舊函式保留供歷史比對，但 mainTick 與所有 Discord egress 入口 fail closed。
 // ============================================================
 function mainTick() {
@@ -763,7 +772,7 @@ function getDiscordFile(imageUrl) {
 
 function assertDiscordEgressDisabled_() {
   if (DISCORD_IO_MODE === "local_bridge") {
-    throw new Error("Discord 40333：v10.3 禁止 GAS 直接存取 Discord；請啟動本地 ap_discord_bot.py");
+    throw new Error("Discord 40333：v10.4 禁止 GAS 直接存取 Discord；請啟動本地 ap_discord_bot.py");
   }
 }
 
@@ -925,8 +934,8 @@ function logToSheet(event, detail, jobId) {
 
 // ============================================================
 // 📨 doPost：本地 Intake Bridge 的唯一 GAS 入口
-//    POST {ingestSecret, images:[...], caption, messageId} → GAS
-//    messageId 是冪等鍵；任何可能的半寫入都 fail closed，不自動重跑。
+//    submit 快速保存私人暫存資料並回傳 QUEUED；status 只讀取 durable state。
+//    messageId 是冪等鍵；Gemini / Catalog 寫入只由 processBridgeQueue 執行。
 // ============================================================
 function bridgeJsonResponse_(payload) {
   return ContentService
@@ -941,48 +950,60 @@ function bridgeError_(message, code, retrySafe) {
   return err;
 }
 
-/**
- * Rebuild the minimum safe response for a source message already committed to
- * both AP_MEDIA and Catalog.  No Gemini call and no write occurs on replay.
- */
-function findExistingBridgeArtifact_(spreadsheet, sourceMessageId) {
-  const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
-  if (!mediaSheet || mediaSheet.getLastRow() < 2) return null;
-  const mediaRows = mediaSheet
-    .getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length)
-    .getValues();
-  const matched = mediaRows.filter(row => String(row[9] || "") === String(sourceMessageId));
-  if (!matched.length) return null;
+function bridgeStateKey_(messageId) {
+  return BRIDGE_STATE_PREFIX + String(messageId || "");
+}
 
-  const artifactUuids = Array.from(new Set(matched.map(row => String(row[0] || "")).filter(Boolean)));
-  if (artifactUuids.length !== 1) {
-    throw bridgeError_(
-      `messageId ${sourceMessageId} 對應 ${artifactUuids.length} 個 artifactUuid，必須人工 reconcile`,
-      "IDEMPOTENCY_CONFLICT",
-      false
-    );
+function parseBridgeState_(raw) {
+  if (!raw) return null;
+  try {
+    const state = JSON.parse(raw);
+    return state && typeof state === "object" ? state : null;
+  } catch (_) {
+    return null;
   }
-  const artifactUuid = artifactUuids[0];
-  const catalogSheet = spreadsheet.getSheets()[0];
-  const catalogRows = catalogSheet.getLastRow() >= 2
-    ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
-    : [];
-  const catalogRow = catalogRows.find(row => String(row[0] || "") === artifactUuid);
-  if (!catalogRow) {
-    throw bridgeError_(
-      `messageId ${sourceMessageId} 已有 AP_MEDIA，但 Catalog 缺少 ${artifactUuid}；必須人工 reconcile`,
-      "PARTIAL_INGEST_REQUIRES_RECONCILE",
-      false
-    );
-  }
-  const primary = matched.find(row => row[6] === true || String(row[6]).toLowerCase() === "true") || matched[0];
+}
+
+function readBridgeState_(props, messageId) {
+  return parseBridgeState_(props.getProperty(bridgeStateKey_(messageId)));
+}
+
+function writeBridgeState_(props, state) {
+  state.version = BRIDGE_STATE_VERSION;
+  state.updatedAt = new Date().toISOString();
+  props.setProperty(bridgeStateKey_(state.messageId), JSON.stringify(state));
+  return state;
+}
+
+function bridgeAcceptedResponse_(state) {
+  return {
+    success: false,
+    accepted: ["ACCEPTING", "QUEUED", "RUNNING"].includes(String(state.state || "")),
+    code: String(state.code || "JOB_PENDING"),
+    retrySafe: false,
+    bridgeVersion: BRIDGE_CLIENT_VERSION,
+    messageId: String(state.messageId || ""),
+    jobId: String(state.jobId || state.messageId || ""),
+    state: String(state.state || "UNKNOWN"),
+    phase: String(state.phase || ""),
+    pollAfterSeconds: 5,
+    error: String(state.error || "")
+  };
+}
+
+function bridgeResultFromCatalog_(sourceMessageId, artifactUuid, catalogRow, mediaRows) {
+  const primary = mediaRows.find(row => row[6] === true || String(row[6]).toLowerCase() === "true") || mediaRows[0];
   const status = String(catalogRow[11] || "");
   return {
     success: true,
+    accepted: false,
+    state: "COMPLETED",
     duplicate: true,
+    bridgeVersion: BRIDGE_CLIENT_VERSION,
     messageId: String(sourceMessageId),
+    jobId: String(sourceMessageId),
     artifactUuid: artifactUuid,
-    imageCount: matched.length,
+    imageCount: mediaRows.length,
     fileUrl: String(primary[3] || ""),
     analysis: {
       isValid: status !== STATUS_REJECTED,
@@ -1000,14 +1021,404 @@ function findExistingBridgeArtifact_(spreadsheet, sourceMessageId) {
   };
 }
 
+/**
+ * Rebuild a response for a message already committed to AP_MEDIA + Catalog.
+ * Quarantined artifacts (Catalog 已退件 and every media row rejected) do not
+ * compete with the single active keeper.  Multiple active UUIDs fail closed.
+ */
+function findExistingBridgeArtifact_(spreadsheet, sourceMessageId) {
+  const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
+  if (!mediaSheet || mediaSheet.getLastRow() < 2) return null;
+  const mediaRows = mediaSheet
+    .getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length)
+    .getValues();
+  const matched = mediaRows.filter(row => String(row[9] || "") === String(sourceMessageId));
+  if (!matched.length) return null;
+
+  const catalogSheet = spreadsheet.getSheets()[0];
+  const catalogRows = catalogSheet.getLastRow() >= 2
+    ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+    : [];
+  const artifactUuids = Array.from(new Set(matched.map(row => String(row[0] || "")).filter(Boolean)));
+  const candidates = artifactUuids.map(artifactUuid => {
+    const catalogRow = catalogRows.find(row => String(row[0] || "") === artifactUuid);
+    const artifactMedia = matched.filter(row => String(row[0] || "") === artifactUuid);
+    if (!catalogRow) {
+      throw bridgeError_(
+        `messageId ${sourceMessageId} 已有 AP_MEDIA，但 Catalog 缺少 ${artifactUuid}；必須人工 reconcile`,
+        "PARTIAL_INGEST_REQUIRES_RECONCILE",
+        false
+      );
+    }
+    const quarantined = String(catalogRow[11] || "") === STATUS_REJECTED
+      && artifactMedia.every(row => String(row[7] || "") === MEDIA_STATUS_REJECTED);
+    return { artifactUuid: artifactUuid, catalogRow: catalogRow, mediaRows: artifactMedia, quarantined: quarantined };
+  });
+  const active = candidates.filter(candidate => !candidate.quarantined);
+  if (active.length !== 1) {
+    throw bridgeError_(
+      `messageId ${sourceMessageId} 對應 ${active.length} 個有效 artifactUuid（總計 ${candidates.length}），必須人工 reconcile`,
+      "IDEMPOTENCY_CONFLICT",
+      false
+    );
+  }
+  const keeper = active[0];
+  return bridgeResultFromCatalog_(
+    sourceMessageId,
+    keeper.artifactUuid,
+    keeper.catalogRow,
+    keeper.mediaRows
+  );
+}
+
+function readBridgeJsonFile_(fileId) {
+  if (!fileId) throw bridgeError_("Bridge result file 缺失", "RESULT_FILE_MISSING", false);
+  return JSON.parse(DriveApp.getFileById(String(fileId)).getBlob().getDataAsString("UTF-8"));
+}
+
+function writeBridgeJsonFile_(folder, name, payload) {
+  const content = JSON.stringify(payload);
+  const existing = folder.getFilesByName(name);
+  const file = existing.hasNext()
+    ? existing.next()
+    : folder.createFile(name, content, MimeType.PLAIN_TEXT);
+  file.setContent(content);
+  return file;
+}
+
+function stageBridgeJob_(data, messageId) {
+  const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+  const suppliedImages = Array.isArray(data.images) ? data.images : [];
+  if (!suppliedImages.length || suppliedImages.length > MAX_IMAGES_PER_ARTIFACT) {
+    throw bridgeError_(`同一藏品圖片數須為 1–${MAX_IMAGES_PER_ARTIFACT}`, "INVALID_IMAGE_COUNT", false);
+  }
+  const totalBase64Length = suppliedImages.reduce((sum, image) => {
+    const encoded = image && image.imageBase64;
+    return sum + (typeof encoded === "string" ? encoded.length : 0);
+  }, 0);
+  if (totalBase64Length > 28000000) {
+    throw bridgeError_("多圖 POST payload 超過安全上限；請減少圖片或降低解析度", "PAYLOAD_TOO_LARGE", false);
+  }
+
+  const root = DriveApp.getFolderById(ROOT_FOLDER_ID);
+  const stagingRoot = getOrCreateChildFolder_(root, BRIDGE_STAGING_FOLDER_NAME);
+  if (stagingRoot.getFoldersByName(messageId).hasNext()) {
+    throw bridgeError_("相同 messageId 已有 staging folder；必須人工 reconcile", "STAGING_CONFLICT", false);
+  }
+  const jobFolder = stagingRoot.createFolder(messageId);
+  const images = suppliedImages.map((image, index) => {
+    const encoded = image && image.imageBase64;
+    if (typeof encoded !== "string" || encoded.length < 100) {
+      throw bridgeError_(`第 ${index + 1} 張缺少有效的 imageBase64`, "INVALID_IMAGE", false);
+    }
+    const mimeType = String(image.mimeType || "image/jpeg").toLowerCase();
+    if (!allowedMimeTypes.includes(mimeType)) {
+      throw bridgeError_(`第 ${index + 1} 張 MIME type 不支援`, "INVALID_MIME_TYPE", false);
+    }
+    const originalName = safeDriveFileName_(image.filename || `Antique_${index + 1}${extensionForMime_(mimeType)}`);
+    const filename = `${String(index + 1).padStart(2, "0")}_${originalName}`;
+    const blob = Utilities.newBlob(Utilities.base64Decode(encoded), mimeType, filename);
+    const file = jobFolder.createFile(blob);
+    return {
+      attachmentId: cleanAnalysisText_(image.attachmentId, 100, false),
+      filename: filename,
+      mimeType: mimeType,
+      sizeBytes: blob.getBytes().length,
+      fileId: file.getId()
+    };
+  });
+  const manifest = {
+    version: BRIDGE_STATE_VERSION,
+    messageId: messageId,
+    caption: cleanAnalysisText_(data.caption, 800, false) || "無描述",
+    channelId: cleanAnalysisText_(data.channelId, 100, false),
+    userId: cleanAnalysisText_(data.userId, 100, false),
+    userName: cleanAnalysisText_(data.userName, 100, false),
+    receivedAt: new Date().toISOString(),
+    jobFolderId: jobFolder.getId(),
+    images: images
+  };
+  const manifestFile = writeBridgeJsonFile_(jobFolder, "manifest.json", manifest);
+  return {
+    jobFolderId: jobFolder.getId(),
+    manifestFileId: manifestFile.getId(),
+    imageCount: images.length
+  };
+}
+
+function statusBridgeJob_(messageId) {
+  const props = PropertiesService.getScriptProperties();
+  const rawState = props.getProperty(bridgeStateKey_(messageId));
+  const state = parseBridgeState_(rawState);
+  if (rawState && !state) {
+    throw bridgeError_("durable state JSON 損壞；必須人工 reconcile", "STATE_CORRUPT", false);
+  }
+  if (!state) {
+    const existing = findExistingBridgeArtifact_(SpreadsheetApp.openById(SHEET_ID), messageId);
+    if (existing) return existing;
+    throw bridgeError_("找不到此 messageId 的 durable job", "JOB_NOT_FOUND", false);
+  }
+  if (state.state === "COMPLETED") {
+    try {
+      const result = readBridgeJsonFile_(state.resultFileId);
+      result.state = "COMPLETED";
+      result.bridgeVersion = BRIDGE_CLIENT_VERSION;
+      return result;
+    } catch (err) {
+      const existing = findExistingBridgeArtifact_(SpreadsheetApp.openById(SHEET_ID), messageId);
+      if (existing) return existing;
+      throw err;
+    }
+  }
+  return bridgeAcceptedResponse_(state);
+}
+
+function submitBridgeJob_(data, messageId) {
+  if (String(data.bridgeVersion || "") !== BRIDGE_CLIENT_VERSION) {
+    throw bridgeError_(
+      `Intake client 必須升級為 ${BRIDGE_CLIENT_VERSION}`,
+      "CLIENT_UPGRADE_REQUIRED",
+      false
+    );
+  }
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const rawState = props.getProperty(bridgeStateKey_(messageId));
+    const existingState = parseBridgeState_(rawState);
+    if (rawState && !existingState) {
+      throw bridgeError_("durable state JSON 損壞；必須人工 reconcile", "STATE_CORRUPT", false);
+    }
+    if (existingState) return statusBridgeJob_(messageId);
+    const existingArtifact = findExistingBridgeArtifact_(SpreadsheetApp.openById(SHEET_ID), messageId);
+    if (existingArtifact) return existingArtifact;
+    if (props.getProperty(BRIDGE_PARTIAL_PREFIX + messageId)) {
+      throw bridgeError_(
+        `messageId ${messageId} 曾進入寫入階段；執行 diagBridgeReconcilePlan() 後再處理`,
+        "PARTIAL_INGEST_REQUIRES_RECONCILE",
+        false
+      );
+    }
+    writeBridgeState_(props, {
+      messageId: messageId,
+      jobId: messageId,
+      state: "ACCEPTING",
+      phase: "STAGING",
+      createdAt: new Date().toISOString(),
+      attempt: 0
+    });
+  } finally {
+    lock.releaseLock();
+  }
+
+  try {
+    const staged = stageBridgeJob_(data, messageId);
+    const current = readBridgeState_(props, messageId) || { messageId: messageId, jobId: messageId };
+    Object.assign(current, staged, {
+      state: "QUEUED",
+      phase: "STAGED",
+      queuedAt: new Date().toISOString(),
+      code: "JOB_QUEUED",
+      error: ""
+    });
+    writeBridgeState_(props, current);
+    return bridgeAcceptedResponse_(current);
+  } catch (err) {
+    const current = readBridgeState_(props, messageId) || { messageId: messageId, jobId: messageId };
+    Object.assign(current, {
+      state: "RECONCILE_REQUIRED",
+      phase: "STAGING_FAILED",
+      code: String(err.bridgeCode || "STAGING_FAILED"),
+      error: String(err.message || err).substring(0, 500)
+    });
+    writeBridgeState_(props, current);
+    throw bridgeError_(current.error, current.code, false);
+  }
+}
+
+function claimNextBridgeJob_() {
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const now = Date.now();
+    const propertySnapshot = props.getProperties();
+    if (Object.keys(propertySnapshot).some(key => key.startsWith(BRIDGE_PARTIAL_PREFIX))) {
+      return null;
+    }
+    const stateKeys = Object.keys(propertySnapshot).filter(key => key.startsWith(BRIDGE_STATE_PREFIX));
+    const states = stateKeys.map(key => parseBridgeState_(propertySnapshot[key]));
+    if (states.some(state => !state)) return null;
+
+    states.filter(state => state.state === "COMPLETED").forEach(state => {
+      const age = now - Date.parse(state.completedAt || state.updatedAt || 0);
+      if (age > BRIDGE_COMPLETED_STATE_RETENTION_MS) {
+        props.deleteProperty(bridgeStateKey_(state.messageId));
+      }
+    });
+
+    states.filter(state => state.state === "ACCEPTING").forEach(state => {
+      const age = now - Date.parse(state.updatedAt || state.createdAt || 0);
+      if (age > BRIDGE_RUNNING_LEASE_MS) {
+        Object.assign(state, {
+          state: "RECONCILE_REQUIRED",
+          phase: "STAGING_LEASE_EXPIRED",
+          code: "STAGING_LEASE_EXPIRED",
+          error: "staging 未在 lease 內完成；檢查私人暫存資料後再處理"
+        });
+        writeBridgeState_(props, state);
+      }
+    });
+
+    const active = states.find(state => state.state === "RUNNING");
+    if (active) {
+      const age = now - Date.parse(active.startedAt || active.updatedAt || 0);
+      if (age <= BRIDGE_RUNNING_LEASE_MS) return null;
+      Object.assign(active, {
+        state: active.phase === "PERSISTENCE_STARTED" ? "RECONCILE_REQUIRED" : "FAILED",
+        code: "WORKER_LEASE_EXPIRED",
+        error: "worker 超過 lease；未自動重跑，避免重複 Gemini 或持久化"
+      });
+      writeBridgeState_(props, active);
+    }
+
+    if (states.some(state => state.state === "RECONCILE_REQUIRED")) return null;
+
+    const queued = states
+      .filter(state => state.state === "QUEUED")
+      .sort((a, b) => String(a.queuedAt || "").localeCompare(String(b.queuedAt || "")))[0];
+    if (!queued) return null;
+    Object.assign(queued, {
+      state: "RUNNING",
+      phase: "ANALYZING",
+      startedAt: new Date().toISOString(),
+      attempt: Number(queued.attempt || 0) + 1,
+      code: "JOB_RUNNING",
+      error: ""
+    });
+    writeBridgeState_(props, queued);
+    return queued;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function promoteStagedMedia_(manifest, category, era, artifactUuid) {
+  const root = DriveApp.getFolderById(ROOT_FOLDER_ID);
+  const catFolder = getOrCreateChildFolder_(root, category);
+  const eraFolder = getOrCreateChildFolder_(catFolder, era);
+  const itemFolder = getOrCreateChildFolder_(eraFolder, artifactUuid);
+  const stamp = Utilities.formatDate(new Date(), "Asia/Taipei", "yyyyMMdd_HHmmss");
+  return manifest.images.map((image, index) => {
+    const file = DriveApp.getFileById(image.fileId);
+    file.setName(`${stamp}_${String(index + 1).padStart(2, "0")}_${safeDriveFileName_(image.filename)}`);
+    file.moveTo(itemFolder);
+    return {
+      mediaId: Utilities.getUuid(),
+      driveFileId: file.getId(),
+      driveUrl: file.getUrl(),
+      sourceAttachmentId: String(image.attachmentId || ""),
+      mimeType: String(image.mimeType || "image/jpeg"),
+      sizeBytes: Number(image.sizeBytes || 0),
+      sortOrder: index + 1,
+      isPrimary: index === 0
+    };
+  });
+}
+
+function completeBridgeState_(state, result) {
+  const props = PropertiesService.getScriptProperties();
+  const folder = DriveApp.getFolderById(state.jobFolderId);
+  const resultFile = writeBridgeJsonFile_(folder, "result.json", result);
+  Object.assign(state, {
+    state: "COMPLETED",
+    phase: "COMMITTED",
+    code: "JOB_COMPLETED",
+    error: "",
+    resultFileId: resultFile.getId(),
+    artifactUuid: result.artifactUuid,
+    imageCount: result.imageCount,
+    completedAt: new Date().toISOString()
+  });
+  writeBridgeState_(props, state);
+  props.deleteProperty(BRIDGE_PARTIAL_PREFIX + state.messageId);
+}
+
+function processBridgeJob_(state) {
+  const props = PropertiesService.getScriptProperties();
+  let persistenceStarted = false;
+  try {
+    const manifest = readBridgeJsonFile_(state.manifestFileId);
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    const existing = findExistingBridgeArtifact_(spreadsheet, state.messageId);
+    if (existing) {
+      completeBridgeState_(state, existing);
+      return existing;
+    }
+    const blobs = manifest.images.map(image => DriveApp.getFileById(image.fileId).getBlob());
+    const analysis = analyzeWithGemini(blobs, manifest.caption || "無描述");
+    if (!analysis) throw bridgeError_("Gemini 回傳空值", "GEMINI_EMPTY", false);
+
+    const category = analysis.isValid ? (analysis.category || "未分類") : "退回件";
+    const era = analysis.isValid ? (analysis.era || "時代不詳") : "無";
+    const artifactUuid = Utilities.getUuid();
+    props.setProperty(BRIDGE_PARTIAL_PREFIX + state.messageId, JSON.stringify({
+      messageId: state.messageId,
+      artifactUuid: artifactUuid,
+      phase: "PERSISTENCE_STARTED",
+      startedAt: new Date().toISOString()
+    }));
+    Object.assign(state, {phase: "PERSISTENCE_STARTED", artifactUuid: artifactUuid});
+    writeBridgeState_(props, state);
+    persistenceStarted = true;
+
+    const savedMedia = promoteStagedMedia_(manifest, category, era, artifactUuid);
+    const fileUrl = savedMedia[0].driveUrl;
+    writeMediaRows_(artifactUuid, savedMedia, analysis.views || [], state.messageId);
+    writeToSheet(manifest.caption || "無描述", analysis, fileUrl, artifactUuid);
+    const result = {
+      success: true,
+      accepted: false,
+      state: "COMPLETED",
+      duplicate: false,
+      bridgeVersion: BRIDGE_CLIENT_VERSION,
+      analysis: analysis,
+      fileUrl: fileUrl,
+      messageId: state.messageId,
+      jobId: state.jobId,
+      artifactUuid: artifactUuid,
+      imageCount: savedMedia.length
+    };
+    completeBridgeState_(state, result);
+    console.log(`[AP Bridge Worker] COMPLETED messageId=${state.messageId} artifactUuid=${artifactUuid}`);
+    return result;
+  } catch (err) {
+    const current = readBridgeState_(props, state.messageId) || state;
+    Object.assign(current, {
+      state: persistenceStarted || current.phase === "PERSISTENCE_STARTED" ? "RECONCILE_REQUIRED" : "FAILED",
+      code: String(err.bridgeCode || "WORKER_FAILED"),
+      error: String(err.message || err).substring(0, 500),
+      failedAt: new Date().toISOString()
+    });
+    writeBridgeState_(props, current);
+    console.error(`[AP Bridge Worker] ${current.code} messageId=${state.messageId}: ${current.error}`);
+    return bridgeAcceptedResponse_(current);
+  }
+}
+
+/** Time-driven DD-108 worker. It never reads Discord and claims at most one job. */
+function processBridgeQueue() {
+  const state = claimNextBridgeJob_();
+  if (!state) {
+    console.log("[AP Bridge Worker] 無可執行 job");
+    return {state: "IDLE"};
+  }
+  return processBridgeJob_(state);
+}
+
 function doPost(e) {
   let messageId = "";
-  let requestAccepted = false;
-  let persistenceStarted = false;
-  let inflightKey = "";
-  let partialKey = "";
-  const props = PropertiesService.getScriptProperties();
-  const cache = CacheService.getScriptCache();
   try {
     if (!e || !e.postData || !e.postData.contents) {
       throw bridgeError_("缺少 POST JSON payload", "INVALID_REQUEST", false);
@@ -1020,121 +1431,21 @@ function doPost(e) {
     if (!/^\d{10,30}$/.test(messageId)) {
       throw bridgeError_("缺少有效 Discord messageId，拒絕無冪等鍵的請求", "INVALID_MESSAGE_ID", false);
     }
-    requestAccepted = true;
-    inflightKey = BRIDGE_INFLIGHT_PREFIX + messageId;
-    partialKey = BRIDGE_PARTIAL_PREFIX + messageId;
-
-    const lock = LockService.getScriptLock();
-    lock.waitLock(10000);
-    try {
-      const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
-      const existing = findExistingBridgeArtifact_(spreadsheet, messageId);
-      if (existing) {
-        cache.remove(inflightKey);
-        props.deleteProperty(partialKey);
-        return bridgeJsonResponse_(existing);
-      }
-      const partialRecord = props.getProperty(partialKey);
-      if (partialRecord) {
-        throw bridgeError_(
-          `messageId ${messageId} 曾進入寫入階段；執行 diagBridgeReconcilePlan() 後再處理`,
-          "PARTIAL_INGEST_REQUIRES_RECONCILE",
-          false
-        );
-      }
-      if (cache.get(inflightKey)) {
-        return bridgeJsonResponse_({
-          success: false,
-          code: "INGEST_IN_PROGRESS",
-          retrySafe: true,
-          messageId: messageId,
-          error: "相同 messageId 正在處理中；稍後以同一請求重查"
-        });
-      }
-      cache.put(inflightKey, new Date().toISOString(), BRIDGE_INFLIGHT_SECONDS);
-    } finally {
-      lock.releaseLock();
-    }
-
-    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
-    const caption = cleanAnalysisText_(data.caption, 800, false) || "無描述";
-    const suppliedImages = Array.isArray(data.images) && data.images.length
-      ? data.images
-      : [{ imageBase64: data.imageBase64, mimeType: data.mimeType, filename: data.filename }];
-    if (!suppliedImages.length || suppliedImages.length > MAX_IMAGES_PER_ARTIFACT) {
-      throw bridgeError_(
-        `同一藏品圖片數須為 1–${MAX_IMAGES_PER_ARTIFACT}`,
-        "INVALID_IMAGE_COUNT",
-        false
-      );
-    }
-
-    const totalBase64Length = suppliedImages.reduce((sum, image) => {
-      const encoded = image && image.imageBase64;
-      return sum + (typeof encoded === "string" ? encoded.length : 0);
-    }, 0);
-    if (totalBase64Length > 28000000) {
-      throw bridgeError_("多圖 POST payload 超過安全上限；請減少圖片或降低解析度", "PAYLOAD_TOO_LARGE", false);
-    }
-    const attachments = [];
-    const blobs = suppliedImages.map((image, index) => {
-      const imgB64 = image && image.imageBase64;
-      if (typeof imgB64 !== "string" || imgB64.length < 100) {
-        throw bridgeError_(`第 ${index + 1} 張缺少有效的 imageBase64`, "INVALID_IMAGE", false);
-      }
-      const requestedMime = String(image.mimeType || "image/jpeg").toLowerCase();
-      if (!allowedMimeTypes.includes(requestedMime)) {
-        throw bridgeError_(`第 ${index + 1} 張 MIME type 不支援`, "INVALID_MIME_TYPE", false);
-      }
-      const filename = safeDriveFileName_(image.filename || `Antique_${Date.now()}_${index + 1}${extensionForMime_(requestedMime)}`);
-      attachments.push({
-        id: cleanAnalysisText_(image.attachmentId, 100, false),
-        filename: filename,
-        contentType: requestedMime
-      });
-      return Utilities.newBlob(Utilities.base64Decode(imgB64), requestedMime, filename);
-    });
-
-    const analysis = analyzeWithGemini(blobs, caption);
-    if (!analysis) throw bridgeError_("Gemini 回傳空值", "GEMINI_EMPTY", true);
-
-    const category = analysis.isValid ? (analysis.category || "未分類") : "退回件";
-    const era = analysis.isValid ? (analysis.era || "時代不詳") : "無";
-    const artifactUuid = Utilities.getUuid();
-    props.setProperty(partialKey, JSON.stringify({
-      messageId: messageId,
-      artifactUuid: artifactUuid,
-      phase: "PERSISTENCE_STARTED",
-      startedAt: new Date().toISOString()
-    }));
-    persistenceStarted = true;
-    const savedMedia = saveArtifactMedia_(blobs, attachments, category, era, artifactUuid);
-    const fileUrl = savedMedia[0].driveUrl;
-    writeMediaRows_(artifactUuid, savedMedia, analysis.views || [], messageId);
-    writeToSheet(caption, analysis, fileUrl, artifactUuid);
-    props.deleteProperty(partialKey);
-    cache.remove(inflightKey);
-
-    return bridgeJsonResponse_({
-      success: true,
-      duplicate: false,
-      analysis: analysis,
-      fileUrl: fileUrl,
-      messageId: messageId,
-      artifactUuid: artifactUuid,
-      imageCount: savedMedia.length
-    });
+    const action = String(data.action || "submit").toLowerCase();
+    if (action === "status") return bridgeJsonResponse_(statusBridgeJob_(messageId));
+    if (action !== "submit") throw bridgeError_("不支援的 Bridge action", "INVALID_ACTION", false);
+    return bridgeJsonResponse_(submitBridgeJob_(data, messageId));
   } catch (err) {
-    if (inflightKey && !persistenceStarted) cache.remove(inflightKey);
     const code = String(err.bridgeCode || "BRIDGE_ERROR");
-    const retrySafe = requestAccepted && !persistenceStarted && err.retrySafe === true;
     console.error(`[AP Bridge] ${code} messageId=${messageId || "n/a"}: ${err.message}`);
     return bridgeJsonResponse_({
       success: false,
+      accepted: false,
       code: code,
-      retrySafe: retrySafe,
+      retrySafe: err.retrySafe === true,
+      bridgeVersion: BRIDGE_CLIENT_VERSION,
       messageId: messageId,
-      error: err.message
+      error: String(err.message || err).substring(0, 500)
     });
   }
 }
@@ -2153,7 +2464,7 @@ function finalizePreflightReport_(checks, integrityIssues) {
   const warnCount = checks.filter(check => check.status === "WARN").length
     + issues.filter(issue => issue.severity === "WARN").length;
   return {
-    version: "AP-GAS-v10.3-preflight",
+    version: "AP-GAS-v10.4-preflight",
     generatedAt: new Date().toISOString(),
     status: failCount === 0 ? "PASS" : "FAIL",
     summary: { fail: failCount, warn: warnCount, checks: checks.length, integrityIssues: issues.length },
@@ -2498,12 +2809,13 @@ function diagPredeployAudit() {
     const triggerNames = ScriptApp.getProjectTriggers().map(trigger => trigger.getHandlerFunction());
     const mainCount = triggerNames.filter(name => name === "mainTick").length;
     const legacyCount = triggerNames.filter(name => name === "processJobAsync").length;
-    const healthy = mainCount === 0 && legacyCount === 0;
-    addPreflightCheck_(checks, "trigger.local_bridge", healthy ? "PASS" : "FAIL",
-      `mainTick=${mainCount}；legacy processJobAsync=${legacyCount}`,
-      healthy ? "" : "執行 cleanupTriggers()；local_bridge 不可保留 Discord polling trigger");
+    const workerCount = triggerNames.filter(name => name === BRIDGE_WORKER_FUNCTION).length;
+    const healthy = mainCount === 0 && legacyCount === 0 && workerCount === 1;
+    addPreflightCheck_(checks, "trigger.durable_bridge", healthy ? "PASS" : "FAIL",
+      `processBridgeQueue=${workerCount}；mainTick=${mainCount}；legacy processJobAsync=${legacyCount}`,
+      healthy ? "" : "執行 setupAntiquePipeline()；只保留唯一 processBridgeQueue，不得保留 Discord polling trigger");
   } catch (err) {
-    addPreflightCheck_(checks, "trigger.local_bridge", "WARN", err.message, "完成 Apps Script 授權後重跑");
+    addPreflightCheck_(checks, "trigger.durable_bridge", "WARN", err.message, "完成 Apps Script 授權後重跑");
   }
 
   try {
@@ -2528,6 +2840,20 @@ function diagPredeployAudit() {
     addPreflightCheck_(checks, "bridge.partial_write", partialCount ? "FAIL" : "PASS",
       `local bridge partial marker ${partialCount} 筆`,
       partialCount ? "停止 Intake；執行 diagBridgeReconcilePlan()，不可自動清除或重送" : "");
+    const bridgeStateKeys = Object.keys(propertySnapshot)
+      .filter(key => key.startsWith(BRIDGE_STATE_PREFIX));
+    const parsedBridgeStates = bridgeStateKeys.map(key => parseBridgeState_(propertySnapshot[key]));
+    const corruptBridgeStates = parsedBridgeStates.filter(state => !state).length;
+    const bridgeStates = parsedBridgeStates.filter(Boolean);
+    const bridgeReconcile = bridgeStates.filter(state => state.state === "RECONCILE_REQUIRED").length;
+    const bridgeQueued = bridgeStates.filter(state => state.state === "QUEUED").length;
+    const bridgeRunning = bridgeStates.filter(state => state.state === "RUNNING").length;
+    addPreflightCheck_(checks, "bridge.durable_state",
+      bridgeReconcile || corruptBridgeStates ? "FAIL" : "PASS",
+      `queued=${bridgeQueued}；running=${bridgeRunning}；reconcile=${bridgeReconcile}；corrupt=${corruptBridgeStates}`,
+      bridgeReconcile || corruptBridgeStates
+        ? "停止 Intake；執行 diagBridgeReconcilePlan()，不可自動清除或重送"
+        : "");
   } catch (err) {
     addPreflightCheck_(checks, "queue.pending_jobs", "FAIL", err.message, "由 Craig 確認後才可清空損壞佇列");
   }
@@ -2537,7 +2863,7 @@ function diagPredeployAudit() {
   return report;
 }
 
-/** Controlled local-bridge setup. Creates AP_MEDIA and removes legacy polling triggers. */
+/** Controlled durable-bridge setup. Creates AP_MEDIA and exactly one non-Discord worker. */
 function setupAntiquePipeline() {
   if (!GEMINI_KEY) throw new Error("缺少 Script Property: GEMINI_API_KEY");
   if (AP_INGEST_SECRET.length < 24) throw new Error("AP_INGEST_SECRET 至少需 24 字元");
@@ -2550,6 +2876,15 @@ function setupAntiquePipeline() {
   }
   ensureMediaSheet_(spreadsheet);
   cleanupTriggers();
+  const readiness = diagPredeployAudit();
+  const blockingChecks = readiness.checks.filter(check =>
+    check.status === "FAIL" && check.id !== "trigger.durable_bridge"
+  );
+  const blockingIntegrity = readiness.integrityIssues.filter(issue => issue.severity === "FAIL");
+  if (blockingChecks.length || blockingIntegrity.length) {
+    throw new Error("Setup readiness FAIL；未建立 worker，先修正資料契約、憑證或完整性問題");
+  }
+  setupTrigger();
   const report = diagPredeployAudit();
   if (report.status !== "PASS") {
     throw new Error("Preflight FAIL；先修正資料契約、憑證或完整性問題");
@@ -2594,7 +2929,7 @@ function diagBridgeReconcilePlan() {
   const catalogRows = catalogSheet.getLastRow() >= 2
     ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
     : [];
-  const items = Object.keys(props)
+  const partialItems = Object.keys(props)
     .filter(key => key.startsWith(BRIDGE_PARTIAL_PREFIX))
     .map(key => {
       let record = {};
@@ -2611,16 +2946,265 @@ function diagBridgeReconcilePlan() {
         action: "人工比對 Drive / AP_MEDIA / Catalog；確認後才可清除 marker 或重送"
       };
     });
+  const partialMessageIds = new Set(partialItems.map(item => item.messageId));
+  const durableStateKeys = Object.keys(props)
+    .filter(key => key.startsWith(BRIDGE_STATE_PREFIX));
+  const corruptItems = durableStateKeys
+    .filter(key => !parseBridgeState_(props[key]))
+    .map(key => ({
+      messageId: key.substring(BRIDGE_STATE_PREFIX.length),
+      artifactUuid: "",
+      phase: "STATE_JSON_INVALID",
+      startedAt: "",
+      mediaRows: 0,
+      catalogRows: 0,
+      action: "停止 worker；保存原始 Script Property 後人工修復，不可覆寫"
+    }));
+  const durableItems = durableStateKeys
+    .map(key => parseBridgeState_(props[key]))
+    .filter(state => state && state.state === "RECONCILE_REQUIRED")
+    .filter(state => !partialMessageIds.has(String(state.messageId || "")))
+    .map(state => {
+      const artifactUuid = String(state.artifactUuid || "");
+      return {
+        messageId: String(state.messageId || ""),
+        artifactUuid: artifactUuid,
+        phase: String(state.phase || "UNKNOWN"),
+        startedAt: String(state.startedAt || state.updatedAt || ""),
+        mediaRows: mediaRows.filter(row => String(row[0] || "") === artifactUuid).length,
+        catalogRows: catalogRows.filter(row => String(row[0] || "") === artifactUuid).length,
+        action: "人工比對 staging / Drive / AP_MEDIA / Catalog；確認後才可修復 durable state"
+      };
+    });
+  const items = partialItems.concat(durableItems, corruptItems);
   const plan = {
-    version: "AP-GAS-v10.3-bridge-reconcile",
+    version: "AP-GAS-v10.4-bridge-reconcile",
     generatedAt: new Date().toISOString(),
     mode: "READ_ONLY_PLAN",
     status: items.length ? "ACTION_REQUIRED" : "CLEAN",
-    partialCount: items.length,
+    partialCount: partialItems.length,
+    durableReconcileCount: durableItems.length,
+    corruptStateCount: corruptItems.length,
     items: items
   };
   console.log("[AP Bridge Reconcile Plan] " + JSON.stringify(plan));
   return plan;
+}
+
+/**
+ * CHANGE GAS-DURABLE-ASYNC: DD-108 read-only duplicate detector. It returns
+ * identifiers, row counts, and statuses only; no captions, names, URLs, or formulas.
+ */
+function analyzeBridgeMessageDuplicates_(catalogRows, mediaRows) {
+  const catalogByUuid = {};
+  catalogRows.forEach((row, index) => {
+    const artifactUuid = String(row[0] || "");
+    if (!artifactUuid) return;
+    if (!catalogByUuid[artifactUuid]) catalogByUuid[artifactUuid] = [];
+    catalogByUuid[artifactUuid].push({sheetRow: index + 2, status: String(row[11] || "")});
+  });
+
+  const byMessage = {};
+  mediaRows.forEach((row, index) => {
+    const messageId = String(row[9] || "");
+    const artifactUuid = String(row[0] || "");
+    if (!messageId || !artifactUuid) return;
+    if (!byMessage[messageId]) byMessage[messageId] = {};
+    if (!byMessage[messageId][artifactUuid]) byMessage[messageId][artifactUuid] = [];
+    byMessage[messageId][artifactUuid].push({
+      sheetRow: index + 2,
+      status: String(row[7] || ""),
+      attachmentId: String(row[8] || ""),
+      sortOrder: Number(row[5] || 0)
+    });
+  });
+
+  return Object.keys(byMessage).sort().map(messageId => {
+    const artifactUuids = Object.keys(byMessage[messageId]).sort();
+    if (artifactUuids.length < 2) return null;
+    return {
+      messageId: messageId,
+      artifactCount: artifactUuids.length,
+      artifacts: artifactUuids.map(artifactUuid => {
+        const media = byMessage[messageId][artifactUuid];
+        const catalog = catalogByUuid[artifactUuid] || [];
+        const catalogStatus = catalog.length === 1 ? catalog[0].status : "MISSING_OR_DUPLICATE";
+        const mediaStatuses = Array.from(new Set(media.map(item => item.status))).sort();
+        const quarantined = catalogStatus === STATUS_REJECTED
+          && media.length > 0
+          && mediaStatuses.length === 1
+          && mediaStatuses[0] === MEDIA_STATUS_REJECTED;
+        return {
+          artifactUuid: artifactUuid,
+          catalogRows: catalog.length,
+          mediaRows: media.length,
+          catalogStatus: catalogStatus,
+          mediaStatuses: mediaStatuses,
+          quarantined: quarantined
+        };
+      })
+    };
+  }).filter(Boolean);
+}
+
+/** Read-only DD-108 plan for duplicate artifacts created by timed-out v10.3 POST retries. */
+function diagBridgeMessageDuplicates() {
+  const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+  const catalogSheet = spreadsheet.getSheets()[0];
+  const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
+  if (!mediaSheet) throw new Error("找不到 AP_MEDIA；無法檢查 Bridge messageId 重複寫入");
+  const catalogRows = catalogSheet.getLastRow() >= 2
+    ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+    : [];
+  const mediaRows = mediaSheet.getLastRow() >= 2
+    ? mediaSheet.getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length).getValues()
+    : [];
+  const duplicates = analyzeBridgeMessageDuplicates_(catalogRows, mediaRows);
+  const activeDuplicateCount = duplicates.filter(group =>
+    group.artifacts.filter(artifact => !artifact.quarantined).length > 1
+  ).length;
+  const plan = {
+    version: "AP-GAS-v10.4-dd108-duplicate-plan",
+    generatedAt: new Date().toISOString(),
+    mode: "READ_ONLY_REDACTED",
+    status: activeDuplicateCount ? "ACTION_REQUIRED" : "CLEAN",
+    duplicateMessageCount: duplicates.length,
+    activeDuplicateCount: activeDuplicateCount,
+    groups: duplicates
+  };
+  console.log("[AP Bridge Duplicate Plan] " + JSON.stringify(plan));
+  return plan;
+}
+
+/**
+ * Craig-approved DD-108 repair for the single known v10.3 timeout duplicate.
+ * It changes status only: the keeper remains untouched, the duplicate Catalog
+ * row becomes 已退件, and its AP_MEDIA rows become rejected. Nothing is deleted.
+ */
+function applyDd108KnownTestDuplicateQuarantine() {
+  const ddId = "DD-108";
+  const messageId = "1543912512204967967";
+  const keeperUuid = "9a3705a2-fa29-420b-8047-6b56c524a0a5";
+  const duplicateUuid = "06b0648a-3e4a-4ffe-a330-4e0523b53bba";
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  let catalogStatusCell = null;
+  let duplicateMediaStatusCells = [];
+  let previousCatalogStatus = "";
+  let previousMediaStatuses = [];
+  let writeAttempted = false;
+  try {
+    const spreadsheet = SpreadsheetApp.openById(SHEET_ID);
+    const catalogSheet = spreadsheet.getSheets()[0];
+    const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
+    if (!mediaSheet) throw new Error("找不到 AP_MEDIA");
+    const catalogRows = catalogSheet.getLastRow() >= 2
+      ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+      : [];
+    const mediaRows = mediaSheet.getLastRow() >= 2
+      ? mediaSheet.getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length).getValues()
+      : [];
+    const group = analyzeBridgeMessageDuplicates_(catalogRows, mediaRows)
+      .find(item => item.messageId === messageId);
+    if (!group) throw new Error("找不到核准的 sourceMessageId 重複群組");
+    const actualUuids = group.artifacts.map(item => item.artifactUuid).sort();
+    const expectedUuids = [keeperUuid, duplicateUuid].sort();
+    if (actualUuids.join("|") !== expectedUuids.join("|")) {
+      throw new Error("重複群組 UUID 與 DD-108 核准證據不一致");
+    }
+    if (group.artifacts.some(item => item.catalogRows !== 1 || item.mediaRows < 1)) {
+      throw new Error("Catalog / AP_MEDIA 列數不符合單一完整藏品契約");
+    }
+    const keeperMedia = mediaRows.filter(row => String(row[0] || "") === keeperUuid && String(row[9] || "") === messageId);
+    const duplicateMedia = mediaRows.filter(row => String(row[0] || "") === duplicateUuid && String(row[9] || "") === messageId);
+    const mediaFingerprint = rows => rows.map(row => `${String(row[8] || "")}:${Number(row[5] || 0)}`).sort().join("|");
+    if (mediaFingerprint(keeperMedia) !== mediaFingerprint(duplicateMedia)) {
+      throw new Error("兩筆藏品的 attachment / sortOrder 證據不一致；拒絕自動隔離");
+    }
+    const duplicateCatalogIndex = catalogRows.findIndex(row => String(row[0] || "") === duplicateUuid);
+    if (duplicateCatalogIndex < 0) throw new Error("找不到 duplicate Catalog row");
+    const duplicateMediaIndexes = [];
+    mediaRows.forEach((row, index) => {
+      if (String(row[0] || "") === duplicateUuid && String(row[9] || "") === messageId) {
+        duplicateMediaIndexes.push(index);
+      }
+    });
+    catalogStatusCell = catalogSheet.getRange(duplicateCatalogIndex + 2, 12);
+    duplicateMediaStatusCells = duplicateMediaIndexes.map(index => mediaSheet.getRange(index + 2, 8));
+    previousCatalogStatus = String(catalogStatusCell.getDisplayValue() || "");
+    previousMediaStatuses = duplicateMediaStatusCells.map(cell => String(cell.getDisplayValue() || ""));
+    if (previousCatalogStatus === STATUS_REJECTED
+        && previousMediaStatuses.every(status => status === MEDIA_STATUS_REJECTED)) {
+      const already = {
+        version: "AP-GAS-v10.4-dd108-quarantine",
+        ddId: ddId,
+        status: "ALREADY_APPLIED",
+        messageId: messageId,
+        keeperUuid: keeperUuid,
+        quarantinedUuid: duplicateUuid,
+        catalogRowsTouched: 0,
+        mediaRowsTouched: 0,
+        filesDeleted: 0
+      };
+      console.log("[AP DD-108 Quarantine] " + JSON.stringify(already));
+      return already;
+    }
+    if (previousCatalogStatus !== STATUS_PENDING_REVIEW
+        || previousMediaStatuses.some(status => status !== MEDIA_STATUS_PENDING)) {
+      throw new Error("duplicate 的現行狀態已偏離待覆核 / pending；拒絕覆寫人工決策");
+    }
+    writeAttempted = true;
+    catalogStatusCell.setValue(STATUS_REJECTED);
+    duplicateMediaStatusCells.forEach(cell => cell.setValue(MEDIA_STATUS_REJECTED));
+    SpreadsheetApp.flush();
+    if (String(catalogStatusCell.getDisplayValue()) !== STATUS_REJECTED
+        || duplicateMediaStatusCells.some(cell => String(cell.getDisplayValue()) !== MEDIA_STATUS_REJECTED)) {
+      throw new Error("隔離後驗證失敗");
+    }
+    const receipt = {
+      version: "AP-GAS-v10.4-dd108-quarantine",
+      ddId: ddId,
+      status: "APPLIED",
+      appliedAt: new Date().toISOString(),
+      messageId: messageId,
+      keeperUuid: keeperUuid,
+      quarantinedUuid: duplicateUuid,
+      catalogRowsTouched: 1,
+      mediaRowsTouched: duplicateMediaStatusCells.length,
+      filesDeleted: 0,
+      rollback: "Restore captured Catalog/AP_MEDIA status values only if verification fails"
+    };
+    console.log("[AP DD-108 Quarantine] " + JSON.stringify(receipt));
+    return receipt;
+  } catch (err) {
+    let rollback = writeAttempted ? "NOT_CONFIRMED" : "NOT_NEEDED";
+    if (writeAttempted && catalogStatusCell) {
+      try {
+        catalogStatusCell.setValue(previousCatalogStatus);
+        duplicateMediaStatusCells.forEach((cell, index) => cell.setValue(previousMediaStatuses[index]));
+        SpreadsheetApp.flush();
+        const restored = String(catalogStatusCell.getDisplayValue()) === previousCatalogStatus
+          && duplicateMediaStatusCells.every((cell, index) =>
+            String(cell.getDisplayValue()) === previousMediaStatuses[index]
+          );
+        rollback = restored ? "RESTORED_PREVIOUS_STATUSES" : "RESTORE_VERIFICATION_FAILED";
+      } catch (rollbackErr) {
+        rollback = "RESTORE_ERROR: " + rollbackErr.message;
+      }
+    }
+    console.error("[AP DD-108 Quarantine] " + JSON.stringify({
+      version: "AP-GAS-v10.4-dd108-quarantine",
+      ddId: ddId,
+      status: "FAILED",
+      messageId: messageId,
+      error: String(err.message || err),
+      rollback: rollback,
+      filesDeleted: 0
+    }));
+    throw new Error(`[DD-108] ${err.message}; rollback=${rollback}`);
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /** Zero Gemini cost. Run after deployment; run Gemini canary separately only when needed. */
@@ -2630,14 +3214,15 @@ function diagPostdeployCanary() {
   const triggers = ScriptApp.getProjectTriggers().map(trigger => trigger.getHandlerFunction());
   const mainCount = triggers.filter(name => name === "mainTick").length;
   const legacyCount = triggers.filter(name => name === "processJobAsync").length;
-  const noPollingTriggers = mainCount === 0 && legacyCount === 0;
-  addPreflightCheck_(checks, "post.local_bridge.trigger", noPollingTriggers ? "PASS" : "FAIL",
-    `mainTick=${mainCount}；legacy processJobAsync=${legacyCount}`,
-    noPollingTriggers ? "" : "執行 cleanupTriggers()；GAS 不可再輪詢 Discord");
+  const workerCount = triggers.filter(name => name === BRIDGE_WORKER_FUNCTION).length;
+  const healthyTriggers = mainCount === 0 && legacyCount === 0 && workerCount === 1;
+  addPreflightCheck_(checks, "post.durable_bridge.trigger", healthyTriggers ? "PASS" : "FAIL",
+    `processBridgeQueue=${workerCount}；mainTick=${mainCount}；legacy processJobAsync=${legacyCount}`,
+    healthyTriggers ? "" : "執行 setupAntiquePipeline()；GAS 不可輪詢 Discord，且須有唯一背景 worker");
   addPreflightCheck_(checks, "post.local_bridge.mode",
     DISCORD_IO_MODE === "local_bridge" && AP_INGEST_SECRET.length >= 24 ? "PASS" : "FAIL",
     `mode=${DISCORD_IO_MODE}；GAS Discord egress calls=0`,
-    "設定至少 24 字元 AP_INGEST_SECRET，並確認部署的是 v10.3 local_bridge");
+    "設定至少 24 字元 AP_INGEST_SECRET，並確認部署的是 v10.4 durable_async bridge");
 
   try {
     const service = ScriptApp.getService();
@@ -2689,7 +3274,7 @@ function diagPostdeployCanary() {
 function cleanupTriggers() {
   ScriptApp.getProjectTriggers().forEach(trigger => {
     const fn = trigger.getHandlerFunction();
-    if (fn === "mainTick" || fn === "processJobAsync") {
+    if (fn === "mainTick" || fn === "processJobAsync" || fn === BRIDGE_WORKER_FUNCTION) {
       ScriptApp.deleteTrigger(trigger);
     }
   });
@@ -2697,7 +3282,11 @@ function cleanupTriggers() {
 
 function setupTrigger() {
   cleanupTriggers();
-  throw new Error("v10.3 local_bridge 禁止建立 mainTick；舊 trigger 已清除");
+  ScriptApp.newTrigger(BRIDGE_WORKER_FUNCTION)
+    .timeBased()
+    .everyMinutes(1)
+    .create();
+  console.log("✅ processBridgeQueue 1分鐘 durable worker Trigger 建立完成");
 }
 
 // ============================================================
@@ -2732,7 +3321,7 @@ function safeEnqueue(jobId) {
 
 /**
  * 安全重置：僅在 queue / durable payload / dead-letter 全空時，
- * 清除舊 Discord lastId 與 polling trigger；有資料時 fail closed。
+ * 清除舊 Discord lastId，重建唯一 durable worker；有 legacy queue 資料時 fail closed。
  */
 function resetBot() {
   const props = PropertiesService.getScriptProperties();
@@ -2744,9 +3333,9 @@ function resetBot() {
   }
   props.deleteProperty(PENDING_JOBS_PROPERTY);
   props.deleteProperty("discord_last_message_id");
-  cleanupTriggers();
-  console.log("✅ resetBot 完成：確認空佇列、Discord lastId 重置、legacy trigger 已移除");
-  console.log("   v10.3 請在本地啟動 ap_discord_bot.py；GAS 不再輪詢 Discord");
+  setupTrigger();
+  console.log("✅ resetBot 完成：確認空佇列、Discord lastId 重置、唯一 durable worker 已重建");
+  console.log("   v10.4 請在本地啟動 ap_discord_bot.py；GAS 不輪詢 Discord");
 }
 
 /**

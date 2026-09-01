@@ -1,11 +1,11 @@
 """
-🏺 吉寶軒 — 骨董影像編目 Intake Bridge  v3.0
+🏺 吉寶軒 — 骨董影像編目 Intake Bridge  v4.0
 ================================================================
 功能：#antique-analysis 頻道骨董圖片鑑定
 
 流程：
   用戶同訊息上傳 1–8 張圖片 → Gateway on_message
-  → 本地下載與壓縮 → 安全 GAS doPost → Gemini 編目 → Embed 報告
+  → 本地下載與壓縮 → GAS durable submit → status polling → Embed 報告
 
 架構決策（2026-04-24）：
   - Gateway 模式取代舊版 REST 輪詢（即時觸發，無 60 秒延遲）
@@ -15,13 +15,17 @@
 CHANGE GAS-LOCAL-BRIDGE: Discord/Cloudflare 40333 後恢復本地 Gateway I/O；
 GAS 仍是 Gemini、Drive、Catalog、AP_MEDIA 的唯一寫入權威。
 
-版本：v3.0.0 (2026-08-31)
+CHANGE GAS-DURABLE-ASYNC: submit 只負責快速入列；GAS 背景 worker 完成
+Gemini / Drive / Sheets 後，本地端以小型 status request 取得結果。
+
+版本：v4.0.0 (2026-09-01)
 """
 
 import asyncio
 import json
 import logging
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -88,6 +92,10 @@ logging.basicConfig(
 log = logging.getLogger("ap_antique_bot")
 _active_message_ids: set[int] = set()
 _intake_semaphore = asyncio.Semaphore(1)
+
+
+class GasTransportError(RuntimeError):
+    """The HTTP outcome is uncertain; the durable messageId may still exist."""
 
 # ================================================================
 # Discord Bot 初始化（Gateway 模式）
@@ -259,59 +267,129 @@ async def _download_and_prepare_images(attachments: list[discord.Attachment]):
     return prepared
 
 
-async def _post_to_gas(payload: dict[str, object]) -> dict[str, object]:
-    timeout = aiohttp.ClientTimeout(total=210)
+async def _gas_json_request(
+    session: aiohttp.ClientSession,
+    payload: dict[str, object],
+    *,
+    attempts: int,
+    timeout_seconds: int,
+) -> dict[str, object]:
     last_error: Exception | None = None
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        for attempt in range(1, 4):
-            try:
-                async with session.post(GAS_DOPOST_URL, json=payload) as response:
-                    body = await response.text()
-                    if response.status != 200:
-                        if response.status == 429 or response.status >= 500:
-                            raise aiohttp.ClientResponseError(
-                                response.request_info,
-                                response.history,
-                                status=response.status,
-                                message="GAS transient HTTP",
-                            )
-                        raise RuntimeError(f"GAS HTTP {response.status}；拒絕自動重送")
-                    if body.lstrip().lower().startswith("<!doctype"):
-                        raise RuntimeError(
-                            "GAS Web App 未開放匿名 /exec 存取，回傳 HTML；拒絕自動重送"
+    for attempt in range(1, attempts + 1):
+        try:
+            timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+            async with session.post(GAS_DOPOST_URL, json=payload, timeout=timeout) as response:
+                body = await response.text()
+                if response.status != 200:
+                    if response.status == 429 or response.status >= 500:
+                        raise aiohttp.ClientResponseError(
+                            response.request_info,
+                            response.history,
+                            status=response.status,
+                            message="GAS transient HTTP",
                         )
-                    try:
-                        result = json.loads(body)
-                    except ValueError as exc:
-                        raise RuntimeError("GAS 回傳非 JSON；拒絕自動重送") from exc
-                    if not isinstance(result, dict):
-                        raise RuntimeError("GAS JSON 不是 object；拒絕自動重送")
-                    if (
-                        result.get("success") is False
-                        and result.get("code") == "INGEST_IN_PROGRESS"
-                        and result.get("retrySafe") is True
-                    ):
-                        last_error = RuntimeError("相同 messageId 仍在 GAS 處理中")
-                        if attempt < 3:
-                            log.warning(
-                                "[Antique] GAS 尚在處理 msgId=%s；%d 秒後重查既有結果",
-                                payload.get("messageId"),
-                                5 * attempt,
-                            )
-                            await asyncio.sleep(5 * attempt)
-                            continue
-                    return result
-            except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
-                last_error = exc
-                if attempt >= 3:
-                    break
+                    raise RuntimeError(f"GAS HTTP {response.status}；拒絕自動重送")
+                if body.lstrip().lower().startswith("<!doctype"):
+                    raise RuntimeError(
+                        "GAS Web App 未開放匿名 /exec 存取，回傳 HTML；拒絕自動重送"
+                    )
+                try:
+                    result = json.loads(body)
+                except ValueError as exc:
+                    raise RuntimeError("GAS 回傳非 JSON；拒絕自動重送") from exc
+                if not isinstance(result, dict):
+                    raise RuntimeError("GAS JSON 不是 object；拒絕自動重送")
+                return result
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            last_error = exc
+            if attempt >= attempts:
+                break
+            log.warning(
+                "[Antique] GAS %s transport 第 %d 次暫時失敗，將以同 messageId 重試：%s",
+                payload.get("action", "submit"),
+                attempt,
+                exc,
+            )
+            await asyncio.sleep(2 * attempt)
+    raise GasTransportError(f"GAS transport 失敗：{last_error}")
+
+
+def _terminal_bridge_error(result: dict[str, object]) -> RuntimeError:
+    code = str(result.get("code") or "BRIDGE_ERROR")
+    error = str(result.get("error") or "未知錯誤")[:500]
+    state = str(result.get("state") or "UNKNOWN")
+    return RuntimeError(f"GAS durable job {state}/{code}：{error}")
+
+
+async def _post_to_gas(payload: dict[str, object]) -> dict[str, object]:
+    """Submit once durably, then poll small status requests until terminal."""
+    message_id = str(payload.get("messageId") or "")
+    status_payload = {
+        "bridgeVersion": "AP-local-bridge-v4.0",
+        "action": "status",
+        "ingestSecret": AP_INGEST_SECRET,
+        "messageId": message_id,
+    }
+    async with aiohttp.ClientSession() as session:
+        try:
+            result = await _gas_json_request(
+                session,
+                payload,
+                attempts=3,
+                timeout_seconds=55,
+            )
+        except GasTransportError as exc:
+            # A disconnected submit can still have reached GAS. Polling by the
+            # same messageId resolves that uncertainty without another payload.
+            log.warning(
+                "[Antique] submit 回應不確定，改以 durable status 查詢 msgId=%s：%s",
+                message_id,
+                exc,
+            )
+            result = {"accepted": True, "state": "SUBMIT_UNKNOWN", "pollAfterSeconds": 3}
+
+        if result.get("success") is True:
+            return result
+        if result.get("accepted") is not True:
+            raise _terminal_bridge_error(result)
+
+        log.info(
+            "[Antique] GAS durable job 已受理 msgId=%s state=%s",
+            message_id,
+            result.get("state", "QUEUED"),
+        )
+        deadline = time.monotonic() + 12 * 60
+        poll_after = max(2, min(int(result.get("pollAfterSeconds") or 5), 15))
+        while time.monotonic() < deadline:
+            await asyncio.sleep(poll_after)
+            try:
+                result = await _gas_json_request(
+                    session,
+                    status_payload,
+                    attempts=2,
+                    timeout_seconds=30,
+                )
+            except GasTransportError as exc:
                 log.warning(
-                    "[Antique] GAS transport 第 %d 次暫時失敗，將以同 messageId 重試：%s",
-                    attempt,
+                    "[Antique] status 暫時不可達 msgId=%s；durable job 保持不變：%s",
+                    message_id,
                     exc,
                 )
-                await asyncio.sleep(2 * attempt)
-    raise RuntimeError(f"GAS transport 失敗：{last_error}")
+                continue
+            if result.get("success") is True:
+                return result
+            if result.get("accepted") is not True:
+                raise _terminal_bridge_error(result)
+            poll_after = max(2, min(int(result.get("pollAfterSeconds") or 5), 15))
+            log.info(
+                "[Antique] GAS durable job msgId=%s state=%s phase=%s",
+                message_id,
+                result.get("state", "UNKNOWN"),
+                result.get("phase", ""),
+            )
+    raise RuntimeError(
+        "GAS durable job 等待超過 12 分鐘；資料仍保留在 GAS，請先查狀態，不要重建新 messageId"
+    )
 
 
 async def _set_terminal_reaction(message: discord.Message, emoji: str) -> None:
@@ -444,8 +522,8 @@ def main():
     if ENTERPRISE_SSL_BYPASS:
         apply_enterprise_ssl_bypass()
         log.warning("[SSL] AP_ENTERPRISE_SSL_BYPASS 已啟用")
-    log.info("🏺 吉寶軒 Intake Bridge v3.0 啟動中...")
-    log.info("   模式：Discord Gateway → local compression → GAS doPost")
+    log.info("🏺 吉寶軒 Intake Bridge v4.0 啟動中...")
+    log.info("   模式：Discord Gateway → local compression → GAS durable submit/status")
     log.info("   按 Ctrl+C 停止")
     bot.run(BOT_TOKEN, log_handler=None)
 

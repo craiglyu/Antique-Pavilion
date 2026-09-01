@@ -29,7 +29,7 @@ and craftsmanship. Aesthetic reference points: Sotheby's Asia, Christie's Hong K
 | Layer | Tech | Why |
 |---|---|---|
 | Frontend | **Pure HTML / CSS / vanilla JS** — NO React/Vue/Tailwind/etc. | GitHub Pages compatibility, simplicity, longevity |
-| Backend | **Google Apps Script (GAS) v10.3** | Runs free under Craig's Google account, no infra cost |
+| Backend | **Google Apps Script (GAS) v10.4** | Runs free under Craig's Google account, no infra cost |
 | Storage | Google Sheets (catalog) + Google Drive (images) | Same — free, durable |
 <!-- CHANGE GAS-GEMINI-FALLBACK: Craig 於 2026-08-30 核准 AP GAS 多模型 fallback。 -->
 | AI judgment | **Gemini 3.7 Flash → 3.6 Flash → 3.5 Flash → 3.5 Flash-Lite** via GAS `generateContent` | Free-tier first；3.7/3.6/3.5 medium，3.5 Lite minimal；technical-failure fallback only |
@@ -107,7 +107,8 @@ Discord 官方 API 已從 GAS 實測回傳 `40333 internal network error`；因�
 
 ```
 Discord Gateway → ap_discord_bot.py → 本地壓縮 → GAS /exec doPost
-→ Gemini fallback → private Drive → Catalog + AP_MEDIA → JSON → Discord reply
+→ durable staging → processBridgeQueue → Gemini fallback → private Drive
+→ Catalog + AP_MEDIA → status JSON → Discord reply
 ```
 
 - `ap_discord_bot.py` 只負責 Discord I/O、1–8 張同訊息分組、下載、壓縮與回覆；不得直接呼叫 Gemini。
@@ -118,6 +119,29 @@ Discord Gateway → ap_discord_bot.py → 本地壓縮 → GAS /exec doPost
 - 本地最多 3 次只針對 timeout、連線錯誤、HTTP 429／5xx 的 transport retry；HTML、4xx、
   非 JSON、未授權或 partial write 一律停手。
 - Web App 必須使用正式 `/exec` URL；`doGet()` 保持 guest 可讀，`doPost()` 由 shared secret 保護。
+
+### DD-108 — Durable Async Intake Bridge（Craig 2026-09-01 核准）
+
+<!-- CHANGE GAS-DURABLE-ASYNC: Craig 核准將長時間 GAS POST 拆為 durable submit/status/worker。 -->
+
+2026-08-31 的 2 圖實測中，本地 HTTP client 約 60 秒斷線，但三次 GAS `doPost` 分別在
+約 122／207／285 秒後完成，造成同一 `sourceMessageId` 被寫成兩個完整 UUID。因此 v10.4
+禁止在原始 Web App response 內執行 Gemini 與 Catalog 寫入。
+
+- `action=submit` 只驗證 secret／messageId、將壓縮圖片存入私人 staging folder，並建立
+  `bridge_state_<messageId>` durable state 後快速回傳 `QUEUED`。
+- 唯一的每分鐘 `processBridgeQueue` trigger 只消費已入列工作；它不連 Discord，也不讀 Discord CDN，
+  因此不違反 DD-106 的 Discord polling 禁令。
+- 本地 Intake v4 只以相同 `messageId` 提交，之後用小型 `action=status` POST 輪詢；submit response
+  斷線時先查 durable state，不得建立新 messageId。
+- `ACCEPTING / QUEUED / RUNNING / COMPLETED / FAILED / RECONCILE_REQUIRED` 是固定狀態；一旦進入
+  persistence 或 staging 不明狀態，必須 fail closed 並由 `diagBridgeReconcilePlan()` 人工處理。
+- 完成結果保存在私人 staging `result.json`；Script Properties 只保存狀態與 Drive file id，不保存
+  base64 圖片或 Gemini 完整輸出。完成 state 保留 90 天後由 worker 移除；舊 messageId replay
+  仍可由 Catalog + AP_MEDIA 重建結果。
+- `diagBridgeMessageDuplicates()` 為唯讀去內容化診斷。已核准的測試重複修復只可執行
+  `applyDd108KnownTestDuplicateQuarantine()`：保留 keeper，不刪列／不刪檔，只將 duplicate Catalog
+  狀態改為 `已退件`、其 AP_MEDIA 改為 `rejected`。
 
 ### DD-107 — Local Bot Control Center（Craig 2026-08-31 核准）
 
@@ -309,8 +333,9 @@ cd "/mnt/c/Users/A50529/Desktop/Craig/Antique Digital Pavilion"
 python3 -u ap_discord_bot.py
 ```
 
-Expected log: `吉寶軒 Intake Bridge v3.0` and
-`Discord Gateway → local compression → GAS doPost`. It creates no GAS polling trigger.
+Expected log: `吉寶軒 Intake Bridge v4.0` and
+`Discord Gateway → local compression → GAS durable submit/status`. GAS keeps exactly one
+non-Discord `processBridgeQueue` worker trigger and no Discord polling trigger.
 
 ### Boot both Bots from the local control center
 

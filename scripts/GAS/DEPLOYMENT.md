@@ -3,8 +3,9 @@
 <!-- CHANGE GAS-CATALOG-PREVIEW: read-only redacted Catalog contract diagnosis before migration. -->
 <!-- CHANGE GAS-DD105-HEADERS: Craig-approved guarded A1:M1 header-only migration. -->
 <!-- CHANGE GAS-LOCAL-BRIDGE: Discord I/O stays local; GAS exposes an idempotent secret-protected intake. -->
+<!-- CHANGE GAS-DURABLE-ASYNC: DD-108 durable submit/status/worker deployment and duplicate quarantine. -->
 
-# AP GAS v10.3 部署與驗收手冊
+# AP GAS v10.4 部署與驗收手冊
 
 這份手冊適用於 `AntiqueAnalysis_AI.md` 主資料管線與 `review_desk/` 人工覆核台。
 所有診斷預設唯讀；本地提交不代表線上已部署。
@@ -18,13 +19,14 @@
 2. 貼上新版 `AntiqueAnalysis_AI.md` 後先儲存。不要執行 `mainTick` 或任何舊 Discord 診斷函式。
 3. 在編輯器執行 `diagPredeployAudit()`。這個函式不呼叫 Gemini，也不修改 Sheet、Drive、
    trigger 或 queue；report 不含任何 secret 值。
-4. 原則上只有 `status: PASS` 才繼續。若唯一 `FAIL` 是 `media.sheet` 找不到 `AP_MEDIA`，而
-   Catalog、Drive、Properties 與 queue 均通過，可進入下一步由受控 setup 建立；其餘 `FAIL`
-   必須先處理。
-5. 執行 `setupAntiquePipeline()`。它只會在缺少時建立 `AP_MEDIA`、驗證凍結契約，並移除
-   舊 `mainTick`／`processJobAsync` trigger；不建立新 trigger。
-6. 再跑一次 `diagPredeployAudit()`，確認 `trigger.local_bridge` 為 `PASS`、`mainTick=0`、
-   legacy `processJobAsync=0`。
+4. 原則上只有 `status: PASS` 才繼續。部署 v10.4 前尚未有 worker 時，允許預期的
+   `trigger.durable_bridge: FAIL`（`processBridgeQueue=0`）；若同時只有 `media.sheet` 找不到
+   `AP_MEDIA`，而 Catalog、Drive、Properties、queue 與 bridge state 均通過，也可由受控 setup
+   建立。其餘 `FAIL` 必須先處理。
+5. 執行 `setupAntiquePipeline()`。它會在缺少時建立 `AP_MEDIA`、驗證凍結契約，移除舊
+   `mainTick`／`processJobAsync`，並重建唯一 `processBridgeQueue` 每分鐘 trigger。
+6. 再跑一次 `diagPredeployAudit()`，確認 `trigger.durable_bridge` 為 `PASS`、
+   `processBridgeQueue=1`、`mainTick=0`、legacy `processJobAsync=0`。
 
 ## 必須停手的 FAIL
 
@@ -38,10 +40,27 @@
 - `queue.pending_jobs` 無法解析：不要直接清空，先保存 Script Property 原始值並查明原因。
 - `PARTIAL_INGEST_REQUIRES_RECONCILE`：同一 `messageId` 可能已有部分 Drive／Sheet 寫入；
   執行 `diagBridgeReconcilePlan()`，不可移除 reaction 後直接重送。
+- `bridge.durable_state` 的 `reconcile>0`：staging 或 persistence 結果不明；停止 Intake，先保留
+  staging 與 state，再執行 `diagBridgeReconcilePlan()`。
+- `bridge.durable_state` 的 `corrupt>0`：Script Property JSON 損壞；保存原始 property 後人工修復，
+  worker 與相同 messageId submit 都會 fail closed。完成 state 只保留 90 天，之後 replay 由
+  Catalog + AP_MEDIA 重建，不代表資料遺失。
 
 `diagMediaReconcilePlan()` 只產生 `READ_ONLY_PLAN`，不修資料、不刪 Drive 檔案、不改分享權限。
-`diagBridgeReconcilePlan()` 只列出 partial marker 對應的 `artifactUuid` 與 Catalog／AP_MEDIA
-筆數；它同樣不修資料，也不會清除 marker。
+`diagBridgeReconcilePlan()` 只列出 partial marker／`RECONCILE_REQUIRED` state 對應的
+`artifactUuid` 與 Catalog／AP_MEDIA 筆數；它同樣不修資料，也不會清除 marker。
+
+## DD-108 已知測試重複的受控隔離
+
+先執行 `diagBridgeMessageDuplicates()`。2026-08-31 已核准證據應只包含
+`sourceMessageId=1543912512204967967` 的兩個 UUID。診斷只輸出 ID、列數與狀態，不回傳藏品內容、
+URL 或公式。
+
+只有該群組仍精確符合 keeper `9a3705a2-fa29-420b-8047-6b56c524a0a5`、duplicate
+`06b0648a-3e4a-4ffe-a330-4e0523b53bba`，且兩者 attachment／sortOrder 完全一致時，才執行一次
+`applyDd108KnownTestDuplicateQuarantine()`。成功 receipt 必須為 `APPLIED`（重跑為
+`ALREADY_APPLIED`）、`catalogRowsTouched=1`、`mediaRowsTouched=2`、`filesDeleted=0`。此函式不刪列、
+不刪 Drive 檔、不改 keeper，只把 duplicate Catalog 設為 `已退件`、媒體設為 `rejected`。
 
 ## Catalog 標題不一致時的唯讀判讀
 
@@ -83,15 +102,15 @@ Craig 於 2026-08-31 核准 DD-105。只有 preview 同時回傳以下四個條�
 
 - 貼新版程式前，先讓舊版 `pending_jobs` 消費至 0。舊 job payload 只有 Cache，無法安全枚舉並
   自動搬入 Script Properties；若 preflight 顯示 pending job 缺少 durable payload，停止部署。
-- v10.3 不再建立或消費 GAS Discord queue；若仍有 pending／dead-letter／orphan，先保存並
+- v10.4 不再建立或消費 GAS Discord queue；若仍有 pending／dead-letter／orphan，先保存並
   人工釐清，不能靠重啟 trigger 消費。
 - 無法安全重試的任務會寫入 `job_dead_<jobId>`；payload 保留供人工復原。執行
   `diagQueueHealth()` 可查看 pending／dead-letter／orphan 數量與錯誤摘要，不會輸出 CDN URL 或 payload。
 - 只有確認失敗發生在寫入前，才可從 Apps Script 手動執行 `safeEnqueue("<jobId>")`；它會重新從
   attempt 1 排入。標為 `PERSISTENCE_MAY_HAVE_STARTED` 或來源不明的 orphan payload 會拒絕重跑，
   必須先用 Catalog／AP_MEDIA reconcile 檢查是否已有部分資料。
-- `resetBot()` 只有在 pending、payload、dead-letter 全部為 0 時才允許執行；它只清除舊 lastId
-  與 legacy trigger，不會再建立 `mainTick`。
+- `resetBot()` 只有在 pending、payload、dead-letter 全部為 0 時才允許執行；它清除舊 lastId、
+  移除 legacy trigger，並重建唯一 `processBridgeQueue`，不會建立 `mainTick`。
 
 ## 正式 Web App 與本地 Intake 設定
 
@@ -115,7 +134,7 @@ Craig 於 2026-08-31 核准 DD-105。只有 preview 同時回傳以下四個條�
 1. 建立新的 Apps Script deployment version；不要直接刪除上一版 deployment。
 2. 執行 `diagPostdeployCanary()`。它會檢查：
    - preflight 仍為 `PASS`；
-   - `mainTick=0`、legacy `processJobAsync=0`；
+   - `processBridgeQueue=1`、`mainTick=0`、legacy `processJobAsync=0`；
    - local bridge mode 與 `AP_INGEST_SECRET` 已就緒，GAS Discord egress calls 固定為 0；
    - 由 `ScriptApp.getService().getUrl()` 取得**正式部署網址**並實際 GET，而非只呼叫編輯器內的
      `doGet()`；回傳筆數必須等於 Catalog 的 `完成` 筆數，且每筆保留 `imageUrl` 並含 `images[]`。
@@ -132,7 +151,8 @@ Craig 於 2026-08-31 核准 DD-105。只有 preview 同時回傳以下四個條�
 
 確認：
 
-1. Discord 訊息只產生一筆藏品結果，不因相近時間合併其他訊息。
+1. Discord log 先出現 durable `QUEUED`／`RUNNING`，同一訊息最後只產生一筆藏品結果，
+   不因相近時間合併其他訊息。
 2. Catalog 新增一個 UUID，狀態為 `待人工覆核`。
 3. `AP_MEDIA` 有 3–5 列使用同一 `artifactUuid`，且恰有一列 `isPrimary=true`。
 4. 原圖維持私人，公開 `doGet()` 尚未回傳該藏品。

@@ -3,6 +3,31 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-01T02:25:52Z",
+      "category": "fix",
+      "scope": "antique-intake.durable-async-bridge",
+      "version_from": "10.3.1",
+      "version_to": "10.4.0",
+      "summary": "依 Craig 核准的 DD-108，將可能超過本地 HTTP 連線時間的 GAS 同步鑑定拆成快速 durable submit、唯一背景 worker 與小型 status polling；新增去內容化重複診斷及已知測試 duplicate 的受控狀態隔離。",
+      "rationale": "真實 2 圖測試中，本地端約 60 秒斷線，但三次 GAS doPost 均持續至 122–285 秒並產生兩個完整 UUID，證明 Cache inflight guard 與同步 response 不能提供可靠冪等。v10.4 先把私人 staging 與 messageId state 持久化，Gemini／Drive／Sheet 僅由單一 worker 執行；本地端只查同一 messageId 狀態，避免 transport retry 再度觸發完整寫入。",
+      "breaking": true,
+      "rollback": "停止本地 Intake，將 GAS deployment 與 Python Intake 一起回復至上一版；不得單獨混用 v3 client 與 v10.4 server，也不得重新啟用 Discord polling trigger",
+      "files": [
+        "AGENTS.md",
+        "STARTUP.md",
+        "ap_discord_bot.py",
+        "scripts/ap_intake_bridge.py",
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "scripts/GAS/DEPLOYMENT.md",
+        "tests/test_ap_intake_bridge.py",
+        "tests/test_antique_gas_preflight.py",
+        "CHG_LOG.json"
+      ],
+      "change_tags": [
+        "GAS-DURABLE-ASYNC"
+      ]
+    },
+    {
       "ts": "2026-08-31T07:46:32Z",
       "category": "feat",
       "scope": "ap-bots.local-control-center",

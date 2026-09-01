@@ -2,6 +2,7 @@
 
 CHANGE GAS-LOCAL-BRIDGE: verify bounded image compression, secret/config gates,
 multi-image payloads, and messageId replay behavior without Discord or Gemini calls.
+CHANGE GAS-DURABLE-ASYNC: verify v4 submit/status protocol and duplicate grouping.
 """
 
 from __future__ import annotations
@@ -49,6 +50,9 @@ def test_python_sources_parse_and_bot_has_no_hardcoded_bridge_secret_or_ssl_fals
     assert 'env("AP_INGEST_SECRET")' in source
     assert "build_ingest_payload" in source
     assert "message.attachments" in source
+    assert '"action": "status"' in source
+    assert "12 * 60" in source
+    assert "AP-local-bridge-v4.0" in source
     assert "ssl=False" not in source
     assert "script.google.com/macros/s/" not in source
 
@@ -95,6 +99,8 @@ def test_payload_accepts_one_to_eight_images_and_enforces_total_budget():
     )
     assert len(payload["images"]) == 8
     assert payload["messageId"] == "1495279823009087551"
+    assert payload["bridgeVersion"] == "AP-local-bridge-v4.0"
+    assert payload["action"] == "submit"
     assert request_bytes < bridge.MAX_GAS_JSON_BYTES
     with pytest.raises(bridge.BridgeInputError, match="1–8"):
         bridge.build_ingest_payload(
@@ -169,6 +175,8 @@ const context = {
 vm.createContext(context);
 vm.runInContext(source, context);
 const response = context.doPost({postData: {contents: JSON.stringify({
+  bridgeVersion: 'AP-local-bridge-v4.0',
+  action: 'submit',
   ingestSecret: secret,
   messageId,
   images: [{imageBase64: 'should-not-be-decoded'}]
@@ -191,3 +199,170 @@ process.stdout.write(JSON.stringify(result));
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["duplicate"] is True
+
+
+def test_gas_durable_queue_claim_is_single_consumer_and_status_is_read_only():
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const values = {
+  bridge_state_1495279823009087551: JSON.stringify({
+    messageId: '1495279823009087551', jobId: '1495279823009087551',
+    state: 'QUEUED', phase: 'STAGED', queuedAt: '2026-09-01T00:00:00.000Z'
+  })
+};
+const props = {
+  getProperty(key) { return values[key] || ''; },
+  getProperties() { return Object.assign({}, values); },
+  setProperty(key, value) { values[key] = String(value); },
+  deleteProperty(key) { delete values[key]; }
+};
+let releases = 0;
+const context = {
+  console: {log() {}, warn() {}, error() {}},
+  PropertiesService: {getScriptProperties() { return props; }},
+  LockService: {getScriptLock() { return {waitLock() {}, releaseLock() { releases += 1; }}; }}
+};
+vm.createContext(context);
+vm.runInContext(source, context);
+const first = context.claimNextBridgeJob_();
+const second = context.claimNextBridgeJob_();
+const status = context.statusBridgeJob_('1495279823009087551');
+assert.strictEqual(first.state, 'RUNNING');
+assert.strictEqual(second, null);
+assert.strictEqual(status.accepted, true);
+assert.strictEqual(status.state, 'RUNNING');
+assert.strictEqual(releases, 2);
+process.stdout.write(JSON.stringify({ok: true}));
+"""
+    result = subprocess.run(
+        ["node", "-e", harness, str(GAS)],
+        cwd=REPO,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"ok": True}
+
+
+def test_gas_duplicate_detector_reports_only_repeated_message_groups():
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const context = {
+  console: {log() {}, warn() {}, error() {}},
+  PropertiesService: {getScriptProperties() { return {getProperty() { return ''; }}; }}
+};
+vm.createContext(context);
+vm.runInContext(source, context);
+const catalog = [
+  ['keeper','','','','','','','','','','','待人工覆核',''],
+  ['duplicate','','','','','','','','','','','待人工覆核',''],
+  ['single','','','','','','','','','','','完成','']
+];
+function media(uuid, mediaId, attachment, messageId, status) {
+  return [uuid, mediaId, '', '', 'front', 1, true, status, attachment, messageId, 'image/jpeg', 10, ''];
+}
+const groups = context.analyzeBridgeMessageDuplicates_(catalog, [
+  media('keeper', 'm1', 'a1', '1543912512204967967', 'pending'),
+  media('duplicate', 'm2', 'a1', '1543912512204967967', 'pending'),
+  media('single', 'm3', 'a2', '1999999999999999999', 'approved')
+]);
+assert.strictEqual(groups.length, 1);
+assert.strictEqual(groups[0].messageId, '1543912512204967967');
+assert.strictEqual(groups[0].artifactCount, 2);
+assert.ok(!JSON.stringify(groups).includes('Drive URL'));
+process.stdout.write(JSON.stringify({ok: true}));
+"""
+    result = subprocess.run(
+        ["node", "-e", harness, str(GAS)],
+        cwd=REPO,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"ok": True}
+
+
+def test_known_duplicate_quarantine_changes_only_duplicate_statuses():
+    harness = r"""
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const messageId = '1543912512204967967';
+const keeper = '9a3705a2-fa29-420b-8047-6b56c524a0a5';
+const duplicate = '06b0648a-3e4a-4ffe-a330-4e0523b53bba';
+const catalogRows = [
+  [keeper,'','','','','','','','','','','待人工覆核',''],
+  [duplicate,'','','','','','','','','','','待人工覆核','']
+];
+const mediaRows = [
+  [keeper,'k1','','','front',1,true,'pending','a1',messageId,'image/jpeg',10,''],
+  [keeper,'k2','','','back',2,false,'pending','a2',messageId,'image/jpeg',10,''],
+  [duplicate,'d1','','','front',1,true,'pending','a1',messageId,'image/jpeg',10,''],
+  [duplicate,'d2','','','back',2,false,'pending','a2',messageId,'image/jpeg',10,'']
+];
+function sheet(rows, isCatalog) {
+  return {
+    getLastRow() { return rows.length + 1; },
+    getRange(row, column, rowCount) {
+      if (rowCount) {
+        return {
+          getValues() { return rows; },
+          getDisplayValues() { return rows; }
+        };
+      }
+      const dataIndex = row - 2;
+      const valueIndex = column - 1;
+      return {
+        getDisplayValue() { return rows[dataIndex][valueIndex]; },
+        setValue(value) { rows[dataIndex][valueIndex] = value; return this; }
+      };
+    }
+  };
+}
+const catalog = sheet(catalogRows, true);
+const media = sheet(mediaRows, false);
+const context = {
+  console: {log() {}, warn() {}, error() {}},
+  PropertiesService: {getScriptProperties() { return {getProperty() { return ''; }}; }},
+  SpreadsheetApp: {
+    openById() { return {getSheets() { return [catalog]; }, getSheetByName() { return media; }}; },
+    flush() {}
+  },
+  LockService: {getScriptLock() { return {waitLock() {}, releaseLock() {}}; }}
+};
+vm.createContext(context);
+vm.runInContext(source, context);
+const receipt = context.applyDd108KnownTestDuplicateQuarantine();
+assert.strictEqual(receipt.status, 'APPLIED');
+assert.strictEqual(receipt.catalogRowsTouched, 1);
+assert.strictEqual(receipt.mediaRowsTouched, 2);
+assert.strictEqual(receipt.filesDeleted, 0);
+assert.strictEqual(catalogRows[0][11], '待人工覆核');
+assert.strictEqual(catalogRows[1][11], '已退件');
+assert.deepStrictEqual(mediaRows.slice(0, 2).map(row => row[7]), ['pending', 'pending']);
+assert.deepStrictEqual(mediaRows.slice(2).map(row => row[7]), ['rejected', 'rejected']);
+const replay = context.applyDd108KnownTestDuplicateQuarantine();
+assert.strictEqual(replay.status, 'ALREADY_APPLIED');
+process.stdout.write(JSON.stringify({ok: true}));
+"""
+    result = subprocess.run(
+        ["node", "-e", harness, str(GAS)],
+        cwd=REPO,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"ok": True}

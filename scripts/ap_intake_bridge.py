@@ -4,6 +4,9 @@ CHANGE GAS-LOCAL-BRIDGE: keep Discord I/O local after Discord error 40333 while
 GAS remains the only Gemini/Drive/Sheets authority.  This module contains no
 Discord client and no network calls so compression and payload limits can be
 tested deterministically.
+
+CHANGE GAS-DURABLE-ASYNC: v4 submits one durable job and polls its status;
+Gemini and persistence no longer run inside the original HTTP response window.
 """
 
 from __future__ import annotations
@@ -187,7 +190,8 @@ def build_ingest_payload(
             f"壓縮圖片總量 {compressed_total} bytes，超過 {MAX_COMPRESSED_TOTAL_BYTES}"
         )
     payload: dict[str, object] = {
-        "bridgeVersion": "AP-local-bridge-v3.0",
+        "bridgeVersion": "AP-local-bridge-v4.0",
+        "action": "submit",
         "ingestSecret": ingest_secret,
         "caption": str(caption or "無描述")[:800],
         "messageId": str(message_id),
