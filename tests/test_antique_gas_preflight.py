@@ -9,6 +9,7 @@ is idempotent, rejects drift, and restores the legacy header after failed verifi
 CHANGE GAS-LOCAL-BRIDGE: verify GAS has no Discord egress/trigger requirement and the
 local bridge secret is a fail-closed deployment prerequisite.
 CHANGE GAS-DURABLE-ASYNC: require exactly one non-Discord background worker.
+CHANGE GAS-CANARY-EXEC-URL: canary must use an explicit formal /exec property.
 """
 
 from __future__ import annotations
@@ -66,8 +67,7 @@ process.stdout.write(JSON.stringify({ok: true}));
     assert '"bridge.partial_write"' in gas
     assert "function diagPostdeployCanary()" in gas
     assert "geminiCalls: 0" in gas
-    assert "ScriptApp.getService()" in gas
-    assert "service.getUrl()" in gas
+    assert 'getProperty("AP_WEBAPP_EXEC_URL")' in gas
     assert "function diagReviewDeskPreflight()" in review
     assert "Catalog A:M 與凍結契約不一致；停止 setup" in review
     assert "diagTestGeminiFallbackCanary()" in runbook
@@ -84,6 +84,8 @@ process.stdout.write(JSON.stringify({ok: true}));
     assert "CHANGE GAS-LOCAL-BRIDGE" in runbook
     assert "CHANGE GAS-LOCAL-BRIDGE" in agents
     assert "DD-106 — Local Discord Intake Bridge" in agents
+    assert "CHANGE GAS-CANARY-EXEC-URL" in gas
+    assert "CHANGE GAS-CANARY-EXEC-URL" in runbook
 
 
 def test_catalog_and_media_integrity_rules_without_network():
@@ -163,6 +165,7 @@ const secrets = {
   DISCORD_BOT_TOKEN: 'discord-super-secret',
   GEMINI_API_KEY: 'gemini-super-secret',
   AP_INGEST_SECRET: 'ingest-super-secret-32-chars',
+  AP_WEBAPP_EXEC_URL: 'https://script.google.com/macros/s/TEST_DEPLOYMENT/exec',
   pending_jobs: '[]'
 };
 const catalogHeaders = ['UUID','入庫時間','用戶描述','品名','分類','年代','故事','拍賣參考品','參考價格','Drive URL','標籤','狀態','展示建議'];
@@ -444,8 +447,8 @@ def test_diagnostics_are_structurally_read_only():
     postdeploy = gas.split("function diagPostdeployCanary()", 1)[1].split(
         "// ============================================================\n// 🧹 Trigger", 1
     )[0]
-    assert "ScriptApp.getService()" in postdeploy
-    assert "UrlFetchApp.fetch(serviceUrl" in postdeploy
+    assert "ScriptApp.getService()" not in postdeploy
+    assert "UrlFetchApp.fetch(AP_WEBAPP_EXEC_URL" in postdeploy
     assert "discordReadOnlyCanary_" not in postdeploy
     assert "post.discord.bot" not in postdeploy
     assert 'gasEgressCalls: 0' in postdeploy

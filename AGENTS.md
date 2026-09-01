@@ -44,7 +44,8 @@ and craftsmanship. Aesthetic reference points: Sotheby's Asia, Christie's Hong K
 - No prompt text in `.py` files — all prompts live in `scripts/ap_org_bot/prompts/<layer>/<agent>.md`
 - No Discord bot may directly call Gemini API — that goes through GAS (so Gemini billing is
   centralized under one Google account)
-- GAS Script Properties hold `GEMINI_API_KEY` / `AP_INGEST_SECRET`; the local Python Intake
+- GAS Script Properties hold `GEMINI_API_KEY` / `AP_INGEST_SECRET` / formal
+  `AP_WEBAPP_EXEC_URL`; the local Python Intake
   environment holds the raw `DISCORD_BOT_TOKEN`, matching `AP_INGEST_SECRET`, and formal
   `AP_GAS_DOPOST_URL`. Missing secrets fail closed and none may enter Git.
 
@@ -142,6 +143,10 @@ Discord Gateway → ap_discord_bot.py → 本地壓縮 → GAS /exec doPost
 - `diagBridgeMessageDuplicates()` 為唯讀去內容化診斷。已核准的測試重複修復只可執行
   `applyDd108KnownTestDuplicateQuarantine()`：保留 keeper，不刪列／不刪檔，只將 duplicate Catalog
   狀態改為 `已退件`、其 AP_MEDIA 改為 `rejected`。
+
+<!-- CHANGE GAS-CANARY-EXEC-URL: postdeploy canary 使用明確的正式 /exec property。 -->
+Postdeploy canary 不得以 `ScriptApp.getService().getUrl()` 作為正式網址唯一來源；它必須讀取
+`AP_WEBAPP_EXEC_URL`、拒絕 `/dev`，且不得在診斷輸出完整 deployment URL。
 
 ### DD-107 — Local Bot Control Center（Craig 2026-08-31 核准）
 

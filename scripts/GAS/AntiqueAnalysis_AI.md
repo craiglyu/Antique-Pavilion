@@ -1,5 +1,5 @@
 /**
- * 🏺 骨董影像編目代理人 v10.4 — Durable Async Local Bridge 多圖版
+ * 🏺 骨董影像編目代理人 v10.4.1 — Durable Async Local Bridge 多圖版
  *
  * [v10.4] Durable async：Discord Gateway 留在本地 Python，GAS doPost 快速入列，
  *         processBridgeQueue 背景執行 Gemini / Drive / Sheets。
@@ -27,18 +27,21 @@
  * CHANGE GAS-DURABLE-ASYNC: DD-108 將長時間同步 doPost 拆為快速私人暫存、durable message
  * state、每分鐘單工 worker 與短輪詢；Script Properties + Script Lock 是唯一性權威，
  * CacheService 不再承擔冪等鎖，避免 HTTP 斷線重送造成重複 Gemini／Drive／Sheet 寫入。
+ * CHANGE GAS-CANARY-EXEC-URL: postdeploy canary 固定測試 Script Property 指定的正式
+ * /exec，避免 ScriptApp.getService().getUrl() 命中 /dev 或另一個 deployment。
  */
 
 // ============================================================
 // 🔑 私鑰與設定
 // ============================================================
 // 憑證只放 Apps Script「專案設定 → 指令碼屬性」，不可再寫入原始碼或 Git：
-//   GEMINI_API_KEY / AP_INGEST_SECRET（本地 Intake Bridge 必填）
+//   GEMINI_API_KEY / AP_INGEST_SECRET / AP_WEBAPP_EXEC_URL
 // DISCORD_BOT_TOKEN 僅留給舊版診斷相容；v10.4 GAS 不讀取其值發送 Discord 請求。
 const DISCORD_BOT_TOKEN  = String(PropertiesService.getScriptProperties().getProperty("DISCORD_BOT_TOKEN") || "");
 const DISCORD_CHANNEL_ID = "1495279823009087551";           // 右鍵頻道 → Copy Channel ID（需開啟開發者模式）
 const GEMINI_KEY         = String(PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY") || "");
 const AP_INGEST_SECRET    = String(PropertiesService.getScriptProperties().getProperty("AP_INGEST_SECRET") || "");
+const AP_WEBAPP_EXEC_URL  = String(PropertiesService.getScriptProperties().getProperty("AP_WEBAPP_EXEC_URL") || "").trim();
 const ROOT_FOLDER_ID     = "17I3qfcFJZ5WxrDYj1FvNBWT-XAP0yfVf";
 const SHEET_ID           = "1a5shhZe7coamCCfLvnqF7jQKnZApTge1vhDU6hrt8go";
 const ALLOWED_USER_IDS   = ["566565645483769863"];    // Discord User ID（18位數字字串）
@@ -2464,7 +2467,7 @@ function finalizePreflightReport_(checks, integrityIssues) {
   const warnCount = checks.filter(check => check.status === "WARN").length
     + issues.filter(issue => issue.severity === "WARN").length;
   return {
-    version: "AP-GAS-v10.4-preflight",
+    version: "AP-GAS-v10.4.1-preflight",
     generatedAt: new Date().toISOString(),
     status: failCount === 0 ? "PASS" : "FAIL",
     summary: { fail: failCount, warn: warnCount, checks: checks.length, integrityIssues: issues.length },
@@ -2748,6 +2751,10 @@ function diagPredeployAudit() {
       propertyState[key] ? "已設定（值不回傳）" : "缺少 local bridge 必要 Script Property",
       propertyState[key] ? "" : `在 Apps Script 專案設定新增 ${key}`);
   });
+  const formalExecUrl = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(AP_WEBAPP_EXEC_URL);
+  addPreflightCheck_(checks, "property.AP_WEBAPP_EXEC_URL", formalExecUrl ? "PASS" : "FAIL",
+    formalExecUrl ? "正式 /exec 已設定（網址不回傳）" : "缺少正式 Web App /exec URL",
+    formalExecUrl ? "" : "在 Apps Script 專案設定新增 AP_WEBAPP_EXEC_URL；不可使用 /dev");
   addPreflightCheck_(checks, "property.DISCORD_BOT_TOKEN", "PASS",
     propertyState.DISCORD_BOT_TOKEN
       ? "仍有舊值，但 local_bridge 不會讀取或傳送（值不回傳）"
@@ -2978,7 +2985,7 @@ function diagBridgeReconcilePlan() {
     });
   const items = partialItems.concat(durableItems, corruptItems);
   const plan = {
-    version: "AP-GAS-v10.4-bridge-reconcile",
+    version: "AP-GAS-v10.4.1-bridge-reconcile",
     generatedAt: new Date().toISOString(),
     mode: "READ_ONLY_PLAN",
     status: items.length ? "ACTION_REQUIRED" : "CLEAN",
@@ -3064,7 +3071,7 @@ function diagBridgeMessageDuplicates() {
     group.artifacts.filter(artifact => !artifact.quarantined).length > 1
   ).length;
   const plan = {
-    version: "AP-GAS-v10.4-dd108-duplicate-plan",
+    version: "AP-GAS-v10.4.1-dd108-duplicate-plan",
     generatedAt: new Date().toISOString(),
     mode: "READ_ONLY_REDACTED",
     status: activeDuplicateCount ? "ACTION_REQUIRED" : "CLEAN",
@@ -3136,7 +3143,7 @@ function applyDd108KnownTestDuplicateQuarantine() {
     if (previousCatalogStatus === STATUS_REJECTED
         && previousMediaStatuses.every(status => status === MEDIA_STATUS_REJECTED)) {
       const already = {
-        version: "AP-GAS-v10.4-dd108-quarantine",
+        version: "AP-GAS-v10.4.1-dd108-quarantine",
         ddId: ddId,
         status: "ALREADY_APPLIED",
         messageId: messageId,
@@ -3162,7 +3169,7 @@ function applyDd108KnownTestDuplicateQuarantine() {
       throw new Error("隔離後驗證失敗");
     }
     const receipt = {
-      version: "AP-GAS-v10.4-dd108-quarantine",
+      version: "AP-GAS-v10.4.1-dd108-quarantine",
       ddId: ddId,
       status: "APPLIED",
       appliedAt: new Date().toISOString(),
@@ -3193,7 +3200,7 @@ function applyDd108KnownTestDuplicateQuarantine() {
       }
     }
     console.error("[AP DD-108 Quarantine] " + JSON.stringify({
-      version: "AP-GAS-v10.4-dd108-quarantine",
+      version: "AP-GAS-v10.4.1-dd108-quarantine",
       ddId: ddId,
       status: "FAILED",
       messageId: messageId,
@@ -3222,14 +3229,13 @@ function diagPostdeployCanary() {
   addPreflightCheck_(checks, "post.local_bridge.mode",
     DISCORD_IO_MODE === "local_bridge" && AP_INGEST_SECRET.length >= 24 ? "PASS" : "FAIL",
     `mode=${DISCORD_IO_MODE}；GAS Discord egress calls=0`,
-    "設定至少 24 字元 AP_INGEST_SECRET，並確認部署的是 v10.4 durable_async bridge");
+    "設定至少 24 字元 AP_INGEST_SECRET，並確認部署的是 v10.4.1 durable_async bridge");
 
   try {
-    const service = ScriptApp.getService();
-    const serviceUrl = service.getUrl();
-    if (!service.isEnabled() || !serviceUrl) throw new Error("此專案尚未啟用 Web App deployment");
-    const separator = serviceUrl.includes("?") ? "&" : "?";
-    const response = UrlFetchApp.fetch(serviceUrl + separator + "apCanary=" + Date.now(), {
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(AP_WEBAPP_EXEC_URL)) {
+      throw new Error("AP_WEBAPP_EXEC_URL 必須是正式 Apps Script /exec URL；不可使用 /dev");
+    }
+    const response = UrlFetchApp.fetch(AP_WEBAPP_EXEC_URL + "?apCanary=" + Date.now(), {
       muteHttpExceptions: true,
       followRedirects: true
     });

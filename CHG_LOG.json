@@ -3,6 +3,27 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-01T06:26:00Z",
+      "category": "fix",
+      "scope": "antique-gas.postdeploy-canary-url",
+      "version_from": "10.4.0",
+      "version_to": "10.4.1",
+      "summary": "依 Craig 核准，以 Script Property AP_WEBAPP_EXEC_URL 明確指定 postdeploy canary 的正式 /exec 目標，避免自動服務網址命中 /dev 或另一個 deployment 而誤判 HTML 為公開 API 故障。",
+      "rationale": "外部匿名請求已證實正式 /exec 回傳 HTTP 200 JSON，但 ScriptApp.getService().getUrl() 的自我檢查持續取得 HTML。此小修正只更換 canary 的目標來源並拒絕 /dev，不改 worker、Sheet、Drive、Catalog 或 Intake。",
+      "breaking": false,
+      "rollback": "git revert <this commit>；回復後 canary 會再次依賴 ScriptApp.getService().getUrl()",
+      "files": [
+        "AGENTS.md",
+        "CHG_LOG.json",
+        "scripts/GAS/AntiqueAnalysis_AI.md",
+        "scripts/GAS/DEPLOYMENT.md",
+        "tests/test_antique_gas_preflight.py"
+      ],
+      "change_tags": [
+        "GAS-CANARY-EXEC-URL"
+      ]
+    },
+    {
       "ts": "2026-09-01T02:25:52Z",
       "category": "fix",
       "scope": "antique-intake.durable-async-bridge",

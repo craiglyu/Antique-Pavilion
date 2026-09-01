@@ -4,8 +4,9 @@
 <!-- CHANGE GAS-DD105-HEADERS: Craig-approved guarded A1:M1 header-only migration. -->
 <!-- CHANGE GAS-LOCAL-BRIDGE: Discord I/O stays local; GAS exposes an idempotent secret-protected intake. -->
 <!-- CHANGE GAS-DURABLE-ASYNC: DD-108 durable submit/status/worker deployment and duplicate quarantine. -->
+<!-- CHANGE GAS-CANARY-EXEC-URL: canary tests the explicit formal /exec Script Property. -->
 
-# AP GAS v10.4 部署與驗收手冊
+# AP GAS v10.4.1 部署與驗收手冊
 
 這份手冊適用於 `AntiqueAnalysis_AI.md` 主資料管線與 `review_desk/` 人工覆核台。
 所有診斷預設唯讀；本地提交不代表線上已部署。
@@ -15,6 +16,7 @@
 1. 在 Apps Script「專案設定 → 指令碼屬性」確認：
    - `GEMINI_API_KEY`：必要。
    - `AP_INGEST_SECRET`：必要，至少 24 字元；本地 Intake 必須使用同一值。
+   - `AP_WEBAPP_EXEC_URL`：必要，填正式 `https://script.google.com/macros/s/.../exec`；不可填 `/dev`。
    - `DISCORD_BOT_TOKEN`：GAS 不需要；舊值可在本地 bridge 驗收後移除。
 2. 貼上新版 `AntiqueAnalysis_AI.md` 後先儲存。不要執行 `mainTick` 或任何舊 Discord 診斷函式。
 3. 在編輯器執行 `diagPredeployAudit()`。這個函式不呼叫 Gemini，也不修改 Sheet、Drive、
@@ -136,8 +138,9 @@ Craig 於 2026-08-31 核准 DD-105。只有 preview 同時回傳以下四個條�
    - preflight 仍為 `PASS`；
    - `processBridgeQueue=1`、`mainTick=0`、legacy `processJobAsync=0`；
    - local bridge mode 與 `AP_INGEST_SECRET` 已就緒，GAS Discord egress calls 固定為 0；
-   - 由 `ScriptApp.getService().getUrl()` 取得**正式部署網址**並實際 GET，而非只呼叫編輯器內的
-     `doGet()`；回傳筆數必須等於 Catalog 的 `完成` 筆數，且每筆保留 `imageUrl` 並含 `images[]`。
+   - 由 Script Property `AP_WEBAPP_EXEC_URL` 取得明確的**正式 `/exec` 網址**並實際 GET，而非
+     使用可能命中 `/dev`／其他 deployment 的自動網址；回傳筆數必須等於 Catalog 的 `完成`
+     筆數，且每筆保留 `imageUrl` 並含 `images[]`。
 3. report 必須顯示 `status: PASS` 與 `geminiCalls: 0`。
 4. 若要驗證模型可用性，再**另外且只執行一次** `diagTestGeminiFallbackCanary()`。這一步會消耗
    Gemini 免費額度；receipt 應列出實際成功模型與前序 fallback attempts。
