@@ -28,7 +28,7 @@ from .paths import PROJECT_ROOT
 log = logging.getLogger("ap_org_bot.claude_cli")
 
 DEFAULT_TIMEOUT_S = 120
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = "claude-sonnet-5"
 
 
 @dataclass(frozen=True)

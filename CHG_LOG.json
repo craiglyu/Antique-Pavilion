@@ -3,6 +3,32 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-02T01:50:00Z",
+      "category": "chore",
+      "scope": "claude-code.foundation-v10 + ap-bots.model-repin",
+      "summary": "Claude Code 作業層升級:CLAUDE.md 加作業層段落(平台事實、WSL 指令、模型分流表、skills 索引)、SessionStart hook 依 session 模型注入 .claude/model_profiles.md 對應段、paths 觸發的完工三件套 rule、/dod-check 與 /brief 指令;bot 模型 pin 由 claude-sonnet-4-6 → claude-sonnet-5(13 處)、claude-opus-4-7 → claude-opus-5(opus_flow)。",
+      "rationale": "Anthropic 官方 prompting 文件(2026-09-02 抓取)指出同一句指令在 Opus 5 / Fable 5.1 / Sonnet 5 上效果相反,校準必須依模型分流而非寫死在共用規則檔;bot 的模型 id 落後兩代。與 Thor repo 同日裁決(Craig Q1–Q8 全通過)同步。",
+      "breaking": false,
+      "rollback": "git revert <this commit>;.claude/settings.json 為 gitignored 本機檔,回退時手動移除 hooks/modelSettings 區塊",
+      "files": [
+        "CLAUDE.md",
+        ".claude/hooks/model_profile.py",
+        ".claude/model_profiles.md",
+        ".claude/rules/publish_dod.md",
+        ".claude/commands/brief.md",
+        ".claude/commands/dod-check.md",
+        "config/agents.yaml",
+        "scripts/ap_org_bot/infra/claude_cli.py",
+        "scripts/ap_org_bot/agents/base.py",
+        "scripts/ap_org_bot/agents/_core/feedback_pm.py",
+        "scripts/ap_org_bot/agents/_domain/ap/opus_researcher.py",
+        "scripts/ap_org_bot/agents/_domain/ap/opus_flow.py",
+        "STARTUP.md",
+        "CHG_LOG.json"
+      ],
+      "change_tags": []
+    },
+    {
       "ts": "2026-09-01T07:08:00Z",
       "category": "feat",
       "scope": "ap-bots.windows-console-entrypoint",

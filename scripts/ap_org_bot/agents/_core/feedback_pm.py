@@ -25,7 +25,7 @@ class FeedbackPMAgent:
 
     name = "feedback_pm"
     prompt_name = "feedback_pm"
-    model = "claude-sonnet-4-6"
+    model = "claude-sonnet-5"
 
     def __init__(self, claude_client: HeadlessClient):
         self.claude = claude_client

@@ -3,7 +3,7 @@
 Two phases (lifted from legacy `_spawn_opus_design_ruling` ap_org_bot.py:563-668):
 1. Sonnet writes a Design Decision Package (DD) markdown to memory/opus_inbox/
    — uses OpusDesignResearcherAgent
-2. Opus 4.7 reads the DD and emits a ruling — uses raw HeadlessClient because
+2. Opus 5 reads the DD and emits a ruling — uses raw HeadlessClient because
    the system prompt is loaded from config/opus_design_system_prompt.txt and
    the prompt body IS the DD content.
 
@@ -42,7 +42,7 @@ DEFAULT_OPUS_SYSTEM_PROMPT = (
     "Make decisive design rulings. Do not hedge. Do not suggest more options "
     "— pick one and explain why."
 )
-OPUS_MODEL = "claude-opus-4-7"
+OPUS_MODEL = "claude-opus-5"
 
 
 class OpusEscalationFlow:

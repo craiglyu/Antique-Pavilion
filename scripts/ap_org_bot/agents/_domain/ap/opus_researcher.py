@@ -17,7 +17,7 @@ class OpusDesignResearcherAgent(HeadlessAgent):
     discord_emoji = "📦"
     header_label = "Opus DD Researcher"
 
-    model = "claude-sonnet-4-6"
+    model = "claude-sonnet-5"
     max_turns = 12
     timeout_s = 300
     parses_opus_escalate = False

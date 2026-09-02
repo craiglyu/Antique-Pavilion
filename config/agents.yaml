@@ -17,7 +17,7 @@ agents:
     phase: 0
     active: true
     prompt: pm
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
 
   - key: feedback_pm
     class: ap_org_bot.agents._core.feedback_pm.FeedbackPMAgent
@@ -25,7 +25,7 @@ agents:
     phase: 0
     active: true
     prompt: feedback_pm
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     notes: "Standalone (not channel-bound); fires on cron 11:00/20:00 Asia/Taipei"
 
   - key: designer
@@ -34,7 +34,7 @@ agents:
     phase: 0
     active: true
     prompt: designer
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
 
   - key: dev
     class: ap_org_bot.agents._domain.ap.dev.DevAgent
@@ -42,7 +42,7 @@ agents:
     phase: 0
     active: true
     prompt: dev
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
 
   - key: marketing
     class: ap_org_bot.agents._domain.ap.marketing.MarketingAgent
@@ -50,7 +50,7 @@ agents:
     phase: 0
     active: true
     prompt: marketing
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
 
   - key: auto_dev
     class: ap_org_bot.agents._domain.ap.auto_dev.AutoDevAgent
@@ -58,7 +58,7 @@ agents:
     phase: 0
     active: true
     prompt: auto_dev
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     notes: "Button-triggered (not channel-bound) — fires when Craig approves a P0/P1/P2 visual proposal"
 
   - key: gas_dev
@@ -67,7 +67,7 @@ agents:
     phase: 0
     active: true
     prompt: gas_dev
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     notes: "Button-triggered, non-frontend proposals"
 
   - key: opus_design_researcher
@@ -76,7 +76,7 @@ agents:
     phase: 0
     active: true
     prompt: opus_design_researcher
-    model: claude-sonnet-4-6
+    model: claude-sonnet-5
     notes: "Phase 1 of Opus design ruling flow — writes DD package"
 
   # ── Phase 1 (blueprint v1.1 §2.3-2.12 — implement next) ───────────

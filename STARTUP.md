@@ -247,7 +247,7 @@ pip3 install discord.py aiohttp pytz apscheduler python-dotenv
 ### ORG Bot 的 Claude CLI 無回應
 ```bash
 # 測試 claude stdin 管道
-echo "請回答：1+1=?" | claude -p --model claude-sonnet-4-6 --max-turns 1
+echo "請回答：1+1=?" | claude -p --model claude-sonnet-5 --max-turns 1
 ```
 
 若有正常輸出 → CLI 正常，問題在 Bot 邏輯。

@@ -51,7 +51,7 @@ class HeadlessAgent:
     header_label: ClassVar[str] = "Agent"
 
     # ── Subclass MAY override ───────────────────────────────────────────
-    model: ClassVar[str] = "claude-sonnet-4-6"
+    model: ClassVar[str] = "claude-sonnet-5"
     allowed_tools: ClassVar[str] = "Read,Grep,Glob"
     max_turns: ClassVar[int] = 8
     timeout_s: ClassVar[int] = 300
