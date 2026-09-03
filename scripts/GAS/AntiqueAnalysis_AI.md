@@ -1,5 +1,10 @@
 /**
- * 🏺 骨董影像編目代理人 v10.4.1 — Durable Async Local Bridge 多圖版
+ * 🏺 骨董影像編目代理人 v10.4.2 — Durable Async Local Bridge 多圖版
+ *
+ * [v10.4.2] CHANGE GAS-PARAM-HYGIENE（2026-09-03）：移除已廢棄的 temperature/topP/topK；
+ *           maxOutputTokens 2200→4096；路由器把 finishReason=MAX_TOKENS 記為 "truncated"；
+ *           鏈頂 3.7 thinkingLevel medium→high；lite minimal→low。純參數與觀測性，不改 prompt、
+ *           不改 schema、不改 Sheets。部署後先跑 diagTestGeminiFallbackCanary()。
  *
  * [v10.4] Durable async：Discord Gateway 留在本地 Python，GAS doPost 快速入列，
  *         processBridgeQueue 背景執行 Gemini / Drive / Sheets。
@@ -48,11 +53,16 @@ const ALLOWED_USER_IDS   = ["566565645483769863"];    // Discord User ID（18位
 const GEMINI_API_BASE    = "https://generativelanguage.googleapis.com/v1beta/models/";
 const GEMINI_FILES_BASE  = "https://generativelanguage.googleapis.com/v1beta/";
 const GEMINI_FILES_UPLOAD_BASE = "https://generativelanguage.googleapis.com/upload/v1beta/files";
+// CHANGE GAS-PARAM-HYGIENE (v10.4.2, 2026-09-03)：
+//   - 鏈頂 3.7 改 thinkingLevel "high"：取樣參數（temperature/topP/topK）已被官方廢棄，
+//     prompt 末尾 9 條自我校驗能否真的執行，只剩 thinking 深度可控。
+//   - lite 的 "minimal" 改 "low"：generateContent 文件列出的合法值只有 low / medium / high，
+//     且明寫 3.8 Flash 不支援 minimal；lite 是 fallback 鏈最後一環，壞了只會表現成全鏈失敗。
 const GEMINI_MODEL_ROUTES = Object.freeze([
-  Object.freeze({ model: "gemini-3.7-flash",      thinkingLevel: "medium"  }),
+  Object.freeze({ model: "gemini-3.7-flash",      thinkingLevel: "high"    }),
   Object.freeze({ model: "gemini-3.6-flash",      thinkingLevel: "medium"  }),
   Object.freeze({ model: "gemini-3.5-flash",      thinkingLevel: "medium"  }),
-  Object.freeze({ model: "gemini-3.5-flash-lite", thinkingLevel: "minimal" })
+  Object.freeze({ model: "gemini-3.5-flash-lite", thinkingLevel: "low"     })
 ]);
 const GEMINI_TRANSIENT_RETRIES = 1; // 首次 + 1 次短重試，再換下一模型
 const DISCORD_API        = "https://discord.com/api/v10";
@@ -1843,9 +1853,44 @@ function fetchGeminiWithFallback_(payload, validatorFn, options) {
         break;
       }
 
+      let result;
       try {
-        const result = JSON.parse(rawText);
+        result = JSON.parse(rawText);
         if (result.error) throw new Error(result.error.message || "Gemini API error");
+      } catch (envelopeErr) {
+        attempts.push({
+          model: route.model,
+          thinkingLevel: route.thinkingLevel,
+          retry: retryIndex,
+          status: "invalid_response",
+          httpCode: httpCode,
+          elapsedMs: Date.now() - startedAt,
+          error: String(envelopeErr.message || envelopeErr).substring(0, 180)
+        });
+        break;
+      }
+
+      // CHANGE GAS-PARAM-HYGIENE (v10.4.2)：先讀 finishReason 再交給 validator。
+      //   MAX_TOKENS 代表輸出被截斷（JSON 必然不完整），過去會被當成 invalid_response 與
+      //   「模型回傳壞 JSON」混在一起，receipt 看不出是 cap 太小。獨立成 "truncated" 狀態，
+      //   並帶 usageMetadata 讓 diag 能看到 thoughtsTokenCount；截斷仍換下一個模型（不重試同模型）。
+      const firstCandidate = result.candidates && result.candidates[0];
+      const finishReason = String((firstCandidate && firstCandidate.finishReason) || "");
+      if (finishReason === "MAX_TOKENS") {
+        attempts.push({
+          model: route.model,
+          thinkingLevel: route.thinkingLevel,
+          retry: retryIndex,
+          status: "truncated",
+          finishReason: finishReason,
+          httpCode: httpCode,
+          elapsedMs: Date.now() - startedAt,
+          usageMetadata: result.usageMetadata || {}
+        });
+        break;
+      }
+
+      try {
         const value = validatorFn(result, route);
         const receipt = {
           selectedModel: route.model,
@@ -2171,10 +2216,14 @@ displayRecommendation 必須避免「紫檀底座 + 文竹 + 暖色側光」固�
       ]
     }],
     generationConfig: {
-      temperature:      0.65,   // v9.2: 0.55→0.65 增加表達多樣性，減少套版
-      topP:             0.92,
-      topK:             40,
-      maxOutputTokens:  2200,   // v9.2: 2600→2200 鼓勵精煉，反 padding
+      // CHANGE GAS-PARAM-HYGIENE (v10.4.2)：移除 temperature / topP / topK。
+      //   官方 changelog 2026-07-21 已 deprecate 三者，3.8 Flash migration checklist 明寫要刪；
+      //   v9.2 把 temperature 0.55→0.65 的「增加多樣性」在現行模型上已是 no-op。
+      //   maxOutputTokens 2200→4096：逐欄上限加總（story 480 + features 260 + display 180 +
+      //   8 張圖的 views[] observation）在正常案件就逼近 2000 tokens；一截斷 JSON 即壞，
+      //   路由器會當成 invalid_response 靜默降級到下一個模型。反 padding 改由 response_schema
+      //   的字數區間負責，不再靠 cap。
+      maxOutputTokens:  4096,
       response_mime_type: "application/json",
       response_schema: {
         type: "OBJECT",
@@ -2271,7 +2320,7 @@ function diagTestGeminiFallbackCanary() {
   const payload = {
     contents: [{ parts: [{ text: "Return JSON with ok=true and note='AP fallback canary'." }] }],
     generationConfig: {
-      temperature: 0,
+      // CHANGE GAS-PARAM-HYGIENE: canary 同樣不再送 temperature（已廢棄；3.8 會拒收）
       maxOutputTokens: 512,
       response_mime_type: "application/json",
       response_schema: {
