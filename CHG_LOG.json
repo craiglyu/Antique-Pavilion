@@ -3,6 +3,33 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T00:00:00Z",
+      "category": "docs",
+      "scope": "design-handoff.fable-5-1",
+      "summary": "產出 Fable 5.1 現況資源包與 session prompt：Sol 藍圖逐項完成度實測盤點 + Gemini API 對照官方文件的四個發現。",
+      "rationale": "Craig 要帶 UX/UI、質感與 GAS 解析調教三個議題去找 Fable 5.1 討論。既有的 GPT56_SOL_* 現況卡停在 2026-08-21，已無法反映 Slice 1 完成、Slice 2 七成、DoD 協議上線與 62 件實際資料的現況；Sol 的 mockup 也只呈現單件單態，無法作為決策依據。",
+      "breaking": false,
+      "rollback": "git revert <sha>（純文件，無行為變更）",
+      "files": [
+        "FABLE_AP_CURRENT_STATE_2026-09-03.md (新增)",
+        "FABLE_AP_SESSION_PROMPT_2026-09-03.md (新增)"
+      ],
+      "findings": {
+        "sol_slice_1": "100% 完成（LOT/四角金線/雲霧/focus-border/3D tilt/錦格紙紋/假承諾 全部 grep=0）",
+        "sol_slice_2": "約 7 成：WebGL 霧與全頁暗角已除、bg-layer 已改 hero panel 460/330px；但 ruyiCloudBreathe 16s 與 heroMist 32s/28s 仍持續，山水未依右側構圖重做",
+        "sol_slice_3": "只完成 fail-closed 一半：modalAppraisal 已除、refItem/refPrice 前端 0 消費；DD-103 未過故欄位不存在",
+        "sol_3_1_geometry": "1440x1024 實測達標且超標：hero panel 430px、rail top 438px、首張卡片露出 391px（Sol 要求 >=240px）",
+        "sol_3_2_rail": "未執行：glyph 8 個、count badge 7 個仍在；375 已是 overflow-x auto，wrap/scroll 衝突已朝 scroll 解決",
+        "discoverability": "仍全為 0：ld+json / location.hash / pushState / navigator.share / canonical",
+        "gemini_deprecated_sampling": "temperature/topP/topK 自 2026-07-21 官方 deprecated 且 migration checklist 要求移除；GAS 仍送 0.65/0.92/40，v9.2 的 temperature 調校可能已是 no-op",
+        "gemini_thinking_minimal": "generateContent 文件列 low/medium/high 並註明 minimal 在 3.8 Flash 會回錯；GAS 對 3.5-flash-lite 用 minimal，為 fallback 鏈最後一環，合法性需實測",
+        "gemini_model_head": "gemini-3.8-flash 已於 2026-09-02 GA；GAS 鏈頂為 3.7-flash（仍有效）",
+        "gemini_legacy_api": "generateContent 已被標為 Legacy，官方主推 Interactions API；不緊急",
+        "gemini_verified_ok": "thinkingConfig.thinkingLevel JSON 路徑正確；response_schema snake_case 可運作（proto3 JSON 雙寫法皆接受）",
+        "local_preview_trap": "本機預覽 hero 無山水：seedream webp 只在 repo 根目錄，部署 workflow 才複製到公開 repo 根目錄"
+      }
+    },
+    {
       "ts": "2026-09-02T01:50:00Z",
       "category": "chore",
       "scope": "claude-code.foundation-v10 + ap-bots.model-repin",
