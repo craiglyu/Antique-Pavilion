@@ -3,6 +3,17 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T02:00:00Z",
+      "category": "design",
+      "scope": "contact.copyright-wording",
+      "summary": "洽詢區版權聲明「鑑定資料」改為「鑑賞資料」（Publish/index.html 與根目錄 index.html 同步）。",
+      "change_tags": ["CONTACT-WORDING"],
+      "rationale": "Fable 5.1 設計稿第二次校對指出「鑑定資料」踩在真偽措辭邊界；Craig 於三個候選（編目／鑑賞／考據）中拍板「鑑賞資料」：保留「鑑」的品鑑語意、與「私人鑑賞圖錄」母方向同源、法律語意上不等於鑑定服務。",
+      "breaking": false,
+      "rollback": "git revert <sha>",
+      "files": ["Publish/index.html", "index.html", "CHG_LOG.json"]
+    },
+    {
       "ts": "2026-09-03T00:00:00Z",
       "category": "docs",
       "scope": "design-handoff.fable-5-1",
