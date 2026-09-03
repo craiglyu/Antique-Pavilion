@@ -3,6 +3,17 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T06:00:00Z",
+      "category": "design",
+      "scope": "catalogue-card.type-floor",
+      "summary": "TYPE-FLOOR：目錄卡規格行文字分層（索引行 12.5px 分類墨色／年代金褐；材質行 12px 加「材質」小標並以 hairline 與標題分離；無材質時整行隱藏）、全站介面字級地板 11px（modal stage/dossier head/fact dt/action caption、badge、細看連結）、洽詢區去 32px 菱格底紋與印章 hover 旋轉。",
+      "change_tags": ["TYPE-FLOOR"],
+      "rationale": "Craig 2026-09-03 指出目錄卡分類／年代與材質字太小且貼著標題，只剩斷行可分；於「文字分層／年代細框／分類年代皆框」三案中選文字分層。Fable 診斷：Slice 1 減法後的質感缺口是尺度對比而非顏色，16 處 0.62–0.68rem（9.9–10.9px）低於可讀地板。",
+      "breaking": false,
+      "rollback": "git revert <sha>",
+      "files": ["Publish/index.html", "CHG_LOG.json"]
+    },
+    {
       "ts": "2026-09-03T05:20:00Z",
       "category": "fix",
       "scope": "infra.ssl_patch.aiohttp-cache",
