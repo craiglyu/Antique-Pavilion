@@ -537,29 +537,14 @@
             flex-direction: row;
             align-items: center;
             justify-content: center;
-            gap: 9px;
+            gap: 8px;
             transition: background var(--dur-base) ease;
             position: relative;
         }
         .cat-btn::before { display: none; }
-        .cat-glyph {
-            box-sizing: border-box;
-            display: grid;
-            place-items: center;
-            width: 24px;
-            height: 24px;
-            border: 1px solid rgba(142, 105, 43, 0.48);
-            background: rgba(247, 244, 237, 0.58);
-            color: var(--gold-900);
-            font-family: var(--font-plaque);
-            font-size: 0.82rem;
-            line-height: 1;
-            transform: rotate(0.01deg);
-            transition: color var(--dur-base) ease,
-                        border-color var(--dur-base) ease,
-                        background var(--dur-base) ease,
-                        transform var(--dur-base) var(--ease-out);
-        }
+        /* CHANGE RAIL-INDEX: 移除分類首字 glyph（24px 方框）。Sol §3.2：目次感來自上下 hairline、
+           欄間分隔線與 68px 高度，不來自每顆按鈕再蓋一枚印；glyph 與卡片分類印記重複。
+           件數維持素文字（早已不是彩色徽章），只把 9.9px 抬到 11px 地板。 */
         /* Count is an edition-style index, not a coloured notification badge. */
         .cat-count {
             position: static;
@@ -569,7 +554,7 @@
             border: 0;
             color: var(--gold-900);
             font-family: var(--font-latin);
-            font-size: 0.62rem;
+            font-size: 0.6875rem;
             font-weight: 400;
             line-height: 1;
             text-align: center;
@@ -594,19 +579,9 @@
             transition: transform var(--dur-base) var(--ease-out);
         }
         .cat-btn:hover { background: rgba(196, 154, 69, 0.045); }
-        .cat-btn:hover .cat-glyph {
-            border-color: var(--gold-700);
-            background: rgba(255, 253, 248, 0.82);
-            transform: translateY(-1px);
-        }
         .cat-btn:hover .cat-label { color: var(--fg-1); }
-        /* Active reads as a restrained vermilion collector's mark. */
+        /* Active reads as a restrained vermilion collector's mark: label to ink, one vermilion rule. */
         .cat-btn.active .cat-label { color: var(--fg-1); }
-        .cat-btn.active .cat-glyph {
-            color: var(--seal-red);
-            border-color: rgba(139, 47, 47, 0.72);
-            background: rgba(139, 47, 47, 0.035);
-        }
         .cat-btn.active::after { transform: scaleX(1); }
 
         /* =========================================================
@@ -2885,9 +2860,11 @@
             font-size: 0.8rem;
             letter-spacing: 0.13em;
         }
+        /* CHANGE RAIL-INDEX: 標籤 12px → 14px（0.875rem），字距收到 0.1em；
+           分類名是目次的主體，不該比卡片材質標還小。高度、分隔線、朱紅底線不變。 */
         .cat-label {
-            font-size: 0.75rem;
-            letter-spacing: 0.11em;
+            font-size: 0.875rem;
+            letter-spacing: 0.1em;
         }
         .cat-count { letter-spacing: 0.04em; }
 
@@ -3335,7 +3312,7 @@
                  role="tablist" aria-label="器物分類篩選">
             <button class="cat-btn active" data-cat="all"
                     role="tab" aria-selected="true" aria-controls="gallery">
-                <span class="cat-glyph" aria-hidden="true">全</span>
+                <!-- CHANGE RAIL-INDEX: 去 glyph，分類列只剩「名稱 + 件數」 -->
                 <span class="cat-label">全部典藏</span>
             </button>
                 <!-- category tabs injected dynamically from sheet data after fetch -->
@@ -3984,8 +3961,8 @@
             if (allBtn) {
                 const totalCount = artifactsData.length;
                 allBtn.setAttribute('aria-label', `全部典藏，${totalCount} 件`);
+                /* CHANGE RAIL-INDEX: 動態重建時同樣不產生 glyph */
                 allBtn.innerHTML =
-                    '<span class="cat-glyph" aria-hidden="true">全</span>' +
                     '<span class="cat-label">全部典藏</span>' +
                     `<span class="cat-count" aria-hidden="true">${totalCount}</span>`;
             }
@@ -3999,9 +3976,7 @@
                 btn.setAttribute('aria-selected', 'false');
                 btn.setAttribute('aria-controls', 'gallery');
                 btn.setAttribute('aria-label', `${label}，${count} 件`);
-                const glyph = (label || cat || '典').charAt(0);
                 btn.innerHTML =
-                    `<span class="cat-glyph" aria-hidden="true">${escapeHTML(glyph)}</span>` +
                     `<span class="cat-label">${escapeHTML(label)}</span>` +
                     `<span class="cat-count" aria-hidden="true">${count}</span>`;
                 bar.appendChild(btn);

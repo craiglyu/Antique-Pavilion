@@ -3,6 +3,17 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T03:00:00Z",
+      "category": "design",
+      "scope": "category-rail.index",
+      "summary": "分類列目次化（RAIL-INDEX）：移除 24px 首字 glyph 方框（靜態 markup、動態重建、CSS 與 hover/active 規則），標籤 0.75rem→0.875rem、件數 0.62rem→0.6875rem；高度、分隔線、朱紅底線、tablist a11y 不變。",
+      "change_tags": ["RAIL-INDEX"],
+      "rationale": "Sol §3.2 唯一完全未動的項目。Fable 5.1 2026-09-03 裁決：目次感由上下 hairline、欄間分隔線與 68px 高度撐住，glyph 是每顆按鈕再蓋一枚印、與卡片分類印記重複；減法後的質感缺口在尺度對比，所以標籤抬到 14px、件數抬到 11px 地板。",
+      "breaking": false,
+      "rollback": "git revert <sha>",
+      "files": ["Publish/index.html", "CHG_LOG.json"]
+    },
+    {
       "ts": "2026-09-03T02:00:00Z",
       "category": "design",
       "scope": "contact.copyright-wording",
