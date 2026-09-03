@@ -366,3 +366,77 @@ process.stdout.write(JSON.stringify({ok: true}));
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {"ok": True}
+
+
+# ----------------------------------------------------------------------------
+# CHANGE DD109-MERGE: user-confirmed "merge into keeper" (Craig approved 2026-09-03)
+# ----------------------------------------------------------------------------
+def test_payload_carries_merge_into_only_when_confirmed_and_validates_shape():
+    bridge = _bridge_module()
+    prepared = [bridge.compress_image_bytes(_jpeg(1600, 1200), attachment_id="a1", filename="a.jpg", index=1)]
+    common = dict(ingest_secret="ingest-super-secret-32-chars", caption="", message_id="1495279823009087551",
+                  channel_id="1", user_id="2", user_name="craig")
+    payload, _ = bridge.build_ingest_payload(prepared, **common)
+    assert "mergeInto" not in payload
+    payload, _ = bridge.build_ingest_payload(prepared, merge_into="9a3705a2-1111-4222-8333-444455556666", **common)
+    assert payload["mergeInto"] == "9a3705a2-1111-4222-8333-444455556666"
+    with pytest.raises(bridge.BridgeInputError):
+        bridge.build_ingest_payload(prepared, merge_into="../etc", **common)
+
+
+def test_bot_asks_before_merging_and_never_merges_by_time_alone():
+    source = BOT.read_text(encoding="utf-8")
+    assert "_ask_merge_confirmation" in source
+    assert 'bot.wait_for("reaction_add"' in source
+    assert "merge_into=merge_into" in source
+    assert "NEW_ITEM_KEYWORDS" in source
+    # time proximity alone must not submit a merge: the only path that sets merge_into is the reaction.
+    assert source.count("merge_into = await _ask_merge_confirmation") == 1
+
+
+def test_gas_merge_gate_rejects_missing_or_rejected_keeper_and_worker_skips_gemini():
+    gas = GAS.read_text(encoding="utf-8")
+    assert "processMergeBridgeJob_" in gas
+    assert "MERGE_TARGET_INVALID" in gas
+    # merge path is decided before any Gemini call
+    assert gas.index("if (manifest.mergeInto)") < gas.index("const analysis = analyzeWithGemini(blobs")
+    harness = r"""
+const fs = require('fs'); const vm = require('vm'); const assert = require('assert');
+const source = fs.readFileSync(process.argv[1], 'utf8');
+const props = {getProperty(k){ return k === 'AP_INGEST_SECRET' ? 'ingest-super-secret-32-chars' : ''; }, setProperty(){}, deleteProperty(){}};
+const context = {
+  console: {log(){}, warn(){}, error(){}},
+  PropertiesService: {getScriptProperties(){ return props; }},
+  CacheService: {getScriptCache(){ return {get(){return null;}, put(){}, remove(){}}; }},
+  LockService: {getScriptLock(){ return {waitLock(){}, releaseLock(){}}; }},
+  SpreadsheetApp: {openById(){ throw new Error('not needed'); }},
+  ContentService: {MimeType:{JSON:'json'}, createTextOutput(t){ return {text:t, setMimeType(){ return this; }}; }}
+};
+vm.createContext(context); vm.runInContext(source, context);
+const KEEPER = 'd20f8cdf-0000-4000-8000-000000000183';
+const GONE = '9a3705a2-0000-4000-8000-000000000181';
+const rows = [
+  [KEEPER,'2026','c','龍洋','雜項','清朝','s','','','link','t','待人工覆核','d'],
+  [GONE,'2026','c','x','雜項','清朝','s','','','link','t','已退件','d']
+];
+assert.strictEqual(context.assertMergeTargetValid_(rows, KEEPER)[3], '龍洋');
+for (const bad of ['aaaaaaaa-0000-4000-8000-000000000999', GONE, '../x', '']) {
+  let code = '';
+  try { context.assertMergeTargetValid_(rows, bad); } catch (e) { code = e.bridgeCode; }
+  assert.strictEqual(code, 'MERGE_TARGET_INVALID', 'expected rejection for ' + JSON.stringify(bad));
+}
+process.stdout.write('ok');
+"""
+    result = subprocess.run(["node", "-e", harness, str(GAS)], cwd=REPO, check=False,
+                            capture_output=True, text=True, encoding="utf-8")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "ok"
+
+
+def test_review_desk_merge_is_reversible_and_wired_in_ui():
+    code = (REPO / "scripts" / "GAS" / "review_desk" / "Code.gs").read_text(encoding="utf-8")
+    ui = (REPO / "scripts" / "GAS" / "review_desk" / "Index.html").read_text(encoding="utf-8")
+    assert "function mergeArtifactInto(payload)" in code
+    assert "deleteRow" not in code and "setTrashed" not in code
+    assert '"merge-into"' in code and '"merge-receive"' in code
+    assert 'id="merge-dialog"' in ui and "mergeArtifactInto" in ui and "data-merge-uuid" in ui

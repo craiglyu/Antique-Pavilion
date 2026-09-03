@@ -588,6 +588,36 @@
     </form>
   </dialog>
 
+  <!-- CHANGE DD109-MERGE: fold a duplicate into a keeper; reversible, audited. -->
+  <dialog id="merge-dialog" aria-labelledby="merge-title">
+    <form method="dialog" id="merge-form">
+      <div class="dialog-head">
+        <div><span class="eyebrow">Merge Views</span><h2 id="merge-title">併入既有藏品</h2></div>
+        <button class="dialog-close" type="button" data-close-dialog aria-label="關閉">×</button>
+      </div>
+      <div class="dialog-body">
+        <p id="merge-description"></p>
+        <div class="form-field is-wide">
+          <label for="merge-search">搜尋保留件（品名／UUID）</label>
+          <input id="merge-search" type="search" maxlength="120" placeholder="輸入品名關鍵字縮小清單">
+        </div>
+        <div class="form-field is-wide">
+          <label for="merge-keeper">保留件（keeper）</label>
+          <select id="merge-keeper" required size="8"></select>
+        </div>
+        <p class="hint">被併入者的影像會成為保留件的額外角度（非封面、待覆核或隨保留件狀態），被併入者本身標記為退件；不刪列、不刪檔，稽核可追溯。</p>
+        <div class="form-field is-wide">
+          <label for="merge-note">備註（選填）</label>
+          <input id="merge-note" maxlength="1000" placeholder="例如：同一枚龍洋，Bot 離線期間重貼">
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="dialog-button" type="button" data-close-dialog>取消</button>
+        <button class="dialog-button is-primary" id="merge-submit" type="submit">併入並標記退件</button>
+      </div>
+    </form>
+  </dialog>
+
   <div class="compare-tray" id="compare-tray" hidden>
     <span id="compare-count">已選取 0 件</span>
     <button type="button" id="compare-clear">清除</button>
@@ -731,6 +761,7 @@
       compareSelection: new Set(),
       decision: null,
       editing: null,
+      merge: null,
       imageViewer: { images: [], index: 0, itemName: "" },
       busy: false,
       demo: isLocalPreview(),
@@ -767,6 +798,13 @@
       compareCount: document.getElementById("compare-count"),
       compareClear: document.getElementById("compare-clear"),
       compareCreate: document.getElementById("compare-create"),
+      mergeDialog: document.getElementById("merge-dialog"),
+      mergeForm: document.getElementById("merge-form"),
+      mergeDescription: document.getElementById("merge-description"),
+      mergeSearch: document.getElementById("merge-search"),
+      mergeKeeper: document.getElementById("merge-keeper"),
+      mergeNote: document.getElementById("merge-note"),
+      mergeSubmit: document.getElementById("merge-submit"),
       toast: document.getElementById("toast"),
     };
 
@@ -776,6 +814,7 @@
         if (method === "getBootstrapData") return getDemoData();
         if (method === "createManualReviewGroup") return applyDemoReviewGroup(payload);
         if (method === "saveMediaArrangement") return applyDemoMediaArrangement(payload);
+        if (method === "mergeArtifactInto") return applyDemoMerge(payload);
         return applyDemoDecision(payload);
       }
       const gasRunner = await waitForGasRunner();
@@ -798,6 +837,21 @@
         item.reviewStatus = statusMap[payload.action];
       }
       return { ok: true, item: structuredClone(item), message: "示範模式：介面狀態已更新，未寫入 Google Sheet。" };
+    }
+
+    /* CHANGE DD109-MERGE: demo mirror of mergeArtifactInto — moves views, rejects duplicate. */
+    function applyDemoMerge(payload) {
+      const duplicate = findItem(payload.duplicateUuid);
+      const keeper = findItem(payload.keeperUuid);
+      if (!duplicate || !keeper) throw new Error("找不到示範藏品。");
+      const moved = (duplicate.images || []).map((image, index) => ({
+        ...structuredClone(image), isPrimary: false, legacy: false,
+        mediaId: image.mediaId === "legacy-primary" ? "merged-" + String(duplicate.uuid).slice(0, 8) : image.mediaId,
+        sortOrder: (keeper.images || []).length + index + 1,
+      }));
+      keeper.images = [...(keeper.images || []), ...moved];
+      duplicate.status = "已退件"; duplicate.reviewStatus = "已退件";
+      return { ok: true, movedMedia: moved.length, keeper, duplicate, message: "示範模式：已併入，未寫入 Sheet。" };
     }
 
     function applyDemoReviewGroup(payload) {
@@ -1011,6 +1065,9 @@
       });
       const compare = el("button", "action-button compare-button", selected ? "已加入人工比對" : "加入人工比對");
       compare.type = "button"; compare.dataset.compareUuid = item.uuid; actions.append(compare);
+      /* CHANGE DD109-MERGE */
+      const merge = el("button", "action-button", "併入既有藏品…");
+      merge.type = "button"; merge.dataset.mergeUuid = item.uuid; merge.dataset.groupId = ""; actions.append(merge);
       body.append(line, el("h2", "", item.itemName || "未命名藏品"), facts, actions);
       card.append(figure, body);
       return card;
@@ -1075,9 +1132,75 @@
         button.dataset.groupId = group.groupId;
         actions.append(button);
       });
+      /* CHANGE DD109-MERGE: in a review group the sibling is the natural keeper. */
+      const merge = el("button", "action-button", "併入既有藏品…");
+      merge.type = "button"; merge.dataset.mergeUuid = item.uuid; merge.dataset.groupId = group.groupId;
+      actions.append(merge);
       body.append(actions);
       card.append(figure, body);
       return card;
+    }
+
+    /* CHANGE DD109-MERGE: keeper picker — group siblings first, then the whole catalogue. */
+    function openMerge(uuid, groupId) {
+      const item = findItem(uuid);
+      if (!item) return;
+      state.merge = { duplicateUuid: uuid, groupId: groupId || "" };
+      elements.mergeDescription.textContent = "「" + item.itemName + "」（Row " + item.sourceRow + "）將被併入所選保留件，成為其額外角度；本件標記為退件。";
+      elements.mergeSearch.value = "";
+      elements.mergeNote.value = "";
+      renderMergeOptions();
+      elements.mergeDialog.showModal();
+    }
+
+    function mergeCandidates() {
+      const group = state.merge.groupId ? state.data.groups.find((entry) => entry.groupId === state.merge.groupId) : null;
+      const siblings = group ? group.items.map((entry) => entry.uuid) : [];
+      const pool = (state.data.catalog && state.data.catalog.length ? state.data.catalog : state.data.groups.flatMap((entry) => entry.items));
+      const seen = new Set();
+      return pool
+        .filter((entry) => entry.uuid !== state.merge.duplicateUuid && entry.status !== "已退件")
+        .filter((entry) => { if (seen.has(entry.uuid)) return false; seen.add(entry.uuid); return true; })
+        .sort((a, b) => Number(siblings.includes(b.uuid)) - Number(siblings.includes(a.uuid)) || String(a.itemName).localeCompare(String(b.itemName), "zh-Hant"));
+    }
+
+    function renderMergeOptions() {
+      const query = elements.mergeSearch.value.trim().toLowerCase();
+      const options = mergeCandidates().filter((entry) => !query
+        || String(entry.itemName).toLowerCase().includes(query)
+        || String(entry.uuid).toLowerCase().startsWith(query));
+      elements.mergeKeeper.replaceChildren(...options.slice(0, 200).map((entry) => {
+        const option = document.createElement("option");
+        option.value = entry.uuid;
+        option.textContent = "Row " + entry.sourceRow + " · " + entry.itemName + " · " + (entry.status || "未設定") + " · " + String(entry.uuid).slice(0, 8);
+        return option;
+      }));
+      if (elements.mergeKeeper.options.length) elements.mergeKeeper.selectedIndex = 0;
+    }
+
+    async function submitMerge(event) {
+      event.preventDefault();
+      if (!state.merge || state.busy) return;
+      const keeperUuid = elements.mergeKeeper.value;
+      if (!keeperUuid) return showToast("請先選擇保留件。", true);
+      const keeper = findItem(keeperUuid);
+      if (!window.confirm("確定把本件併入「" + (keeper ? keeper.itemName : keeperUuid) + "」？本件會標記為退件（可從稽核紀錄追溯）。")) return;
+      setBusy(true, elements.mergeSubmit);
+      try {
+        const result = await callServer("mergeArtifactInto", {
+          duplicateUuid: state.merge.duplicateUuid,
+          keeperUuid,
+          note: elements.mergeNote.value,
+        });
+        if (!state.demo) state.data = await callServer("getBootstrapData");
+        elements.mergeDialog.close();
+        render();
+        showToast(result.message);
+      } catch (error) {
+        showToast(error.message || String(error), true);
+      } finally {
+        setBusy(false, elements.mergeSubmit);
+      }
     }
 
     function differenceMap(items) {
@@ -1411,6 +1534,11 @@
         toggleCompare(compareButton.dataset.compareUuid);
         return;
       }
+      const mergeButton = event.target.closest("[data-merge-uuid]");
+      if (mergeButton) {
+        openMerge(mergeButton.dataset.mergeUuid, mergeButton.dataset.groupId);
+        return;
+      }
       const actionButton = event.target.closest("[data-action]");
       if (actionButton) {
         if (actionButton.dataset.action === "edit") openEditor(actionButton.dataset.uuid, actionButton.dataset.groupId);
@@ -1436,6 +1564,8 @@
       if (state.compareSelection.size >= 2) elements.compareDialog.showModal();
     });
     elements.compareForm.addEventListener("submit", submitCompare);
+    elements.mergeForm.addEventListener("submit", submitMerge);
+    elements.mergeSearch.addEventListener("input", renderMergeOptions);
     elements.imagePrev.addEventListener("click", () => moveImageViewer(-1));
     elements.imageNext.addEventListener("click", () => moveImageViewer(1));
     elements.imageRail.addEventListener("click", (event) => {

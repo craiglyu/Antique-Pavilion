@@ -479,6 +479,95 @@ function saveReviewDecision(payload) {
   }
 }
 
+/**
+ * CHANGE DD109-MERGE (Craig 2026-09-03 核准): fold a duplicate artifact into a keeper.
+ * Reversible by design: no row or Drive file is deleted. The duplicate's AP_MEDIA rows
+ * are re-parented to the keeper as non-primary views (status follows the keeper's
+ * publication state); a legacy single-image duplicate gets one AP_MEDIA row created
+ * from its Drive URL. The duplicate Catalog row is marked 已退件 with an audit trail.
+ */
+function mergeArtifactInto(payload) {
+  assertAuthorized_();
+  const duplicateUuid = String((payload && payload.duplicateUuid) || "").trim();
+  const keeperUuid = String((payload && payload.keeperUuid) || "").trim();
+  const note = String((payload && payload.note) || "").trim().slice(0, 1000);
+  if (!duplicateUuid || !keeperUuid) throw new Error("缺少 duplicate 或 keeper UUID。");
+  if (duplicateUuid === keeperUuid) throw new Error("不能把藏品併入自己。");
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    const spreadsheet = getSpreadsheet_();
+    const catalogSheet = spreadsheet.getSheets()[REVIEW_DESK.CATALOG_SHEET_INDEX];
+    const auditSheet = spreadsheet.getSheetByName(REVIEW_DESK.AUDIT_SHEET);
+    const queueSheet = spreadsheet.getSheetByName(REVIEW_DESK.QUEUE_SHEET);
+    const mediaSheet = spreadsheet.getSheetByName(REVIEW_DESK.MEDIA_SHEET);
+    if (!auditSheet || !queueSheet || !mediaSheet) throw new Error("Review Desk 尚未初始化（需要 Review Queue / Review Audit / AP_MEDIA）。");
+
+    const duplicateRow = findCatalogRowByUuid_(catalogSheet, duplicateUuid);
+    const keeperRow = findCatalogRowByUuid_(catalogSheet, keeperUuid);
+    if (!duplicateRow || !keeperRow) throw new Error("找不到 duplicate 或 keeper 的 Catalog 列。");
+    const duplicate = readCatalogItemAtRow_(catalogSheet, duplicateRow);
+    const keeper = readCatalogItemAtRow_(catalogSheet, keeperRow);
+    if (keeper.status === CATALOG_STATUS.REJECTED) throw new Error("keeper 已退件，請先選擇有效的保留件。");
+    if (duplicate.status === CATALOG_STATUS.REJECTED) throw new Error("duplicate 已是退件狀態；若要重新併入請先改為待覆核。");
+
+    const keeperPublished = keeper.status === CATALOG_STATUS.PUBLISHED;
+    const mergedStatus = keeperPublished ? MEDIA_STATUS.APPROVED : MEDIA_STATUS.PENDING;
+    const now = new Date();
+    let moved = 0;
+    let keeperCount = 0;
+
+    if (mediaSheet.getLastRow() >= 2) {
+      const range = mediaSheet.getRange(2, 1, mediaSheet.getLastRow() - 1, MEDIA_HEADERS.length);
+      const rows = range.getValues();
+      rows.forEach((row) => { if (String(row[0]) === keeperUuid) keeperCount += 1; });
+      rows.forEach((row) => {
+        if (String(row[0]) !== duplicateUuid) return;
+        row[0] = keeperUuid;
+        row[5] = keeperCount + moved + 1;   // append after the keeper's existing views
+        row[6] = false;                     // never steal the keeper's cover
+        row[7] = mergedStatus;
+        setDriveFilePublic_(String(row[2] || getDriveFileId_(row[3])), keeperPublished);
+        moved += 1;
+      });
+      if (moved) range.setValues(rows);
+    }
+    if (!moved && duplicate.imageUrl) {
+      // Pre-DD-104 duplicate: materialise its single image as a keeper view.
+      const fileId = getDriveFileId_(duplicate.imageUrl);
+      mediaSheet.appendRow([
+        keeperUuid, `merged-${duplicateUuid.slice(0, 8)}`, fileId, duplicate.imageUrl, "unknown",
+        keeperCount + 1, false, mergedStatus, "", "", "", 0, now,
+      ]);
+      setDriveFilePublic_(fileId, keeperPublished);
+      moved = 1;
+    }
+
+    catalogSheet.getRange(duplicateRow, 12).setValue(CATALOG_STATUS.REJECTED);
+    const mergeNote = `併入 ${keeperUuid}（${keeper.itemName}）` + (note ? `；${note}` : "");
+    updateQueueDecision_(queueSheet, { uuid: duplicateUuid, groupId: "", action: "reject", note: mergeNote }, CATALOG_STATUS.REJECTED);
+    auditSheet.appendRow([
+      now, getReviewerEmail_(), "merge-into", "", duplicateUuid, duplicateRow,
+      duplicate.status, CATALOG_STATUS.REJECTED, JSON.stringify({ keeperUuid, movedMedia: moved, mergedStatus }), mergeNote,
+    ]);
+    auditSheet.appendRow([
+      now, getReviewerEmail_(), "merge-receive", "", keeperUuid, keeperRow,
+      keeper.status, keeper.status, JSON.stringify({ duplicateUuid, movedMedia: moved }), mergeNote,
+    ]);
+    SpreadsheetApp.flush();
+    return {
+      ok: true,
+      movedMedia: moved,
+      keeper: readCatalogItemAtRow_(catalogSheet, keeperRow),
+      duplicate: readCatalogItemAtRow_(catalogSheet, duplicateRow),
+      message: `已將 ${moved} 張影像併入「${keeper.itemName}」；重複件已標記退件，可從稽核紀錄追溯。`,
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function setDriveFilePublic_(fileId, makePublic) {
   if (!fileId) return;
   const file = DriveApp.getFileById(fileId);

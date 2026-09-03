@@ -1,6 +1,10 @@
 /**
  * 🏺 骨董影像編目代理人 v10.4.2 — Durable Async Local Bridge 多圖版
  *
+ * [v10.5.0] CHANGE DD109-MERGE（2026-09-03，Craig 核准）：submit 可帶 mergeInto=<keeper artifactUuid>；
+ *           worker 對合併案不呼叫 Gemini、不新增 Catalog 列，只把 staged 圖搬進 keeper 資料夾並
+ *           以 pending／非封面追加到 AP_MEDIA（sourceMessageId 仍為本則，DD-108 replay 落到 keeper）。
+ *           mergeInto 必須存在且未退件（assertMergeTargetValid_），否則 MERGE_TARGET_INVALID。
  * [v10.4.2] CHANGE GAS-PARAM-HYGIENE（2026-09-03）：移除已廢棄的 temperature/topP/topK；
  *           maxOutputTokens 2200→4096；路由器把 finishReason=MAX_TOKENS 記為 "truncated"；
  *           鏈頂 3.7 thinkingLevel medium→high；lite minimal→low。純參數與觀測性，不改 prompt、
@@ -1140,6 +1144,16 @@ function stageBridgeJob_(data, messageId) {
       fileId: file.getId()
     };
   });
+  // CHANGE DD109-MERGE: 人工確認的「併入既有藏品」。mergeInto 由 Intake Bot 在使用者按 ✅ 後帶入；
+  // GAS 只驗證 keeper 存在且未退件，並在 worker 端跳過 Gemini、只搬媒體。時間接近本身不觸發合併（DD-104）。
+  const mergeInto = cleanAnalysisText_(data.mergeInto, 64, false);
+  if (mergeInto) {
+    const catalogSheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
+    const catalogRows = catalogSheet.getLastRow() >= 2
+      ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+      : [];
+    assertMergeTargetValid_(catalogRows, mergeInto);
+  }
   const manifest = {
     version: BRIDGE_STATE_VERSION,
     messageId: messageId,
@@ -1147,6 +1161,7 @@ function stageBridgeJob_(data, messageId) {
     channelId: cleanAnalysisText_(data.channelId, 100, false),
     userId: cleanAnalysisText_(data.userId, 100, false),
     userName: cleanAnalysisText_(data.userName, 100, false),
+    mergeInto: mergeInto,
     receivedAt: new Date().toISOString(),
     jobFolderId: jobFolder.getId(),
     images: images
@@ -1155,8 +1170,97 @@ function stageBridgeJob_(data, messageId) {
   return {
     jobFolderId: jobFolder.getId(),
     manifestFileId: manifestFile.getId(),
-    imageCount: images.length
+    imageCount: images.length,
+    mergeInto: mergeInto
   };
+}
+
+/**
+ * CHANGE DD109-MERGE: pure validator so the merge gate is unit-testable without Drive.
+ * Returns the keeper's Catalog display row; throws MERGE_TARGET_INVALID otherwise.
+ */
+function assertMergeTargetValid_(catalogRows, keeperUuid) {
+  const uuid = String(keeperUuid || "").trim();
+  if (!/^[0-9a-fA-F-]{8,64}$/.test(uuid)) {
+    throw bridgeError_("mergeInto 不是有效的 artifactUuid", "MERGE_TARGET_INVALID", false);
+  }
+  const row = (catalogRows || []).find(r => String(r[0] || "") === uuid);
+  if (!row) {
+    throw bridgeError_(`mergeInto ${uuid} 不存在於 Catalog`, "MERGE_TARGET_INVALID", false);
+  }
+  if (String(row[11] || "") === STATUS_REJECTED) {
+    throw bridgeError_(`mergeInto ${uuid} 已退件，不可作為 keeper`, "MERGE_TARGET_INVALID", false);
+  }
+  return row;
+}
+
+/**
+ * CHANGE DD109-MERGE: worker path for a confirmed merge. No Gemini call, no new
+ * Catalog row: staged images are promoted into the keeper's Drive folder and
+ * appended to AP_MEDIA as pending, non-primary views tagged with this messageId
+ * (so DD-108 replay still resolves to the keeper).
+ */
+function processMergeBridgeJob_(state, manifest, spreadsheet, props) {
+  const catalogSheet = spreadsheet.getSheets()[0];
+  const catalogRows = catalogSheet.getLastRow() >= 2
+    ? catalogSheet.getRange(2, 1, catalogSheet.getLastRow() - 1, CATALOG_HEADERS.length).getDisplayValues()
+    : [];
+  const keeperRow = assertMergeTargetValid_(catalogRows, manifest.mergeInto);
+  const keeperUuid = String(keeperRow[0]);
+  const category = String(keeperRow[4] || "未分類");
+  const era = String(keeperRow[5] || "時代不詳");
+
+  const mediaSheet = spreadsheet.getSheetByName(MEDIA_SHEET_NAME);
+  const existingCount = (mediaSheet && mediaSheet.getLastRow() >= 2)
+    ? mediaSheet.getRange(2, 1, mediaSheet.getLastRow() - 1, 1).getValues()
+        .filter(r => String(r[0] || "") === keeperUuid).length
+    : 0;
+
+  props.setProperty(BRIDGE_PARTIAL_PREFIX + state.messageId, JSON.stringify({
+    messageId: state.messageId,
+    artifactUuid: keeperUuid,
+    mergedInto: keeperUuid,
+    phase: "PERSISTENCE_STARTED",
+    startedAt: new Date().toISOString()
+  }));
+  Object.assign(state, {phase: "PERSISTENCE_STARTED", artifactUuid: keeperUuid, mergedInto: keeperUuid});
+  writeBridgeState_(props, state);
+
+  const savedMedia = promoteStagedMedia_(manifest, category, era, keeperUuid).map((item, index) => Object.assign(item, {
+    sortOrder: existingCount + index + 1,
+    isPrimary: false
+  }));
+  writeMediaRows_(keeperUuid, savedMedia, [], state.messageId);
+
+  const result = {
+    success: true,
+    accepted: false,
+    state: "COMPLETED",
+    duplicate: false,
+    merged: true,
+    mergedInto: keeperUuid,
+    bridgeVersion: BRIDGE_CLIENT_VERSION,
+    analysis: {
+      isValid: true,
+      itemName: String(keeperRow[3] || ""),
+      category: category,
+      era: era,
+      features: `已併入既有藏品；新增 ${savedMedia.length} 張角度，待審核台指定角度並覆核。`,
+      story: "",
+      refItem: "",
+      refPrice: "",
+      displayRecommendation: "",
+      rejectionReason: ""
+    },
+    fileUrl: savedMedia[0].driveUrl,
+    messageId: state.messageId,
+    jobId: state.jobId,
+    artifactUuid: keeperUuid,
+    imageCount: savedMedia.length
+  };
+  completeBridgeState_(state, result);
+  console.log(`[AP Bridge Worker] MERGED messageId=${state.messageId} into=${keeperUuid} images=${savedMedia.length}`);
+  return result;
 }
 
 function statusBridgeJob_(messageId) {
@@ -1368,6 +1472,11 @@ function processBridgeJob_(state) {
     if (existing) {
       completeBridgeState_(state, existing);
       return existing;
+    }
+    // CHANGE DD109-MERGE: confirmed merge never reaches Gemini or writeToSheet.
+    if (manifest.mergeInto) {
+      persistenceStarted = true;
+      return processMergeBridgeJob_(state, manifest, spreadsheet, props);
     }
     const blobs = manifest.images.map(image => DriveApp.getFileById(image.fileId).getBlob());
     const analysis = analyzeWithGemini(blobs, manifest.caption || "無描述");

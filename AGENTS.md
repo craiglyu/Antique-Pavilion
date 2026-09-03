@@ -148,6 +148,28 @@ Discord Gateway → ap_discord_bot.py → 本地壓縮 → GAS /exec doPost
 Postdeploy canary 不得以 `ScriptApp.getService().getUrl()` 作為正式網址唯一來源；它必須讀取
 `AP_WEBAPP_EXEC_URL`、拒絕 `/dev`，且不得在診斷輸出完整 deployment URL。
 
+### DD-109 — 人工確認的同藏品合併（Craig 2026-09-03 核准）
+
+2026-09-03 實測：Intake Bot 離線期間重貼同一枚龍洋，CatchUp 補跑後審核台出現兩個 UUID。這是
+DD-104／DD-108 的正確行為（不同 `messageId` = 不同藏品），但需要一條**由人確認**的合併路徑。
+LLM 與時間接近仍不得自動合併。
+
+兩層，皆可回復、皆留稽核：
+
+1. **審核台「併入既有藏品」**（`review_desk` `mergeArtifactInto`）：duplicate 的 `AP_MEDIA` 列改掛
+   keeper 的 `artifactUuid`，`isPrimary=false`、`sortOrder` 接在 keeper 既有角度之後，`status` 隨 keeper
+   （keeper 已上架 → `approved` 並開啟連結檢視；否則 `pending`）。pre-DD-104 的單圖 duplicate 以其
+   Drive URL 補一列 `AP_MEDIA`。duplicate 的 Catalog 狀態改 `已退件`；不刪列、不刪檔；
+   `Review Audit` 寫 `merge-into` 與 `merge-receive` 兩筆。keeper 已退件者不可作為目標。
+2. **Intake Bot「與上一件併為同藏品？」**：同一上傳者於 `AP_MERGE_WINDOW_SECONDS`（預設 600）內
+   再貼圖且文字未含「新件」等關鍵字時，Bot 先回一則確認訊息並附 ✅／🆕；只有作者按 ✅ 才以
+   `mergeInto=<keeper artifactUuid>` 提交，60 秒逾時或按 🆕 一律視為新件。GAS `submit` 以
+   `assertMergeTargetValid_()` 驗證 keeper 存在且未退件（否則 `MERGE_TARGET_INVALID`）；worker
+   對合併案**不呼叫 Gemini、不新增 Catalog 列**，只把 staged 圖搬進 keeper 資料夾並以
+   `pending`／非封面追加 `AP_MEDIA`，`sourceMessageId` 仍為本則，DD-108 replay 因此落到 keeper。
+
+不變的事：Catalog 13 欄與 `era` 列舉凍結；合併後的角度仍要在審核台指定 `viewRole` 與封面才上架。
+
 ### DD-107 — Local Bot Control Center（Craig 2026-08-31 核准）
 
 <!-- CHANGE AP-BOT-LAUNCHER: Craig 核准以 Odin launcher_web 模式管理兩個本地 AP Bot。 -->

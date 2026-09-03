@@ -32,6 +32,8 @@ MAX_GAS_JSON_BYTES = 18 * 1024 * 1024
 MAX_SOURCE_IMAGE_BYTES = 30 * 1024 * 1024
 ALLOWED_SOURCE_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 GAS_EXEC_URL_RE = re.compile(r"^https://script\.google\.com/macros/s/[^/]+/exec$")
+# CHANGE DD109-MERGE: keeper artifactUuid format accepted for a user-confirmed merge.
+MERGE_TARGET_RE = re.compile(r"^[0-9a-fA-F-]{8,64}$")
 
 
 class BridgeInputError(ValueError):
@@ -176,12 +178,17 @@ def build_ingest_payload(
     channel_id: str,
     user_id: str,
     user_name: str,
+    merge_into: str = "",
 ) -> tuple[dict[str, object], int]:
     prepared = list(images)
     if not ingest_secret:
         raise BridgeInputError("缺少 AP_INGEST_SECRET")
     if not message_id:
         raise BridgeInputError("缺少 Discord messageId，拒絕無冪等鍵的請求")
+    # CHANGE DD109-MERGE: 只在使用者於 Discord 明確確認後才帶 mergeInto；格式在本地先擋。
+    merge_into = str(merge_into or "").strip()
+    if merge_into and not MERGE_TARGET_RE.fullmatch(merge_into):
+        raise BridgeInputError("mergeInto 不是有效的 artifactUuid")
     if not 1 <= len(prepared) <= MAX_IMAGES_PER_ARTIFACT:
         raise BridgeInputError(f"同一藏品圖片數須為 1–{MAX_IMAGES_PER_ARTIFACT}")
     compressed_total = sum(len(image.data) for image in prepared)
@@ -200,6 +207,8 @@ def build_ingest_payload(
         "userName": str(user_name)[:100],
         "images": [image.to_payload() for image in prepared],
     }
+    if merge_into:
+        payload["mergeInto"] = merge_into
     request_bytes = len(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
     if request_bytes > MAX_GAS_JSON_BYTES:
         raise BridgeInputError(

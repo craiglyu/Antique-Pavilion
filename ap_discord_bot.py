@@ -93,6 +93,73 @@ log = logging.getLogger("ap_antique_bot")
 _active_message_ids: set[int] = set()
 _intake_semaphore = asyncio.Semaphore(1)
 
+# CHANGE DD109-MERGE: 同一上傳者在時間窗內再貼圖時，先問「與上一件併為同藏品？」。
+# 只有使用者按 ✅ 才以 mergeInto 提交；逾時或按 🆕 一律視為新件。時間本身不觸發合併（DD-104）。
+MERGE_WINDOW_SECONDS = int(str(env("AP_MERGE_WINDOW_SECONDS") or "600").strip() or 600)
+MERGE_PROMPT_TIMEOUT_SECONDS = 60
+MERGE_YES_REACTION = "✅"
+MERGE_NEW_REACTION = "🆕"
+NEW_ITEM_KEYWORDS = ("新件", "新藏品", "another", "new item")
+_recent_artifacts: dict[str, dict[str, object]] = {}   # userId → {uuid, name, messageId, ts}
+
+
+def _remember_recent_artifact(user_id: str, result: dict[str, object]) -> None:
+    analysis = result.get("analysis") if isinstance(result.get("analysis"), dict) else {}
+    uuid = str(result.get("artifactUuid") or "")
+    if not uuid or not analysis.get("isValid"):
+        return
+    _recent_artifacts[str(user_id)] = {
+        "uuid": uuid,
+        "name": str(analysis.get("itemName") or "上一件藏品"),
+        "messageId": str(result.get("messageId") or ""),
+        "ts": time.monotonic(),
+    }
+
+
+def _recent_merge_candidate(user_id: str, caption: str) -> dict[str, object] | None:
+    recent = _recent_artifacts.get(str(user_id))
+    if not recent:
+        return None
+    if time.monotonic() - float(recent["ts"]) > MERGE_WINDOW_SECONDS:
+        return None
+    lowered = str(caption or "").strip().lower()
+    if any(keyword in lowered for keyword in NEW_ITEM_KEYWORDS):
+        return None
+    return recent
+
+
+async def _ask_merge_confirmation(message: discord.Message, candidate: dict[str, object]) -> str:
+    """Return the keeper uuid when the author reacts ✅ within the window, else ''."""
+    prompt = await message.reply(
+        f"這 {len(message.attachments)} 張是否為上一件《{candidate['name']}》的不同角度？\n"
+        f"按 {MERGE_YES_REACTION} 併入同一藏品；按 {MERGE_NEW_REACTION} 視為新件。"
+        f"{MERGE_PROMPT_TIMEOUT_SECONDS} 秒未回應視為新件。"
+    )
+    try:
+        await prompt.add_reaction(MERGE_YES_REACTION)
+        await prompt.add_reaction(MERGE_NEW_REACTION)
+    except discord.HTTPException as exc:
+        log.warning("[Merge] 無法加確認 reaction: %s", exc)
+        return ""
+
+    def _check(reaction: discord.Reaction, user: discord.abc.User) -> bool:
+        return (
+            reaction.message.id == prompt.id
+            and user.id == message.author.id
+            and str(reaction.emoji) in (MERGE_YES_REACTION, MERGE_NEW_REACTION)
+        )
+
+    try:
+        reaction, _ = await bot.wait_for("reaction_add", timeout=MERGE_PROMPT_TIMEOUT_SECONDS, check=_check)
+    except asyncio.TimeoutError:
+        await prompt.edit(content=prompt.content + "\n（逾時，已視為新件）")
+        return ""
+    if str(reaction.emoji) == MERGE_YES_REACTION:
+        await prompt.edit(content=f"已確認：併入《{candidate['name']}》。")
+        return str(candidate["uuid"])
+    await prompt.edit(content="已確認：視為新件。")
+    return ""
+
 
 class GasTransportError(RuntimeError):
     """The HTTP outcome is uncertain; the durable messageId may still exist."""
@@ -225,10 +292,21 @@ async def handle_antique_message(message: discord.Message):
     except discord.HTTPException as e:
         log.warning("[Antique] 無法加 reaction: %s", e)
 
-    await message.reply(
-        f"已收到同一件藏品的 {len(images)} 張圖片，正在本地壓縮並送交 GAS 進行影像編目，請稍候..."
-    )
-    asyncio.create_task(_process_antique_images(message, images))
+    # CHANGE DD109-MERGE: 先問要不要併入上一件，再進入序列化的 intake。
+    merge_into = ""
+    candidate = _recent_merge_candidate(str(message.author.id), message.content)
+    if candidate:
+        merge_into = await _ask_merge_confirmation(message, candidate)
+
+    if merge_into:
+        await message.reply(
+            f"已收到 {len(images)} 張新角度，正在本地壓縮並併入《{candidate['name']}》，不重跑影像編目，請稍候..."
+        )
+    else:
+        await message.reply(
+            f"已收到同一件藏品的 {len(images)} 張圖片，正在本地壓縮並送交 GAS 進行影像編目，請稍候..."
+        )
+    asyncio.create_task(_process_antique_images(message, images, merge_into))
 
 
 async def _download_and_prepare_images(attachments: list[discord.Attachment]):
@@ -405,6 +483,13 @@ async def _send_bridge_result(message: discord.Message, result: dict[str, object
     analysis = result.get("analysis") if isinstance(result.get("analysis"), dict) else {}
     file_url = str(result.get("fileUrl") or "")
     image_count = int(result.get("imageCount") or 0)
+    # CHANGE DD109-MERGE: 合併案沒有新的編目文字，只回報併入結果。
+    if result.get("merged") is True:
+        await message.reply(
+            f"**已併入《{analysis.get('itemName', '既有藏品')}》**\n"
+            f"新增 {image_count} 張角度，狀態為待覆核；請到審核台「完整編輯」指定角度與封面後再上架。"
+        )
+        return
     if not analysis.get("isValid"):
         reject_reason = analysis.get("rejectionReason", "圖片不足以進入編目")
         await message.reply(
@@ -443,6 +528,7 @@ async def _send_bridge_result(message: discord.Message, result: dict[str, object
 async def _run_antique_intake(
     message: discord.Message,
     attachments: list[discord.Attachment],
+    merge_into: str = "",
 ) -> None:
     try:
         prepared = await _download_and_prepare_images(attachments)
@@ -454,6 +540,7 @@ async def _run_antique_intake(
             channel_id=str(message.channel.id),
             user_id=str(message.author.id),
             user_name=message.author.display_name,
+            merge_into=merge_into,
         )
         log.info(
             "[Antique] POST GAS msgId=%s images=%d requestBytes=%d compressedBytes=%d",
@@ -470,11 +557,13 @@ async def _run_antique_intake(
 
         await _send_bridge_result(message, result)
         await _set_terminal_reaction(message, COMPLETED_REACTION)
+        _remember_recent_artifact(str(message.author.id), result)
         log.info(
-            "[Antique] 完成 msgId=%s artifactUuid=%s duplicate=%s",
+            "[Antique] 完成 msgId=%s artifactUuid=%s duplicate=%s merged=%s",
             message.id,
             result.get("artifactUuid", ""),
             result.get("duplicate") is True,
+            result.get("merged") is True,
         )
 
         if notion_enabled():
@@ -505,11 +594,12 @@ async def _run_antique_intake(
 async def _process_antique_images(
     message: discord.Message,
     attachments: list[discord.Attachment],
+    merge_into: str = "",
 ) -> None:
     """Serialize intake to protect free-tier quotas and deterministic Sheet writes."""
     try:
         async with _intake_semaphore:
-            await _run_antique_intake(message, attachments)
+            await _run_antique_intake(message, attachments, merge_into)
     finally:
         _active_message_ids.discard(message.id)
 
