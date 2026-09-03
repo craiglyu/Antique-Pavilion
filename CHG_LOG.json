@@ -3,6 +3,17 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T08:40:00Z",
+      "category": "design",
+      "scope": "hero.still",
+      "summary": "HERO-STILL：移除 hero 霧的 heroMistFar 32s／heroMistNear 28s 循環與 will-change（改靜態兩層，opacity 取原中間值）、移除如意雲 ruyiCloudBreathe 16s 呼吸；draw-in 與雙獸合攏入場保留。",
+      "change_tags": ["HERO-STILL"],
+      "rationale": "Fable 2026-09-03 裁決、Craig approve：位移 ±1.4%／2px 與 0.8px 呼吸肉眼不可辨，卻讓兩個 blur(22px) 合成層常駐在 LCP 區域；靜態圖錄頁的生命感來自一次性入場與互動回應。Sol §5「無持續霧、漂浮雲」。",
+      "breaking": false,
+      "rollback": "git revert <sha>",
+      "files": ["Publish/index.html", "CHG_LOG.json"]
+    },
+    {
       "ts": "2026-09-03T08:10:00Z",
       "category": "feat",
       "scope": "review-desk.summary-nav",

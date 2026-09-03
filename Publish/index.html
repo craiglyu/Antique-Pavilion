@@ -188,13 +188,15 @@
             pointer-events: none;
             contain: paint;
         }
+        /* CHANGE HERO-STILL: 霧改為靜態兩層。原本 heroMistFar 32s／heroMistNear 28s 的位移只有
+           ±1.4%／2px，肉眼不可辨，卻讓兩個 blur(22px) 合成層常駐在 LCP 區域。靜態圖錄頁的
+           生命感來自一次性入場與 hover／focus 回應，不來自循環。opacity 取原動畫中間值。 */
         .hero-mist-band {
             position: absolute;
             left: -14%;
             width: 128%;
             border-radius: 50%;
             filter: blur(22px);
-            will-change: transform, opacity;
         }
         .hero-mist-band--far {
             top: 18%;
@@ -204,7 +206,7 @@
                 radial-gradient(ellipse at 18% 54%, rgba(247, 244, 237, 0.84) 0 8%, transparent 38%),
                 radial-gradient(ellipse at 48% 46%, rgba(247, 244, 237, 0.72) 0 11%, transparent 43%),
                 radial-gradient(ellipse at 78% 58%, rgba(247, 244, 237, 0.78) 0 9%, transparent 40%);
-            animation: heroMistFar 32s ease-in-out infinite alternate;
+            transform: scaleX(1.03);
         }
         .hero-mist-band--near {
             top: 47%;
@@ -215,15 +217,7 @@
                 radial-gradient(ellipse at 34% 44%, rgba(247, 244, 237, 0.82) 0 12%, transparent 45%),
                 radial-gradient(ellipse at 62% 57%, rgba(247, 244, 237, 0.88) 0 11%, transparent 43%),
                 radial-gradient(ellipse at 91% 46%, rgba(247, 244, 237, 0.80) 0 9%, transparent 39%);
-            animation: heroMistNear 28s ease-in-out infinite alternate;
-        }
-        @keyframes heroMistFar {
-            from { transform: translate3d(-1.4%, -1px, 0) scaleX(1.02); opacity: 0.09; }
-            to   { transform: translate3d(1.4%, 2px, 0) scaleX(1.04); opacity: 0.13; }
-        }
-        @keyframes heroMistNear {
-            from { transform: translate3d(1.2%, 1px, 0) scaleX(1.03); opacity: 0.13; }
-            to   { transform: translate3d(-1.2%, -2px, 0) scaleX(1.05); opacity: 0.18; }
+            transform: scaleX(1.04);
         }
 
         /* =========================================================
@@ -442,10 +436,11 @@
             overflow: visible;
             filter: drop-shadow(0 2px 3px rgba(83, 62, 24, 0.08));
         }
+        /* CHANGE HERO-STILL: 如意雲保留一次性 draw-in 與雙獸合攏入場，移除 16s 呼吸循環
+           （0.8px 位移在 16 秒內看不見）。 */
         .ruyi-cloud-group {
             transform-box: fill-box;
             transform-origin: center;
-            animation: ruyiCloudBreathe 16s 3s ease-in-out infinite;
         }
         .ruyi-stroke {
             fill: none;
@@ -503,10 +498,6 @@
         @keyframes ruyiUnionReveal {
             from { opacity: 0; transform: scale(0.55) rotate(-12deg); }
             to   { opacity: 1; transform: scale(1) rotate(0); }
-        }
-        @keyframes ruyiCloudBreathe {
-            0%, 100% { opacity: 0.88; transform: translateY(0); }
-            50%      { opacity: 1; transform: translateY(-0.8px); }
         }
 
         /* =========================================================
