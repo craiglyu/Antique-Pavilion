@@ -3,6 +3,32 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T07:30:00Z",
+      "category": "feat",
+      "scope": "dd-109.merge-views",
+      "summary": "DD-109 人工確認的同藏品合併：審核台 mergeArtifactInto（AP_MEDIA 改掛 keeper、duplicate 標退件、雙筆稽核、不刪列不刪檔）+ Intake Bot ✅/🆕 確認後以 mergeInto 提交 + GAS v10.5.0 合併路徑（assertMergeTargetValid_、processMergeBridgeJob_ 不跑 Gemini、不新增 Catalog 列）。AGENTS.md 新增 DD-109；tests/test_ap_intake_bridge.py 新增 4 測試。",
+      "rationale": "Craig 2026-09-03 在審核台看到同一枚龍洋成兩件（Bot 離線重貼 + CatchUp）。DD-104 禁止 LLM 或時間自動合併，故提供由人確認的兩層路徑，並保持可回復與稽核。",
+      "breaking": false,
+      "rollback": "git revert <sha>；Apps Script 兩個專案各回上一版本。",
+      "files": ["scripts/GAS/AntiqueAnalysis_AI.md", "scripts/GAS/review_desk/Code.gs", "scripts/GAS/review_desk/Index.html", "ap_discord_bot.py", "scripts/ap_intake_bridge.py", "tests/test_ap_intake_bridge.py", "AGENTS.md", "CHG_LOG.json"],
+      "deploy_steps": [
+        "公開 API 專案：貼上 AntiqueAnalysis_AI.md v10.5.0 → 現有 /exec 部署『編輯 → 新版本』→ diagTestGeminiFallbackCanary()",
+        "Review Desk 專案：貼上 Code.gs 與 Index.html → 新版本 → 開審核台在 Row 181 按「併入既有藏品…」選 Row 183",
+        "重啟 Intake Bot（Control Center 重新啟動）；同一件 10 分鐘內再貼圖時應先收到 ✅/🆕 確認"
+      ]
+    },
+    {
+      "ts": "2026-09-03T06:30:00Z",
+      "category": "design",
+      "scope": "catalogue-card.material-line",
+      "summary": "MATERIAL-LINE：材質行只認材質、只從品名與標籤抽取；單字材質須標籤完全相等；泛稱被具體詞包含時省略（白玉→不再列玉）；清單移除雕刻／掐絲／鑲嵌等工藝詞，補墨玉／和闐玉／剔紅等。",
+      "change_tags": ["MATERIAL-LINE"],
+      "rationale": "Craig 2026-09-03 指出「材質 玉 · 雕刻」「材質 玉 · 漆」很怪：舊邏輯從 story 全文比對，「漆黑如墨」撈到漆、「金屬」撈到金，清單又混入工藝詞。",
+      "breaking": false,
+      "rollback": "git revert <sha>",
+      "files": ["Publish/index.html", "CHG_LOG.json"]
+    },
+    {
       "ts": "2026-09-03T06:00:00Z",
       "category": "design",
       "scope": "catalogue-card.type-floor",

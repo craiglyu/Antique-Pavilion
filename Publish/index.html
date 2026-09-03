@@ -3534,15 +3534,28 @@
         /* ============ Data & state ============ */
         const API_URL = "https://script.google.com/macros/s/AKfycbz6wId1wRbY48o7xH2X4T0e7UFlppakZvBYmJn4KybA6uGgzk4CZs8YXQSTZoj2Suhiew/exec";
 
+        /* CHANGE MATERIAL-LINE: 材質行只認「材質」，且只從品名與標籤抽取。
+           Craig 2026-09-03 指出「材質 玉 · 雕刻」「材質 玉 · 漆」看起來很怪：舊清單混入工藝詞
+           （雕刻／掐絲／鑲嵌），又從 story 全文比對（「漆黑如墨」撈到「漆」、「金屬」撈到「金」）。
+           三個修正：清單只留材質；來源只取 itemName + tags；泛稱被更具體的詞包含時省略（白玉 → 不再重複「玉」）。
+           單字材質（金／銀／玉／瓷／絹／棉／麻／羅／漆）只在標籤逐項完全相等時才算，避免品名裡的「金」字誤中。 */
         const MATERIAL_KEYWORDS = [
-            /* 金屬 Metals */      '鎏金','銅','青銅','金','銀','錫',
-            /* 玉石 Jade/Stone */  '玉','白玉','翡翠','青玉','和田玉','碧玉','壽山石','田黃','松石','珊瑚','琥珀','水晶','瑪瑙',
-            /* 瓷陶 Ceramics */    '瓷','青花','粉彩','琺瑯','紫砂','汝窯','官窯','哥窯','鈞窯','定窯','龍泉窯',
-            /* 紙織 Paper/Textile */'宣紙','絹','絹本','錦緞','絲綢','織錦','緙絲','棉','麻','羅',
-            /* 木料 Wood */        '紫檀','黃花梨','紅木','楠木','花梨',
-            /* 有機 Organic */     '漆','描漆','螺鈿','象牙','玳瑁','犀角',
-            /* 特殊工藝 Craft */   '景泰藍','掐絲','鑲嵌','雕刻','鎏銀',
+            /* 金屬 Metals */      '鎏金','鎏銀','青銅','紅銅','黃銅','白銀','純銀','銅','金','銀','錫',
+            /* 玉石 Jade/Stone */  '和田玉','和闐玉','白玉','青白玉','青玉','碧玉','墨玉','黃玉','翡翠','壽山石','田黃','雞血石','綠松石','松石','珊瑚','琥珀','蜜蠟','水晶','瑪瑙','玉',
+            /* 瓷陶 Ceramics */    '青花','粉彩','琺瑯彩','琺瑯','五彩','鬥彩','單色釉','紫砂','汝窯','官窯','哥窯','鈞窯','定窯','龍泉窯','陶','瓷',
+            /* 紙織 Paper/Textile */'宣紙','絹本','紙本','絹','錦緞','絲綢','織錦','緙絲','棉','麻','羅',
+            /* 木料 Wood */        '紫檀','黃花梨','黃楊木','紅木','楠木','花梨','沉香',
+            /* 有機 Organic */     '描漆','剔紅','螺鈿','象牙','玳瑁','犀角','漆',
+            /* 掐絲琺瑯 */         '景泰藍',
         ];
+        const SINGLE_CHAR_MATERIALS = new Set(['金','銀','玉','瓷','陶','絹','棉','麻','羅','漆','銅','錫']);
+        /* 品名／標籤常見的複合寫法 → 顯示用材質；讓「銅製流雲紋爐」「高古玉」也能落到正確的一個字 */
+        const MATERIAL_ALIASES = {
+            '銅製': '銅', '銅胎': '銅', '銅器': '銅', '銅鑄': '銅',
+            '高古玉': '玉', '古玉': '玉', '玉質': '玉', '玉器': '玉',
+            '銀幣': '銀', '銀製': '銀', '銀器': '銀', '金製': '金', '金器': '金',
+            '瓷器': '瓷', '陶器': '陶', '木製': '木', '木雕': '木',
+        };
 
         let artifactsData = [];
         /* FIX-09: 目前作用中的分類篩選 — modal 前後導覽需在篩選結果內移動 */
@@ -4172,14 +4185,23 @@
         }
 
         function extractMaterialsAll(item) {
-            const seen = new Set();
-            const out = [];
-            const sources = [item.tags || '', item.story || '', item.itemName || ''];
-            const combined = sources.join(' ');
+            /* CHANGE MATERIAL-LINE: 見 MATERIAL_KEYWORDS 註解。story 不再是來源。 */
+            const name = String(item.itemName || '');
+            const tagList = String(item.tags || '').split(/[\s，,、#＃]+/).map(t => t.trim()).filter(Boolean);
+            const haystack = name + ' ' + tagList.join(' ');
+            const hits = [];
             MATERIAL_KEYWORDS.forEach(m => {
-                if (combined.includes(m) && !seen.has(m)) { seen.add(m); out.push(m); }
+                const matched = SINGLE_CHAR_MATERIALS.has(m)
+                    ? tagList.includes(m)          // 單字材質只接受標籤逐項完全相等
+                    : haystack.includes(m);
+                if (matched && !hits.includes(m)) hits.push(m);
             });
-            return out;
+            Object.keys(MATERIAL_ALIASES).forEach(alias => {
+                const shown = MATERIAL_ALIASES[alias];
+                if (haystack.includes(alias) && !hits.includes(shown)) hits.push(shown);
+            });
+            /* 泛稱被更具體的詞包含時省略：有「白玉」就不再列「玉」，有「青銅」就不再列「銅」 */
+            return hits.filter(m => !hits.some(other => other !== m && other.includes(m)));
         }
 
         /* ============ Modal ============ */
