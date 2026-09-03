@@ -3,6 +3,22 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T05:00:00Z",
+      "category": "fix",
+      "scope": "gas.gemini.param-hygiene",
+      "summary": "GAS v10.4.2 GAS-PARAM-HYGIENE：移除已廢棄的 temperature/topP/topK（主呼叫與 canary）、maxOutputTokens 2200→4096、路由器新增 finishReason=MAX_TOKENS 的 truncated 狀態（帶 usageMetadata）、鏈頂 gemini-3.7-flash thinkingLevel medium→high、lite minimal→low。",
+      "rationale": "官方 2026-07-21 廢棄取樣參數，3.8 migration checklist 要求移除，v9.2 的 temperature 調校已是 no-op；2200 cap 在 8 圖案件會截斷 JSON 並被誤記為 invalid_response 而靜默降級；minimal 非文件列出的合法 thinking level。純參數與觀測性變更，prompt、schema、Sheets 不動。",
+      "breaking": false,
+      "rollback": "Apps Script 版本歷史回到 v10.4.1；本機 scripts/GAS/AntiqueAnalysis_AI.md 為 gitignore，以檔內 CHANGE 註解為準。",
+      "files": ["scripts/GAS/AntiqueAnalysis_AI.md (gitignored)", "CHG_LOG.json"],
+      "deploy_steps": [
+        "Apps Script 編輯器貼上 v10.4.2 全文 → 存檔 → 部署 → 管理部署 → 現有 /exec 部署『編輯 → 新版本』（不要建新部署，URL 不變）",
+        "執行 diagTestGeminiFallbackCanary()：receipt.selectedModel 應為 gemini-3.7-flash、thinkingLevel high、attempts 內無 truncated",
+        "臨時把 GEMINI_MODEL_ROUTES 前三條註解掉再跑一次 canary，確認 gemini-3.5-flash-lite + low 回 200（驗證 fallback 末端）；跑完還原",
+        "在 Discord 測試頻道送一則 3 張圖的真實藏品，檢查 [Gemini Router] log 的 usageMetadata（含 thoughtsTokenCount）與 attempts 無 truncated"
+      ]
+    },
+    {
       "ts": "2026-09-03T03:00:00Z",
       "category": "design",
       "scope": "category-rail.index",
