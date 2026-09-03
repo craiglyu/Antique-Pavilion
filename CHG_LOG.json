@@ -3,6 +3,16 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T05:20:00Z",
+      "category": "fix",
+      "scope": "infra.ssl_patch.aiohttp-cache",
+      "summary": "SSL-AIOHTTP-CACHE：apply_enterprise_ssl_bypass() 同時就地關閉 aiohttp.connector._SSL_CONTEXT_VERIFIED 的驗證；新增 tests/test_infra_ssl_patch.py（子程序驗證，不汙染其他測試）。",
+      "rationale": "2026-09-03 公司網路下 Intake Bot 已印出「[SSL] AP_ENTERPRISE_SSL_BYPASS 已啟用」仍以 CERTIFICATE_VERIFY_FAILED 退出：aiohttp ≥3.9 在 import 時建立並快取 SSLContext，事後改 ssl.create_default_context 碰不到 discord.py 的 session。就地修改快取物件是唯一在兩種 import 順序下都有效的作法。",
+      "breaking": false,
+      "rollback": "git revert <sha>",
+      "files": ["scripts/ap_org_bot/infra/ssl_patch.py", "tests/test_infra_ssl_patch.py", "CHG_LOG.json"]
+    },
+    {
       "ts": "2026-09-03T05:00:00Z",
       "category": "fix",
       "scope": "gas.gemini.param-hygiene",
