@@ -118,16 +118,31 @@
 
     .summary {
       display: grid;
-      grid-template-columns: repeat(5, minmax(100px, 1fr));
+      grid-template-columns: repeat(6, minmax(100px, 1fr));
       border-bottom: 1px solid var(--line);
       background: rgba(252, 250, 245, .6);
     }
+    /* CHANGE RD-SUMMARY-NAV: 摘要方塊是按鈕，點下去直接切到對應清單與狀態篩選（Craig 2026-09-03）。 */
     .summary-card {
+      appearance: none;
+      -webkit-appearance: none;
       min-height: 84px;
       padding: 17px clamp(16px, 2vw, 30px);
+      border: 0;
       border-right: 1px solid var(--line);
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background .2s ease, border-color .2s ease;
     }
     .summary-card:last-child { border-right: 0; }
+    .summary-card:hover { background: rgba(196, 154, 69, .08); }
+    .summary-card:focus-visible { outline: 2px solid var(--gold, #c49a45); outline-offset: -2px; }
+    .summary-card.is-active { border-bottom-color: var(--seal-red, #8a2a2a); background: rgba(196, 154, 69, .06); }
+    .summary-card em { display: block; margin-top: 4px; color: var(--ink-faint); font-size: 11px; font-style: normal; letter-spacing: .04em; }
     .summary-card span { display: block; color: var(--ink-faint); font-size: 11px; letter-spacing: .08em; }
     .summary-card strong { display: block; margin-top: 6px; font-family: Georgia, serif; font-size: 25px; font-weight: 400; }
 
@@ -918,18 +933,40 @@
     function renderSummary() {
       const groups = state.data ? state.data.groups : [];
       const items = state.data && state.data.catalog ? state.data.catalog : groups.flatMap((group) => group.items);
-      const values = [
-        ["全部藏品", items.length],
-        ["比對群組", groups.length],
-        ["目前公開", items.filter((item) => item.status === "完成").length],
-        ["已下架", items.filter((item) => item.status === "已下架").length],
-        ["待覆核", items.filter((item) => item.status === "待人工覆核").length],
+      /* CHANGE RD-SUMMARY-NAV: each tile = {label, count, target}. target.mode 切模式，
+         target.status 套用全部藏品的狀態篩選；六格加總 = 全部藏品，才對得起數字。 */
+      const tiles = [
+        { label: "全部藏品", count: items.length, hint: "全部狀態", target: { mode: "catalog", status: "all" } },
+        { label: "比對群組", count: groups.length, hint: "重複覆核", target: { mode: "review" } },
+        { label: "目前公開", count: items.filter((item) => item.status === "完成").length, hint: "已上架", target: { mode: "catalog", status: "完成" } },
+        { label: "待覆核", count: items.filter((item) => item.status === "待人工覆核").length, hint: "待人工覆核", target: { mode: "catalog", status: "待人工覆核" } },
+        { label: "已下架", count: items.filter((item) => item.status === "已下架").length, hint: "可恢復", target: { mode: "catalog", status: "已下架" } },
+        { label: "已退件", count: items.filter((item) => item.status === "已退件").length, hint: "含已併入者", target: { mode: "catalog", status: "已退件" } },
       ];
-      elements.summary.replaceChildren(...values.map(([label, value]) => {
-        const card = el("div", "summary-card");
-        card.append(el("span", "", label), el("strong", "", String(value)));
+      elements.summary.replaceChildren(...tiles.map((tile) => {
+        const active = tile.target.mode === state.mode
+          && (tile.target.mode === "review" || (state.catalogStatus === tile.target.status && !state.catalogSearch && state.catalogCategory === "all"));
+        const card = el("button", "summary-card" + (active ? " is-active" : ""));
+        card.type = "button";
+        card.dataset.summaryMode = tile.target.mode;
+        card.dataset.summaryStatus = tile.target.status || "";
+        card.setAttribute("aria-pressed", active ? "true" : "false");
+        card.setAttribute("aria-label", tile.label + " " + tile.count + " 件，點擊檢視清單");
+        card.append(el("span", "", tile.label), el("strong", "", String(tile.count)), el("em", "", "檢視 · " + tile.hint));
         return card;
       }));
+    }
+
+    /* CHANGE RD-SUMMARY-NAV: tile click → mode + status filter, then scroll to the stage. */
+    function openSummaryTarget(mode, status) {
+      state.mode = mode;
+      if (mode === "catalog") {
+        state.catalogStatus = status || "all";
+        state.catalogSearch = "";
+        state.catalogCategory = "all";
+      }
+      render();
+      document.getElementById("review-stage").scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function renderGroupList() {
@@ -1018,9 +1055,10 @@
         const option = document.createElement("option"); option.value = value; option.textContent = value; category.append(option);
       });
       category.value = state.catalogCategory;
-      search.addEventListener("input", () => { state.catalogSearch = search.value; renderCatalogResults(); });
-      status.addEventListener("change", () => { state.catalogStatus = status.value; renderCatalogResults(); });
-      category.addEventListener("change", () => { state.catalogCategory = category.value; renderCatalogResults(); });
+      /* CHANGE RD-SUMMARY-NAV: keep the tile highlight in sync with the toolbar filters. */
+      search.addEventListener("input", () => { state.catalogSearch = search.value; renderCatalogResults(); renderSummary(); });
+      status.addEventListener("change", () => { state.catalogStatus = status.value; renderCatalogResults(); renderSummary(); });
+      category.addEventListener("change", () => { state.catalogCategory = category.value; renderCatalogResults(); renderSummary(); });
       toolbar.append(search, status, category);
 
       const results = el("div", "catalog-results");
@@ -1509,6 +1547,12 @@
       renderGroupList();
       renderStage();
       document.getElementById("review-stage").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    elements.summary.addEventListener("click", (event) => {
+      const tile = event.target.closest("[data-summary-mode]");
+      if (!tile) return;
+      openSummaryTarget(tile.dataset.summaryMode, tile.dataset.summaryStatus);
     });
 
     elements.modeSwitch.addEventListener("click", (event) => {

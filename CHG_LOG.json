@@ -3,6 +3,16 @@
   "description": "Append-only change log for AP infrastructure (Bot, prompts, Notion DBs, configs) and for the public page Publish/index.html. Mirrors Thor V0.1 CHG_LOG. Each entry: ts (UTC ISO), category, scope, version_from→version_to, summary, files. Entries touching Publish/index.html MUST also carry change_tags: the in-file CHANGE <TAG> markers introduced by that slice — enforced by tests/test_change_log_contract.py. Newest entry first. See AGENTS.md §12 (Definition of Done) and AP_Sustainability_Roadmap_v0.2.md §3 Item 5.",
   "entries": [
     {
+      "ts": "2026-09-03T08:10:00Z",
+      "category": "feat",
+      "scope": "review-desk.summary-nav",
+      "summary": "RD-SUMMARY-NAV：審核台摘要方塊改為按鈕（全部藏品／比對群組／目前公開／待覆核／已下架／已退件），點擊切模式並套用狀態篩選、捲到清單；目前篩選對應的方塊以朱紅底線標示，工具列篩選變更時同步。新增「已退件」格使六格加總等於全部藏品。",
+      "rationale": "Craig 2026-09-03 提出摘要方塊應可點進去閱覽。",
+      "breaking": false,
+      "rollback": "git revert <sha>",
+      "files": ["scripts/GAS/review_desk/Index.html", "CHG_LOG.json"]
+    },
+    {
       "ts": "2026-09-03T07:30:00Z",
       "category": "feat",
       "scope": "dd-109.merge-views",
