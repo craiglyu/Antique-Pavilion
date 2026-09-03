@@ -436,11 +436,15 @@
             overflow: visible;
             filter: drop-shadow(0 2px 3px rgba(83, 62, 24, 0.08));
         }
-        /* CHANGE HERO-STILL: 如意雲保留一次性 draw-in 與雙獸合攏入場，移除 16s 呼吸循環
-           （0.8px 位移在 16 秒內看不見）。 */
+        /* CHANGE HERO-STILL: 霧改靜態；如意雲呼吸循環依 Craig 2026-09-03 指示保留（品牌儀式感）。 */
         .ruyi-cloud-group {
             transform-box: fill-box;
             transform-origin: center;
+            animation: ruyiCloudBreathe 16s 3s ease-in-out infinite;
+        }
+        @keyframes ruyiCloudBreathe {
+            0%, 100% { opacity: 0.88; transform: translateY(0); }
+            50%      { opacity: 1; transform: translateY(-0.8px); }
         }
         .ruyi-stroke {
             fill: none;
